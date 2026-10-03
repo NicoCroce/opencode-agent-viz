@@ -1,4 +1,17 @@
 export * from './ui';
-export * from './Molecules';
 export * from './Layout';
 export * from './Organisms';
+// Molecules wrappers — re-exported selectively to avoid duplication
+export { Button } from './Molecules/Button';
+export { Text } from './Molecules/Text';
+export { Title } from './Molecules/Title';
+export { Spinner } from './Molecules/Spinner';
+export { EmptyScreenError } from './Molecules/EmptyScreenError';
+export { EmptyScreenFilter } from './Molecules/EmptyScreenFilter';
+export { EmptyState } from './Molecules/EmptyState';
+export { Modal } from './Molecules/Modal';
+export { Select } from './Molecules/Select';
+export { Input } from './Molecules/Input';
+export { Link } from './Molecules/Link';
+export { List } from './Molecules/List';
+export * from './Molecules/AlertDialog';

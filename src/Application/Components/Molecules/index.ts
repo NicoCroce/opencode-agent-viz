@@ -12,5 +12,4 @@ export * from './Link';
 export * from './List';
 export * from './Alert';
 export * from './Checkbox';
-export * from './DatePicker';
 export * from './AlertDialog';

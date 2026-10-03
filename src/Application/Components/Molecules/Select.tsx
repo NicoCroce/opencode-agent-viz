@@ -1,4 +1,4 @@
-import { uuid } from '@app/Application/Helpers';
+import { v4 as uuid } from 'uuid';
 import {
   Select as SelectLib,
   SelectContent,

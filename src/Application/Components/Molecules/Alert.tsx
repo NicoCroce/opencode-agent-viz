@@ -11,7 +11,7 @@ import {
   AlertDescription,
 } from '@app/Application/Components/ui/alert';
 import { cn } from '@/Application/lib/utils';
-import { Container } from '../../Layout';
+import { Container } from '@app/Application/Components/Layout';
 
 const alertVariants = cva(
   'relative w-full rounded-lg border px-4 py-3 text-sm',

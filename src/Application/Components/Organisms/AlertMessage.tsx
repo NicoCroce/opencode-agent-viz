@@ -8,7 +8,7 @@ import {
   faMagnifyingGlass,
   IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
-import { Button } from '../../Molecules/Button';
+import { Button } from '@app/Application/Components/Molecules/Button';
 import { cn } from '@/Application/lib/utils';
 import { Container } from '../..';
 
