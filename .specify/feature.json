@@ -1,0 +1,6 @@
+{
+  "feature_key": "opencode-agent-viz",
+  "name": "OpenCode Agent Viz",
+  "description": "Real-time visualization of multi-agent executions",
+  "version": "0.0.0"
+}
