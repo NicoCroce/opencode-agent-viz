@@ -8,6 +8,8 @@
 - **skills/** — Skills locales del proyecto (heredadas de gestDoc)
   - front-ddd-generator, code-reviewer, dev-logger, etc.
 - **templates/speckit/** — Plantillas para Spec-kit (specify, plan, tasks)
+- **plugins/** — Plugins locales (se cargan automáticamente)
+  - `selectable-questions.ts` — Fuerza el uso del tool `question` en vez de menús de texto plano
 - **scripts/bash/** — Scripts de utilidad (timeout, etc.)
 
 ## Configuración
@@ -15,7 +17,7 @@
 Ver `opencode.json`:
 - Instructions cargadas automáticamente
 - Temperaturas por agente (specify/tasks = 0.1, plan = 0.3)
-- Plugins: ninguno por ahora
+- Plugins: `plugins/` se cargan automáticamente; sus tipos vienen de `@opencode/plugin` (ver `.opencode/package.json`)
 
 ## Uso
 

@@ -35,6 +35,22 @@
   --height-control: 2.6rem;
   --height-control-2x: calc(var(--height-control) * 2);
   --width-control: var(--height-control);
+
+  /* Dark / Flat design tokens (plan.md → Design Direction) */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-surface-0: hsl(var(--surface-0));
+  --color-surface-1: hsl(var(--surface-1));
+  --color-surface-2: hsl(var(--surface-2));
+
+  --color-status-running: hsl(var(--status-running));
+  --color-status-waiting: hsl(var(--status-waiting));
+  --color-status-done: hsl(var(--status-done));
+  --color-status-error: hsl(var(--status-error));
+  --color-status-idle: hsl(var(--status-idle));
+
+  --radius-flat: 4px;
 }
 
 @layer base {
@@ -91,6 +107,16 @@
     --chart-3: 350 80% 72%;
     --chart-4: 351 83% 82%;
     --chart-5: 352 83% 91%;
+
+    /* Dark / Flat surfaces + status LEDs */
+    --surface-0: 220 24% 5%;
+    --surface-1: 218 22% 8%;
+    --surface-2: 215 21% 11%;
+    --status-running: 199 89% 60%;
+    --status-waiting: 38 92% 55%;
+    --status-done: 140 55% 47%;
+    --status-error: 0 84% 60%;
+    --status-idle: 220 9% 46%;
   }
 }
 
@@ -105,6 +131,24 @@
 
 html {
   font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
 }
 
 html,

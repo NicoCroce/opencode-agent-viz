@@ -13,6 +13,17 @@ const ignores = {
     'dist/**',
     'node_modules/**',
     'pnpm-lock.yaml/**',
+    '.opencode/**',
+    '.specify/**',
+    '.agents/**',
+    '.atl/**',
+    'specs/**',
+    'scripts/**',
+    'eslint.config.js',
+    'postcss.config.js',
+    'tailwind.config.js',
+    'vite.config.ts',
+    'vitest.config.ts',
   ],
 };
 
@@ -42,7 +53,11 @@ export default [
   {
     files: ['**/*.{js,mjs,cjs,ts,jsx,tsx}'],
     languageOptions: {
-      parserOptions: { ecmaFeatures: { jsx: true } },
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
+        projectService: true,
+        tsconfigRootDir: process.cwd(),
+      },
       globals: globals.browser,
     },
   },

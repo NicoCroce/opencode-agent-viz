@@ -1,0 +1,15 @@
+{"type":"server.connected","properties":{}}
+{"type":"session.created","properties":{"info":{"id":"ses_root","projectID":"proj","directory":"/repo","title":"develop","version":"1.0.0","time":{"created":1000,"updated":1000}}}}
+{"type":"message.updated","properties":{"info":{"id":"msg_root_1","sessionID":"ses_root","role":"user","time":{"created":1010},"agent":"develop","model":{"providerID":"opencode","modelID":"deepseek-v4"}}}}
+{"type":"message.updated","properties":{"info":{"id":"msg_root_2","sessionID":"ses_root","role":"assistant","time":{"created":1020,"completed":1520},"parentID":"msg_root_1","modelID":"deepseek-v4","providerID":"opencode","mode":"primary","path":{"cwd":"/repo","root":"/repo"},"cost":0.0123,"tokens":{"input":1200,"output":300,"reasoning":120,"cache":{"read":400,"write":50}}}}}
+{"type":"message.part.updated","properties":{"part":{"id":"part_tool_1","sessionID":"ses_root","messageID":"msg_root_2","type":"tool","callID":"call_1","tool":"task","state":{"status":"completed","input":{"subagent_type":"explore"},"output":"ok","title":"explore","metadata":{},"time":{"start":1030,"end":1200}}}}}
+{"type":"session.created","properties":{"info":{"id":"ses_child","projectID":"proj","directory":"/repo","parentID":"ses_root","title":"explore","version":"1.0.0","time":{"created":1210,"updated":1210}}}}
+{"type":"session.status","properties":{"sessionID":"ses_child","status":{"type":"busy"}}}
+{"type":"message.updated","properties":{"info":{"id":"msg_child_1","sessionID":"ses_child","role":"user","time":{"created":1220},"agent":"explore","model":{"providerID":"opencode","modelID":"deepseek-v4"}}}}
+{"type":"message.updated","properties":{"info":{"id":"msg_child_2","sessionID":"ses_child","role":"assistant","time":{"created":1230,"completed":1400},"parentID":"msg_child_1","modelID":"deepseek-v4","providerID":"opencode","mode":"subagent","path":{"cwd":"/repo","root":"/repo"},"cost":0.004,"tokens":{"input":800,"output":120,"reasoning":30,"cache":{"read":100,"write":10}}}}}
+{"type":"message.part.updated","properties":{"part":{"id":"part_retry_1","sessionID":"ses_child","messageID":"msg_child_2","type":"retry","attempt":2,"error":{"name":"APIError","data":{"message":"rate limited","isRetryable":true}},"time":{"created":1260}}}}
+{"type":"todo.updated","properties":{"sessionID":"ses_root","todos":[{"content":"Implement graph","status":"in_progress","priority":"high","id":"todo_1"}]}}
+{"type":"permission.updated","properties":{"id":"perm_1","type":"bash","sessionID":"ses_root","messageID":"msg_root_2","title":"Run tests","metadata":{},"time":{"created":1300}}}
+{"type":"session.status","properties":{"sessionID":"ses_child","status":{"type":"idle"}}}
+{"type":"permission.replied","properties":{"sessionID":"ses_root","permissionID":"perm_1","response":"always"}}
+{"type":"session.idle","properties":{"sessionID":"ses_root"}}

@@ -15,3 +15,6 @@ export { Input } from './Molecules/Input';
 export { Link } from './Molecules/Link';
 export { List } from './Molecules/List';
 export * from './Molecules/AlertDialog';
+export { Metric } from './Molecules/Metric';
+export { StatusDot } from './Molecules/StatusDot';
+export { DurationBar } from './Molecules/DurationBar';

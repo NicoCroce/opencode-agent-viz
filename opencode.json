@@ -6,7 +6,6 @@
     ".opencode/instructions/app.instructions.md",
     ".opencode/instructions/memory.instructions.md"
   ],
-  "plugin": [],
   "agent": {
     "develop": {
       "temperature": 0.1

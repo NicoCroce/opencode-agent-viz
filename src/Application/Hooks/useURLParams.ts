@@ -41,7 +41,9 @@ export const useURLParams = <TParams extends Record<string, string | number>>(
       });
 
       if (baseURL) {
-        navigate(`${baseURL}?${updatedParams.toString()}`, { replace: true });
+        void navigate(`${baseURL}?${updatedParams.toString()}`, {
+          replace: true,
+        });
       } else {
         setSearchParams(updatedParams, { replace: true });
       }
@@ -75,7 +77,7 @@ export const useURLParams = <TParams extends Record<string, string | number>>(
   // Función para limpiar todos los parámetros
   const clearParams = useCallback(() => {
     if (baseURL) {
-      navigate(baseURL, { replace: true });
+      void navigate(baseURL, { replace: true });
     } else {
       setSearchParams({}, { replace: true });
     }
