@@ -1,0 +1,30 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "name": "opencode-agent-viz",
+  "description": "Real-time visualization of multi-agent executions in OpenCode",
+  "instructions": [
+    ".opencode/instructions/app.instructions.md",
+    ".opencode/instructions/memory.instructions.md"
+  ],
+  "plugin": [],
+  "agent": {
+    "develop": {
+      "temperature": 0.1
+    },
+    "speckit-specify": {
+      "temperature": 0.1
+    },
+    "speckit-clarify": {
+      "temperature": 0.1
+    },
+    "speckit-plan": {
+      "temperature": 0.3
+    },
+    "speckit-tasks": {
+      "temperature": 0.1
+    },
+    "speckit-analyze": {
+      "temperature": 0.1
+    }
+  }
+}
