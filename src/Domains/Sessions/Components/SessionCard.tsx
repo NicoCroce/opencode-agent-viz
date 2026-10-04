@@ -1,5 +1,6 @@
 import { cn } from '@app/Application/lib/utils';
 import { StatusDot } from '@app/Application/Components';
+import { formatTimeRange } from '@app/Application/Helpers';
 import { toNodeStatus } from '@app/Domains/Graph/lib/nodeStatus';
 import type { TSessionStatus } from '../Session.entity';
 import type { TRootSessionItem } from '../Hooks/useRootSessions';
@@ -10,12 +11,6 @@ interface SessionCardProps {
   selected: boolean;
   onSelect: (id: string) => void;
 }
-
-const formatTime = (ms: number): string =>
-  new Date(ms).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 
 export const SessionCard = ({
   item,
@@ -29,6 +24,11 @@ export const SessionCard = ({
     hasActivity: true,
     hasPermission: false,
     hasError: false,
+  });
+  const timeRange = formatTimeRange({
+    startedAt: session.time.created,
+    endedAt: session.time.updated,
+    isRunning: status?.type === 'busy' || status?.type === 'retry',
   });
 
   return (
@@ -45,15 +45,15 @@ export const SessionCard = ({
     >
       <span className="flex items-center gap-2">
         <StatusDot status={nodeStatus} />
-        <span className="truncate font-mono text-xs text-muted-foreground">
-          {agentName ?? 'agent'}
+        <span className="truncate text-sm font-medium text-foreground">
+          {session.title}
         </span>
         <span className="ml-auto font-mono text-[11px] tabular-nums text-muted-foreground">
-          {formatTime(session.time.updated)}
+          {timeRange}
         </span>
       </span>
-      <span className="truncate text-sm font-medium text-foreground">
-        {session.title}
+      <span className="truncate text-xs text-muted-foreground">
+        {agentName ?? 'agente no disponible'}
       </span>
     </button>
   );

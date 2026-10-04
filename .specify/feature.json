@@ -3,5 +3,5 @@
   "name": "OpenCode Agent Viz",
   "description": "Real-time visualization of multi-agent executions",
   "version": "0.0.0",
-  "feature_directory": "specs/001-agent-viz-observability"
+  "feature_directory": "specs/002-viz-ux-refinements"
 }

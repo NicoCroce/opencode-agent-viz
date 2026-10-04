@@ -57,6 +57,17 @@ export interface TGraphModel {
   edges: TGraphEdge[];
 }
 
+/**
+ * Tamaño/posición elegidos por el usuario para un nodo, por sesión.
+ * Estado de vista local: sin persistencia ni escritura en el servidor.
+ */
+export interface TNodeSizeOverride {
+  width: number;
+  height: number;
+  x?: number;
+  y?: number;
+}
+
 export const EMPTY_TOKEN_USAGE: TTokenUsage = {
   input: null,
   output: null,

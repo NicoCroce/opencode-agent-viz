@@ -6,7 +6,7 @@ import {
   EmptyScreenError,
   EmptyState,
 } from '@app/Application/Components';
-import { useDevice } from '@app/Application/Hooks';
+import { useDevice, useEscapeKey } from '@app/Application/Hooks';
 import {
   SessionList,
   SessionListSkeleton,
@@ -17,7 +17,10 @@ import {
 import { InspectorPanel } from '@app/Domains/Inspector';
 import {
   AgentGraph,
+  buildChain,
   GraphSkeleton,
+  layoutChain,
+  useChainSelection,
   useFollowMode,
   useGraphModel,
 } from '@app/Domains/Graph';
@@ -40,15 +43,27 @@ export const WorkspacePage = () => {
   const follow = useFollowMode(graph.activeNodeId);
 
   const rootId = id ?? null;
-  const [selection, setSelection] = useState<{
-    rootId: string | null;
-    nodeId: string;
-  } | null>(null);
-  const selectedNodeId =
-    selection && selection.rootId === rootId ? selection.nodeId : rootId;
+  const {
+    selectedNodeId,
+    inspectedNodeId,
+    isChainMode,
+    selectNode,
+    clearSelection,
+  } = useChainSelection(rootId);
 
-  const selectedNode =
-    graph.graph.nodes.find((node) => node.id === selectedNodeId) ?? null;
+  useEscapeKey(clearSelection, isChainMode);
+
+  // Proyección de la vista: grafo completo o cadena raíz→nodo en una fila.
+  // Si el nodo seleccionado ya no existe, `buildChain` devuelve `null` y se
+  // conserva el grafo completo (sin estado vacío inconsistente).
+  const displayGraph = useMemo(() => {
+    if (!isChainMode || !selectedNodeId) return graph.graph;
+    const chain = buildChain(graph.graph, selectedNodeId);
+    return chain ? layoutChain(chain) : graph.graph;
+  }, [isChainMode, selectedNodeId, graph.graph]);
+
+  const inspectedNode =
+    graph.graph.nodes.find((node) => node.id === inspectedNodeId) ?? null;
 
   const rail = (
     <Container space="small" className="p-3">
@@ -102,17 +117,20 @@ export const WorkspacePage = () => {
           />
         ) : (
           <AgentGraph
-            graph={graph.graph}
+            graph={displayGraph}
             selectedNodeId={selectedNodeId}
-            onSelectNode={(nodeId) => setSelection({ rootId, nodeId })}
+            isChainMode={isChainMode}
+            onSelectNode={selectNode}
+            onClearSelection={clearSelection}
             followNodeId={follow.followNodeId}
+            resetKey={rootId}
           />
         )}
       </Container>
     </Container>
   );
 
-  const inspectorPane = <InspectorPanel node={selectedNode} />;
+  const inspectorPane = <InspectorPanel node={inspectedNode} />;
 
   if (isMobile) {
     return (

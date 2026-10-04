@@ -1,6 +1,11 @@
-import { Container } from '@app/Application/Components';
+import { Button, Container } from '@app/Application/Components';
 import { formatDuration } from '@app/Application/Helpers';
+import {
+  faChevronDown,
+  faChevronUp,
+} from '@fortawesome/free-solid-svg-icons';
 import type { TToolHistoryEntry } from '../Inspector.entity';
+import { useToolHistory } from '../Hooks/useToolHistory';
 
 interface ToolHistoryProps {
   tools: TToolHistoryEntry[];
@@ -14,6 +19,9 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export const ToolHistory = ({ tools }: ToolHistoryProps) => {
+  const { visibleTools, hiddenCount, canExpand, isExpanded, toggle } =
+    useToolHistory(tools);
+
   if (tools.length === 0) {
     return (
       <Container space="small">
@@ -33,7 +41,7 @@ export const ToolHistory = ({ tools }: ToolHistoryProps) => {
         Herramientas
       </span>
       <Container space="small">
-        {tools.map((tool, index) => (
+        {visibleTools.map((tool, index) => (
           <div
             key={`${tool.name}-${index}`}
             className="flex items-center justify-between gap-2 border-b border-border py-1 last:border-b-0"
@@ -56,6 +64,19 @@ export const ToolHistory = ({ tools }: ToolHistoryProps) => {
           </div>
         ))}
       </Container>
+
+      {canExpand ? (
+        <Button
+          variant="outline"
+          showIcon
+          icon={isExpanded ? faChevronUp : faChevronDown}
+          aria-expanded={isExpanded}
+          onClick={toggle}
+          className="h-auto! justify-start! gap-1! border-0! bg-transparent! p-0! font-mono text-[11px] text-muted-foreground shadow-none! hover:bg-transparent! hover:text-foreground"
+        >
+          {isExpanded ? 'Ver menos' : `Ver ${hiddenCount} más`}
+        </Button>
+      ) : null}
     </Container>
   );
 };
