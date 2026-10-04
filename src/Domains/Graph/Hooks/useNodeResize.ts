@@ -38,10 +38,14 @@ export const useNodeResize = (resetKey: string | null): UseNodeResizeResult => {
   const overrides = state.resetKey === resetKey ? state.overrides : {};
 
   const onNodesChange = useCallback<OnNodesChange<TGraphNode>>((changes) => {
-    setState((current) => ({
-      ...current,
-      overrides: reduceNodeOverrides(current.overrides, changes),
-    }));
+    setState((current) => {
+      const overrides = reduceNodeOverrides(current.overrides, changes);
+      // Sin overrides nuevos no se toca el estado: devolver `current` evita un
+      // re-render que rebuildaría `nodes` y haría que React Flow descarte las
+      // dimensiones medidas (los nodos quedarían `visibility: hidden`).
+      if (overrides === current.overrides) return current;
+      return { ...current, overrides };
+    });
   }, []);
 
   return { overrides, onNodesChange };

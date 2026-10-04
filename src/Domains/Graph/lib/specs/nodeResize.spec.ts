@@ -99,6 +99,19 @@ describe('reduceNodeOverrides', () => {
     expect(result).toEqual(overrides);
   });
 
+  it('returns the same reference when there is nothing to apply', () => {
+    const overrides: TOverrides = { n1: override() };
+
+    const result = reduceNodeOverrides(overrides, [
+      measurement('n1', 200, 96),
+      select('n1', true),
+    ]);
+
+    // Misma referencia: permite al hook evitar un re-render que haría que
+    // React Flow descarte las dimensiones medidas y oculte los nodos.
+    expect(result).toBe(overrides);
+  });
+
   it('still stores the final dimensions emitted at the end of a user resize', () => {
     const result = reduceNodeOverrides({}, [dimensions('n1', 340, 220, false)]);
 

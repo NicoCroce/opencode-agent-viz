@@ -47,7 +47,12 @@ export const reduceNodeOverrides = (
   overrides: Record<string, TNodeSizeOverride>,
   changes: NodeChange<TGraphNode>[],
 ): Record<string, TNodeSizeOverride> => {
-  const next: Record<string, TNodeSizeOverride> = { ...overrides };
+  // Se clona de forma perezosa: si ningún cambio es relevante devolvemos la
+  // MISMA referencia. Así el llamador puede evitar un re-render, lo que importa
+  // porque React Flow emite una `NodeDimensionChange` de medición automática en
+  // cada montaje: un re-render con nodos nuevos haría que React Flow descarte
+  // las dimensiones medidas y oculte los nodos (`visibility: hidden`).
+  let next = overrides;
 
   for (const change of changes) {
     if (
@@ -55,6 +60,7 @@ export const reduceNodeOverrides = (
       change.dimensions &&
       isUserResize(change)
     ) {
+      if (next === overrides) next = { ...overrides };
       const prev = next[change.id];
       next[change.id] = {
         ...prev,
@@ -68,6 +74,7 @@ export const reduceNodeOverrides = (
     if (change.type === 'position' && change.position) {
       const prev = next[change.id];
       if (!prev) continue;
+      if (next === overrides) next = { ...overrides };
       next[change.id] = {
         ...prev,
         x: change.position.x,

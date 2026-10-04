@@ -46,6 +46,27 @@ describe('useNodeResize', () => {
     expect(result.current.overrides).toEqual({});
   });
 
+  it('keeps the overrides reference on automatic measurement (no re-render)', () => {
+    const { result } = renderHook(() => useNodeResize('session-a'));
+
+    const before = result.current.overrides;
+
+    act(() =>
+      result.current.onNodesChange([
+        {
+          id: 'node-1',
+          type: 'dimensions',
+          dimensions: { width: 220, height: 96 },
+        },
+      ]),
+    );
+
+    // React Flow mide los nodos en el montaje y emite una `dimensions` sin
+    // `resizing`: no debe producir un re-render (FR-002), o los nodos quedarían
+    // ocultos al resetearse sus dimensiones medidas.
+    expect(result.current.overrides).toBe(before);
+  });
+
   it('clears overrides when resetKey changes', () => {
     const { result, rerender } = renderHook(
       ({ resetKey }: { resetKey: string | null }) => useNodeResize(resetKey),
