@@ -11,6 +11,7 @@ import type {
 
 const data: TGraphNodeData = {
   sessionId: 'root',
+  title: 'Tarea de prueba',
   createdAt: null,
   updatedAt: null,
   agentName: 'develop',
@@ -77,10 +78,10 @@ const renderWithNode = (
 ) => renderAgentNode({ data: withData({ status, metrics: withMetrics(metrics) }) });
 
 describe('AgentNode', () => {
-  it('renders the agent, model, metrics and current tool', () => {
+  it('renders the session title, metrics and current tool', () => {
     renderAgentNode();
-    expect(screen.getByText('develop')).toBeInTheDocument();
-    expect(screen.getByText('opencode/deepseek')).toBeInTheDocument();
+    expect(screen.getByText('Tarea de prueba')).toBeInTheDocument();
+    expect(screen.queryByText('develop')).not.toBeInTheDocument();
     expect(screen.getByText('1m 23s')).toBeInTheDocument();
     expect(screen.getByText('bash')).toBeInTheDocument();
   });
@@ -102,6 +103,59 @@ describe('AgentNode', () => {
     const ancestor = renderAgentNode({ selected: false });
     expect(ancestor.container.querySelector('.border-accent')).toBeNull();
     expect(ancestor.container.querySelector('.border-border')).toBeInTheDocument();
+  });
+});
+
+describe('AgentNode — título', () => {
+  it('shows the session title instead of the agent name', () => {
+    renderAgentNode();
+    expect(screen.getByText('Tarea de prueba')).toBeInTheDocument();
+    expect(screen.queryByText('develop')).not.toBeInTheDocument();
+  });
+
+  it('falls back to the agent name when the session has no title', () => {
+    renderAgentNode({ data: withData({ title: null }) });
+    expect(screen.getByText('develop')).toBeInTheDocument();
+  });
+});
+
+describe('AgentNode — modelo', () => {
+  it('renders provider/model and the variant tag', () => {
+    renderAgentNode({
+      data: withData({
+        model: {
+          providerID: 'opencode-go',
+          id: 'deepseek-v4.1-flash',
+          variant: 'high',
+        },
+      }),
+    });
+
+    expect(
+      screen.getByText('opencode-go/deepseek-v4.1-flash'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('high')).toBeInTheDocument();
+  });
+
+  it('hides the model line when the node has no model', () => {
+    renderAgentNode({ data: withData({ model: null }) });
+    expect(screen.queryByText('opencode/deepseek')).not.toBeInTheDocument();
+  });
+});
+
+describe('AgentNode — consumo resumido', () => {
+  it('renders tokens, cost and duration on one line', () => {
+    renderAgentNode();
+    expect(screen.getByText('1.5k tok')).toBeInTheDocument();
+    expect(screen.getByText('$0.0200')).toBeInTheDocument();
+    expect(screen.getByText('1m 23s')).toBeInTheDocument();
+  });
+
+  it('shows the model line but not the labeled sections', () => {
+    renderAgentNode();
+    expect(screen.queryByText('Modelo')).not.toBeInTheDocument();
+    expect(screen.queryByText('Consumo')).not.toBeInTheDocument();
+    expect(screen.getByText('opencode/deepseek')).toBeInTheDocument();
   });
 });
 

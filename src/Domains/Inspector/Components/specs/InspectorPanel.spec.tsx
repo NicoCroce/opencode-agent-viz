@@ -10,6 +10,7 @@ const node: TGraphNode = {
   position: { x: 0, y: 0 },
   data: {
     sessionId: 'root',
+    title: 'Tarea raíz',
     createdAt: null,
     updatedAt: null,
     agentName: 'develop',
@@ -43,18 +44,44 @@ describe('InspectorPanel', () => {
 
   it('renders sections and empty states for a selected node', () => {
     renderWithProviders(<InspectorPanel node={node} />);
+    expect(screen.getByText('Tarea raíz')).toBeInTheDocument();
     expect(screen.getByText('develop')).toBeInTheDocument();
+    expect(screen.getByText('Modelo')).toBeInTheDocument();
+    expect(screen.getByText('Nombre')).toBeInTheDocument();
+    expect(screen.getByText('opencode/deepseek')).toBeInTheDocument();
+    expect(screen.getAllByText('Razonamiento').length).toBeGreaterThan(0);
     expect(screen.getByText('Métricas')).toBeInTheDocument();
     expect(screen.getByText('Sin tareas de subagente.')).toBeInTheDocument();
     expect(screen.getByText('Sin errores.')).toBeInTheDocument();
     expect(screen.getByText('ejecutado varias veces')).toBeInTheDocument();
   });
 
+  it('shows the model variant as "Razonamiento"', () => {
+    const withVariant: TGraphNode = {
+      ...node,
+      data: {
+        ...node.data,
+        model: {
+          providerID: 'opencode-go',
+          id: 'deepseek-v4.1-flash',
+          variant: 'high',
+        },
+      },
+    };
+
+    renderWithProviders(<InspectorPanel node={withVariant} />);
+
+    expect(
+      screen.getByText('opencode-go/deepseek-v4.1-flash'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('high')).toBeInTheDocument();
+  });
+
   it('lists the peers that ran in parallel with the node', () => {
     const peer: TGraphNode = {
       ...node,
       id: 'peer',
-      data: { ...node.data, agentName: 'explore' },
+      data: { ...node.data, title: 'Tarea hermana' },
     };
 
     renderWithProviders(
@@ -62,7 +89,7 @@ describe('InspectorPanel', () => {
     );
 
     expect(screen.getByText('En paralelo (2)')).toBeInTheDocument();
-    expect(screen.getByText('explore')).toBeInTheDocument();
+    expect(screen.getByText('Tarea hermana')).toBeInTheDocument();
   });
 
   it('does not render the parallel section when there are no peers', () => {

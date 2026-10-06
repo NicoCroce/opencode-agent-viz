@@ -10,12 +10,12 @@ import {
 import '@xyflow/react/dist/style.css';
 import { cn } from '@app/Application/lib/utils';
 import {
-  NODE_CARD_HEIGHT,
   NODE_HEIGHT,
   NODE_WIDTH,
   topologySignature,
 } from '../lib/layoutGraph';
 import { buildViewNodes } from '../lib/buildViewNodes';
+import { cardHeight } from '../lib/cardHeight';
 import type { TGraphModel, TGraphNode, TNodeStatus } from '../Graph.entity';
 import {
   EXECUTION_ROW_PAD,
@@ -130,12 +130,13 @@ export const AgentGraph = ({
     return active ? (plan.levelByNode[active.id] ?? null) : null;
   }, [graph.nodes, plan]);
 
-  // Alto real de cada nodo: el override de resize o el alto base de la card,
-  // para que el carril acompañe al nodo.
+  // Alto real de cada nodo: el override de resize o el alto calculado según el
+  // contenido (`cardHeight`), para que el carril acompañe al card.
   const heightByNode = useMemo(() => {
     const map: Record<string, number> = {};
     for (const node of graph.nodes) {
-      map[node.id] = overrides[node.id]?.height ?? NODE_CARD_HEIGHT;
+      map[node.id] =
+        overrides[node.id]?.height ?? cardHeight(node.data, NODE_WIDTH);
     }
     return map;
   }, [graph.nodes, overrides]);

@@ -80,6 +80,7 @@ export const buildGraph = ({
       position: { x: 0, y: 0 },
       data: {
         sessionId: session.id,
+        title: session.title ?? null,
         createdAt: session.time.created,
         updatedAt: session.time.idle ?? session.time.updated,
         agentName,

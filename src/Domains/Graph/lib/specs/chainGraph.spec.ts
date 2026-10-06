@@ -12,6 +12,7 @@ const node = (id: string): TGraphNode => ({
   position: { x: 0, y: 0 },
   data: {
     sessionId: id,
+    title: id,
     createdAt: null,
     updatedAt: null,
     agentName: id,

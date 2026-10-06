@@ -49,6 +49,8 @@ export interface TNodeParallelism {
 
 export interface TGraphNodeData extends Record<string, unknown> {
   sessionId: string;
+  /** Título de la tarea/sesión; reemplaza al agente en el nodo. */
+  title: string | null;
   /**
    * `SessionInfo.time.created`: instante de creación de la sesión. Es estable
    * (no depende de que los mensajes hayan cargado) y ordena los niveles de

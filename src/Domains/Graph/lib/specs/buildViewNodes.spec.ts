@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { TGraphNode, TNodeSizeOverride } from '../../Graph.entity';
 import { EMPTY_METRICS } from '../../Graph.entity';
 import { NODE_WIDTH } from '../layoutGraph';
+import { cardHeight } from '../cardHeight';
 import { buildViewNodes } from '../buildViewNodes';
 
 // Contrato: `specs/002-viz-ux-refinements/contracts/graph-view-contract.md`
@@ -13,6 +14,7 @@ const node = (id: string, x = 0, y = 0): TGraphNode => ({
   position: { x, y },
   data: {
     sessionId: id,
+    title: id,
     createdAt: null,
     updatedAt: null,
     agentName: id,
@@ -40,7 +42,7 @@ describe('buildViewNodes', () => {
 
     expect(view.position).toEqual({ x: 40, y: 80 });
     expect(view.width).toBe(NODE_WIDTH);
-    expect(view.height).toBeUndefined();
+    expect(view.height).toBe(cardHeight(node('root').data, NODE_WIDTH));
     expect(view.selected).toBe(false);
   });
 

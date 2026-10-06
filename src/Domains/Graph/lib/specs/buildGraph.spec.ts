@@ -22,6 +22,7 @@ const session = (id: string, parentID?: string): SessionInfo => ({
   agent: parentID === undefined ? 'develop' : 'explore',
   cost: 0,
   tokens: emptyTokens,
+  title: `tarea ${id}`,
   time: { created: 1, updated: 2 },
   location: { directory: '/repo' },
 });
@@ -73,7 +74,17 @@ describe('buildGraph', () => {
     expect(graph.nodes.find((n) => n.id === 'child')?.data.agentName).toBe(
       'explore',
     );
+    expect(graph.nodes.find((n) => n.id === 'child')?.data.title).toBe(
+      'tarea child',
+    );
     expect(graph.nodes.find((n) => n.id === 'root')?.data.isRoot).toBe(true);
+  });
+
+  it('leaves title null when the session reports no title', () => {
+    const graph = buildGraph(
+      baseInput({ sessions: [{ ...session('root'), title: undefined }] }),
+    );
+    expect(graph.nodes[0].data.title).toBeNull();
   });
 
   it('handles a session with no subagents as a single root node', () => {

@@ -1,5 +1,6 @@
 import { Container, StatusDot } from '@app/Application/Components';
 import { folderName } from '@app/Application/Helpers';
+import { UNAVAILABLE } from '@app/Application/Helpers/formatDuration';
 import type { TGraphNode, TNodeStatus } from '@app/Domains/Graph/Graph.entity';
 import { useInspectorData } from '../Hooks/useInspectorData';
 import { LoopBadge } from './LoopBadge';
@@ -23,6 +24,16 @@ const STATUS_LABEL: Record<TNodeStatus, string> = {
   idle: 'Inactivo',
 };
 
+/** Fila etiqueta/valor: etiqueta a la izquierda, dato monoespaciado a la derecha. */
+const DetailRow = ({ label, value }: { label: string; value: string }) => (
+  <div className="flex min-w-0 items-baseline justify-between gap-3">
+    <span className="shrink-0 text-[11px] text-muted-foreground">{label}</span>
+    <span className="min-w-0 break-all text-right font-mono text-[11px] text-foreground">
+      {value}
+    </span>
+  </div>
+);
+
 export const InspectorPanel = ({
   node,
   parallelPeers = [],
@@ -43,23 +54,20 @@ export const InspectorPanel = ({
     );
   }
 
-  const { metrics } = node.data;
+  const { metrics, model } = node.data;
 
   return (
     <Container space="medium" className="overflow-auto p-4">
+      {/* Identidad: título completo (sin cortar) + agente + estado + directorio */}
       <Container space="small">
-        <span className="flex items-center gap-2">
-          <StatusDot status={node.data.status} />
-          <span className="font-mono text-sm font-semibold text-foreground">
-            {node.data.agentName}
-          </span>
+        <span className="text-sm font-semibold leading-snug text-foreground">
+          {node.data.title ?? node.data.agentName}
         </span>
-        <span className="font-mono text-[11px] text-muted-foreground">
-          {node.data.model
-            ? `${node.data.model.providerID}/${node.data.model.id}`
-            : 'modelo no disponible'}
-          {' · '}
-          {STATUS_LABEL[node.data.status]}
+        <span className="flex min-w-0 items-center gap-2 font-mono text-[11px] text-muted-foreground">
+          <StatusDot status={node.data.status} />
+          <span className="text-foreground">{node.data.agentName}</span>
+          <span aria-hidden>·</span>
+          <span>{STATUS_LABEL[node.data.status]}</span>
         </span>
         <span
           className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground"
@@ -74,10 +82,24 @@ export const InspectorPanel = ({
           <span className="min-w-0 truncate font-mono text-[11px] text-muted-foreground">
             Invocado por{' '}
             <span className="text-foreground">
-              {invokedBy.data.agentName}
+              {invokedBy.data.title ?? invokedBy.data.agentName}
             </span>
           </span>
         ) : null}
+      </Container>
+
+      {/* Modelo: nombre y razonamiento (variante del modelo) */}
+      <Container space="small">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          Modelo
+        </span>
+        <Container space="small">
+          <DetailRow
+            label="Nombre"
+            value={model ? `${model.providerID}/${model.id}` : UNAVAILABLE}
+          />
+          <DetailRow label="Razonamiento" value={model?.variant ?? UNAVAILABLE} />
+        </Container>
       </Container>
 
       <MetricsSection metrics={metrics} />
@@ -92,7 +114,7 @@ export const InspectorPanel = ({
               <div key={peer.id} className="flex min-w-0 items-center gap-2">
                 <StatusDot status={peer.data.status} />
                 <span className="min-w-0 truncate font-mono text-xs text-foreground">
-                  {peer.data.agentName}
+                  {peer.data.title ?? peer.data.agentName}
                 </span>
               </div>
             ))}
