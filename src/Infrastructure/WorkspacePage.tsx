@@ -17,9 +17,7 @@ import {
 import { InspectorPanel } from '@app/Domains/Inspector';
 import {
   AgentGraph,
-  buildChain,
   GraphSkeleton,
-  layoutChain,
   useChainSelection,
   useFollowMode,
   useGraphModel,
@@ -43,29 +41,16 @@ export const WorkspacePage = () => {
   const follow = useFollowMode(graph.activeNodeId);
 
   const rootId = id ?? null;
-  const {
-    selectedNodeId,
-    inspectedNodeId,
-    isChainMode,
-    selectNode,
-    clearSelection,
-  } = useChainSelection(rootId);
+  const { selectedNodeId, inspectedNodeId, selectNode, clearSelection } =
+    useChainSelection(rootId);
 
-  useEscapeKey(clearSelection, isChainMode);
-
-  // Proyección de la vista: grafo completo o cadena raíz→nodo en una fila.
-  // Si el nodo seleccionado ya no existe, `buildChain` devuelve `null` y se
-  // conserva el grafo completo (sin estado vacío inconsistente).
-  const displayGraph = useMemo(() => {
-    if (!isChainMode || !selectedNodeId) return graph.graph;
-    const chain = buildChain(graph.graph, selectedNodeId);
-    return chain ? layoutChain(chain) : graph.graph;
-  }, [isChainMode, selectedNodeId, graph.graph]);
+  useEscapeKey(clearSelection, selectedNodeId !== null);
 
   const inspectedNode =
     graph.graph.nodes.find((node) => node.id === inspectedNodeId) ?? null;
 
-  // Agentes que corrieron en paralelo con el nodo inspeccionado.
+  // Agentes que corrieron en paralelo con el nodo inspeccionado. Se calcula
+  // sobre el grafo completo (no sobre la proyección de cadena).
   const inspectedPeers = useMemo(() => {
     if (!inspectedNodeId) return [];
     const group = graph.parallelGroups.find((candidate) =>
@@ -77,6 +62,16 @@ export const WorkspacePage = () => {
       .map((nodeId) => graph.graph.nodes.find((node) => node.id === nodeId))
       .filter((node): node is NonNullable<typeof node> => Boolean(node));
   }, [graph.parallelGroups, graph.graph.nodes, inspectedNodeId]);
+
+  // Relación padre → hijo: quién invocó al nodo inspeccionado.
+  const inspectedParent = useMemo(() => {
+    if (!inspectedNodeId) return null;
+    const edge = graph.graph.edges.find(
+      (candidate) => candidate.target === inspectedNodeId,
+    );
+    if (!edge) return null;
+    return graph.graph.nodes.find((node) => node.id === edge.source) ?? null;
+  }, [graph.graph.edges, graph.graph.nodes, inspectedNodeId]);
 
   const rail = (
     <Container space="small" className="p-3">
@@ -130,9 +125,9 @@ export const WorkspacePage = () => {
           />
         ) : (
           <AgentGraph
-            graph={displayGraph}
+            graph={graph.graph}
+            plan={graph.executionPlan}
             selectedNodeId={selectedNodeId}
-            isChainMode={isChainMode}
             onSelectNode={selectNode}
             onClearSelection={clearSelection}
             followNodeId={follow.followNodeId}
@@ -144,7 +139,11 @@ export const WorkspacePage = () => {
   );
 
   const inspectorPane = (
-    <InspectorPanel node={inspectedNode} parallelPeers={inspectedPeers} />
+    <InspectorPanel
+      node={inspectedNode}
+      parallelPeers={inspectedPeers}
+      invokedBy={inspectedParent}
+    />
   );
 
   if (isMobile) {

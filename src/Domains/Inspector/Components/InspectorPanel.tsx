@@ -11,6 +11,8 @@ interface InspectorPanelProps {
   node: TGraphNode | null;
   /** Otros agentes del mismo grupo de paralelismo que `node`. */
   parallelPeers?: TGraphNode[];
+  /** Nodo que invocó a `node` (relación padre → hijo), si lo hay. */
+  invokedBy?: TGraphNode | null;
 }
 
 const STATUS_LABEL: Record<TNodeStatus, string> = {
@@ -21,7 +23,11 @@ const STATUS_LABEL: Record<TNodeStatus, string> = {
   idle: 'Inactivo',
 };
 
-export const InspectorPanel = ({ node, parallelPeers = [] }: InspectorPanelProps) => {
+export const InspectorPanel = ({
+  node,
+  parallelPeers = [],
+  invokedBy = null,
+}: InspectorPanelProps) => {
   const { tools, errors, tasks, resources } = useInspectorData(node);
 
   if (!node) {
@@ -64,6 +70,14 @@ export const InspectorPanel = ({ node, parallelPeers = [] }: InspectorPanelProps
           </span>
           <span className="truncate">{folderName(node.data.directory)}</span>
         </span>
+        {invokedBy ? (
+          <span className="min-w-0 truncate font-mono text-[11px] text-muted-foreground">
+            Invocado por{' '}
+            <span className="text-foreground">
+              {invokedBy.data.agentName}
+            </span>
+          </span>
+        ) : null}
       </Container>
 
       <MetricsSection metrics={metrics} />

@@ -5,6 +5,7 @@ export * from './Hooks';
 export * from './lib/buildGraph';
 export * from './lib/buildViewNodes';
 export * from './lib/chainGraph';
+export * from './lib/executionLevels';
 export * from './lib/layoutGraph';
 export * from './lib/nodeResize';
 export * from './lib/parallelism';

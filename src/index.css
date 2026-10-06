@@ -146,6 +146,20 @@ html {
   }
 }
 
+/* Entrada de los carriles de ejecución del grafo. */
+@keyframes lane-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.lane-in {
+  animation: lane-in 260ms ease-out both;
+}
+
 :focus-visible {
   outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;

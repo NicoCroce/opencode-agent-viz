@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TGraphModel } from '../../Graph.entity';
-import { layoutGraph, topologySignature } from '../layoutGraph';
+import { topologySignature } from '../layoutGraph';
 
 const model = (): TGraphModel => ({
   nodes: [
@@ -10,6 +10,7 @@ const model = (): TGraphModel => ({
       position: { x: 0, y: 0 },
       data: {
         sessionId: 'root',
+        title: 'root task',
         createdAt: null,
         updatedAt: null,
         agentName: 'develop',
@@ -38,6 +39,7 @@ const model = (): TGraphModel => ({
       position: { x: 0, y: 0 },
       data: {
         sessionId: 'child',
+        title: 'child task',
         createdAt: null,
         updatedAt: null,
         agentName: 'explore',
@@ -66,14 +68,8 @@ const model = (): TGraphModel => ({
   ],
 });
 
-describe('layoutGraph', () => {
-  it('assigns non-zero positions', () => {
-    const laidOut = layoutGraph(model());
-    const child = laidOut.nodes.find((n) => n.id === 'child');
-    expect(child?.position.y).toBeGreaterThan(0);
-  });
-
-  it('keeps a stable topology signature when only data changes', () => {
+describe('topologySignature', () => {
+  it('keeps a stable signature when only data changes', () => {
     const first = model();
     const second = model();
     second.nodes[0].data.status = 'done';

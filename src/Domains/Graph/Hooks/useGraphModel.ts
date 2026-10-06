@@ -6,7 +6,12 @@ import { queryKeys } from '../../queryKeys';
 import { useGetAgents, useGetSessions, useGetSessionStatus } from '../../Sessions/Sessions.service';
 import { buildGraph } from '../lib/buildGraph';
 import type { TSessionMessageLike } from '../lib/deriveMetrics';
-import { layoutGraph, topologySignature } from '../lib/layoutGraph';
+import {
+  deriveExecutionLevels,
+  layoutExecution,
+  type TExecutionPlan,
+} from '../lib/executionLevels';
+import { topologySignature } from '../lib/layoutGraph';
 import { deriveParallelGroups } from '../lib/parallelism';
 import type {
   TGraphModel,
@@ -47,6 +52,8 @@ export interface UseGraphModelResult {
   graph: TGraphModel;
   /** Grupos de agentes que corrieron en paralelo en el subárbol visible. */
   parallelGroups: TParallelGroup[];
+  /** Niveles de ejecución (tandas) y posiciones derivadas, para el layout. */
+  executionPlan: TExecutionPlan;
   activeNodeId: string | null;
   isLoading: boolean;
   isError: boolean;
@@ -123,8 +130,18 @@ export const useGraphModel = (
   );
 
   const signature = topologySignature(model);
+
+  // El plan de ejecución (niveles por tanda) se memoiza por firma de topología:
+  // el orden temporal de las sesiones ya creadas es estable, así que no hace
+  // falta recalcularlo en cada tick (Principio VII).
+  const executionPlan = useMemo(
+    () => deriveExecutionLevels(model, now),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [signature],
+  );
+
   const positions = useMemo(() => {
-    const laidOut = layoutGraph(model);
+    const laidOut = layoutExecution(model, executionPlan);
     return Object.fromEntries(
       laidOut.nodes.map((node) => [node.id, node.position]),
     );
@@ -170,6 +187,7 @@ export const useGraphModel = (
   return {
     graph,
     parallelGroups,
+    executionPlan,
     activeNodeId,
     // Mientras no sepamos el directorio del proyecto no podemos cargar nada.
     isLoading: Boolean(sessionId) && !directory ? true : sessionsQuery.isLoading,
