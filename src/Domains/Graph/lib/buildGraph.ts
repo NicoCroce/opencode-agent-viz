@@ -80,6 +80,8 @@ export const buildGraph = ({
       position: { x: 0, y: 0 },
       data: {
         sessionId: session.id,
+        createdAt: session.time.created,
+        updatedAt: session.time.idle ?? session.time.updated,
         agentName,
         directory: session.location.directory,
         model: resolveModel(sessionMessages) ?? agent?.model ?? null,
@@ -92,6 +94,9 @@ export const buildGraph = ({
         metrics,
         isRoot: session.parentID === undefined,
         currentTool: currentTool(sessionMessages),
+        // El paralelismo es una propiedad de la vista (depende del subárbol y
+        // de `now`); se completa en `useGraphModel`.
+        parallel: null,
       },
     };
   });

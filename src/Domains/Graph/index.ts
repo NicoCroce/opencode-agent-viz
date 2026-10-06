@@ -7,6 +7,7 @@ export * from './lib/buildViewNodes';
 export * from './lib/chainGraph';
 export * from './lib/layoutGraph';
 export * from './lib/nodeResize';
+export * from './lib/parallelism';
 export * from './lib/deriveMetrics';
 export * from './lib/eventReducer';
 export * from './lib/nodeStatus';

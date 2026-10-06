@@ -13,6 +13,8 @@ const node = (id: string, x = 0, y = 0): TGraphNode => ({
   position: { x, y },
   data: {
     sessionId: id,
+    createdAt: null,
+    updatedAt: null,
     agentName: id,
     directory: '/repo',
     model: null,
@@ -20,6 +22,7 @@ const node = (id: string, x = 0, y = 0): TGraphNode => ({
     metrics: { ...EMPTY_METRICS },
     isRoot: id === 'root',
     currentTool: null,
+    parallel: null,
   },
 });
 

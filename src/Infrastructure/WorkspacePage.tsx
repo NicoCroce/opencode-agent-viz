@@ -65,6 +65,19 @@ export const WorkspacePage = () => {
   const inspectedNode =
     graph.graph.nodes.find((node) => node.id === inspectedNodeId) ?? null;
 
+  // Agentes que corrieron en paralelo con el nodo inspeccionado.
+  const inspectedPeers = useMemo(() => {
+    if (!inspectedNodeId) return [];
+    const group = graph.parallelGroups.find((candidate) =>
+      candidate.nodeIds.includes(inspectedNodeId),
+    );
+    if (!group) return [];
+    return group.nodeIds
+      .filter((nodeId) => nodeId !== inspectedNodeId)
+      .map((nodeId) => graph.graph.nodes.find((node) => node.id === nodeId))
+      .filter((node): node is NonNullable<typeof node> => Boolean(node));
+  }, [graph.parallelGroups, graph.graph.nodes, inspectedNodeId]);
+
   const rail = (
     <Container space="small" className="p-3">
       <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -130,7 +143,9 @@ export const WorkspacePage = () => {
     </Container>
   );
 
-  const inspectorPane = <InspectorPanel node={inspectedNode} />;
+  const inspectorPane = (
+    <InspectorPanel node={inspectedNode} parallelPeers={inspectedPeers} />
+  );
 
   if (isMobile) {
     return (

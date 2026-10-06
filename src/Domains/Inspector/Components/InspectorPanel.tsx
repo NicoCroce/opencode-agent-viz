@@ -9,6 +9,8 @@ import { ToolHistory } from './ToolHistory';
 
 interface InspectorPanelProps {
   node: TGraphNode | null;
+  /** Otros agentes del mismo grupo de paralelismo que `node`. */
+  parallelPeers?: TGraphNode[];
 }
 
 const STATUS_LABEL: Record<TNodeStatus, string> = {
@@ -19,7 +21,7 @@ const STATUS_LABEL: Record<TNodeStatus, string> = {
   idle: 'Inactivo',
 };
 
-export const InspectorPanel = ({ node }: InspectorPanelProps) => {
+export const InspectorPanel = ({ node, parallelPeers = [] }: InspectorPanelProps) => {
   const { tools, errors, tasks, resources } = useInspectorData(node);
 
   if (!node) {
@@ -65,6 +67,24 @@ export const InspectorPanel = ({ node }: InspectorPanelProps) => {
       </Container>
 
       <MetricsSection metrics={metrics} />
+
+      {parallelPeers.length > 0 ? (
+        <Container space="small">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            En paralelo ({parallelPeers.length + 1})
+          </span>
+          <Container space="small">
+            {parallelPeers.map((peer) => (
+              <div key={peer.id} className="flex min-w-0 items-center gap-2">
+                <StatusDot status={peer.data.status} />
+                <span className="min-w-0 truncate font-mono text-xs text-foreground">
+                  {peer.data.agentName}
+                </span>
+              </div>
+            ))}
+          </Container>
+        </Container>
+      ) : null}
 
       {metrics.hasLoop ? (
         <LoopBadge

@@ -10,6 +10,8 @@ const node: TGraphNode = {
   position: { x: 0, y: 0 },
   data: {
     sessionId: 'root',
+    createdAt: null,
+    updatedAt: null,
     agentName: 'develop',
     directory: '/repo/opencode-agent-viz',
     model: { providerID: 'opencode', id: 'deepseek' },
@@ -27,6 +29,7 @@ const node: TGraphNode = {
     },
     isRoot: true,
     currentTool: null,
+    parallel: null,
   },
 };
 
@@ -45,5 +48,25 @@ describe('InspectorPanel', () => {
     expect(screen.getByText('Sin tareas de subagente.')).toBeInTheDocument();
     expect(screen.getByText('Sin errores.')).toBeInTheDocument();
     expect(screen.getByText('ejecutado varias veces')).toBeInTheDocument();
+  });
+
+  it('lists the peers that ran in parallel with the node', () => {
+    const peer: TGraphNode = {
+      ...node,
+      id: 'peer',
+      data: { ...node.data, agentName: 'explore' },
+    };
+
+    renderWithProviders(
+      <InspectorPanel node={node} parallelPeers={[peer]} />,
+    );
+
+    expect(screen.getByText('En paralelo (2)')).toBeInTheDocument();
+    expect(screen.getByText('explore')).toBeInTheDocument();
+  });
+
+  it('does not render the parallel section when there are no peers', () => {
+    renderWithProviders(<InspectorPanel node={node} />);
+    expect(screen.queryByText(/En paralelo/)).not.toBeInTheDocument();
   });
 });

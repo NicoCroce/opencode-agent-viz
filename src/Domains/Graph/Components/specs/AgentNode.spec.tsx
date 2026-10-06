@@ -11,6 +11,8 @@ import type {
 
 const data: TGraphNodeData = {
   sessionId: 'root',
+  createdAt: null,
+  updatedAt: null,
   agentName: 'develop',
   directory: '/repo/opencode-agent-viz',
   model: { providerID: 'opencode', id: 'deepseek' },
@@ -28,6 +30,7 @@ const data: TGraphNodeData = {
   },
   isRoot: true,
   currentTool: { name: 'bash', state: 'running' },
+  parallel: null,
 };
 
 const props = {
@@ -157,5 +160,33 @@ describe('AgentNode — rango horario (US5)', () => {
     expect(
       screen.getByText('no disponible – no disponible'),
     ).toBeInTheDocument();
+  });
+});
+
+describe('AgentNode — paralelismo', () => {
+  it('renders the parallel badge with the group size', () => {
+    renderAgentNode({
+      data: withData({ parallel: { groupId: 'g', size: 4 } }),
+    });
+
+    const badge = screen.getByText('∥4');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveAttribute(
+      'title',
+      '4 agentes ejecutados en paralelo',
+    );
+    expect(badge).toHaveClass('text-foreground');
+  });
+
+  it('does not render a badge when the node ran alone', () => {
+    renderAgentNode({ data: withData({ parallel: null }) });
+    expect(screen.queryByText(/∥/)).not.toBeInTheDocument();
+  });
+
+  it('does not render a badge for a group of one', () => {
+    renderAgentNode({
+      data: withData({ parallel: { groupId: 'g', size: 1 } }),
+    });
+    expect(screen.queryByText(/∥/)).not.toBeInTheDocument();
   });
 });

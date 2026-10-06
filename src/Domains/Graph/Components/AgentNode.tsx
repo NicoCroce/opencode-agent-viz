@@ -55,6 +55,7 @@ const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) =>
     endedAt: metrics.endedAt,
     isRunning,
   });
+  const parallel = data.parallel && data.parallel.size > 1 ? data.parallel : null;
 
   return (
     <div
@@ -84,8 +85,18 @@ const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) =>
           <span className="min-w-0 truncate font-mono text-xs font-semibold text-foreground">
             {data.agentName}
           </span>
-          <span className="shrink-0 text-[11px] text-muted-foreground">
-            {STATUS_LABEL[data.status]}
+          <span className="flex shrink-0 items-center gap-1">
+            {parallel ? (
+              <span
+                className="rounded-flat border border-foreground/40 px-1 font-mono text-[10px] leading-4 text-foreground"
+                title={`${parallel.size} agentes ejecutados en paralelo`}
+              >
+                {`∥${parallel.size}`}
+              </span>
+            ) : null}
+            <span className="text-[11px] text-muted-foreground">
+              {STATUS_LABEL[data.status]}
+            </span>
           </span>
         </div>
 

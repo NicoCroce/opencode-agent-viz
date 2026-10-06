@@ -10,6 +10,8 @@ const model = (): TGraphModel => ({
       position: { x: 0, y: 0 },
       data: {
         sessionId: 'root',
+        createdAt: null,
+        updatedAt: null,
         agentName: 'develop',
         directory: '/repo',
         model: null,
@@ -27,6 +29,7 @@ const model = (): TGraphModel => ({
         },
         isRoot: true,
         currentTool: null,
+        parallel: null,
       },
     },
     {
@@ -35,6 +38,8 @@ const model = (): TGraphModel => ({
       position: { x: 0, y: 0 },
       data: {
         sessionId: 'child',
+        createdAt: null,
+        updatedAt: null,
         agentName: 'explore',
         directory: '/repo',
         model: null,
@@ -52,6 +57,7 @@ const model = (): TGraphModel => ({
         },
         isRoot: false,
         currentTool: null,
+        parallel: null,
       },
     },
   ],

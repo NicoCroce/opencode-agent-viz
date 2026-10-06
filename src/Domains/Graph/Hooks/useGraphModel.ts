@@ -7,7 +7,12 @@ import { useGetAgents, useGetSessions, useGetSessionStatus } from '../../Session
 import { buildGraph } from '../lib/buildGraph';
 import type { TSessionMessageLike } from '../lib/deriveMetrics';
 import { layoutGraph, topologySignature } from '../lib/layoutGraph';
-import type { TGraphModel } from '../Graph.entity';
+import { deriveParallelGroups } from '../lib/parallelism';
+import type {
+  TGraphModel,
+  TNodeParallelism,
+  TParallelGroup,
+} from '../Graph.entity';
 import { useNow } from './useNow';
 
 export const filterSubtree = (
@@ -40,6 +45,8 @@ export const filterSubtree = (
 
 export interface UseGraphModelResult {
   graph: TGraphModel;
+  /** Grupos de agentes que corrieron en paralelo en el subárbol visible. */
+  parallelGroups: TParallelGroup[];
   activeNodeId: string | null;
   isLoading: boolean;
   isError: boolean;
@@ -126,15 +133,33 @@ export const useGraphModel = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature]);
 
+  // Los grupos de paralelismo dependen del tiempo de ejecución, así que se
+  // recalculan con `now` (igual que las métricas), sin tocar el layout.
+  const parallelGroups = useMemo(
+    () => deriveParallelGroups(model, now),
+    [model, now],
+  );
+
+  const parallelByNode = useMemo(() => {
+    const map: Record<string, TNodeParallelism> = {};
+    for (const group of parallelGroups) {
+      for (const id of group.nodeIds) {
+        map[id] = { groupId: group.id, size: group.nodeIds.length };
+      }
+    }
+    return map;
+  }, [parallelGroups]);
+
   const graph = useMemo<TGraphModel>(
     () => ({
       edges: model.edges,
       nodes: model.nodes.map((node) => ({
         ...node,
         position: positions[node.id] ?? node.position,
+        data: { ...node.data, parallel: parallelByNode[node.id] ?? null },
       })),
     }),
-    [model, positions],
+    [model, positions, parallelByNode],
   );
 
   const activeNodeId =
@@ -144,6 +169,7 @@ export const useGraphModel = (
 
   return {
     graph,
+    parallelGroups,
     activeNodeId,
     // Mientras no sepamos el directorio del proyecto no podemos cargar nada.
     isLoading: Boolean(sessionId) && !directory ? true : sessionsQuery.isLoading,

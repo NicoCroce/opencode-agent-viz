@@ -27,8 +27,40 @@ export interface TCurrentTool {
   state: string;
 }
 
+/**
+ * Grupo de agentes que corrieron en paralelo (intervalos de ejecución
+ * solapados entre hermanos). Ver `lib/parallelism.ts`.
+ */
+export interface TParallelGroup {
+  id: string;
+  /** Sesión padre común a todos los miembros; `null` para raíces. */
+  parentId: string | null;
+  nodeIds: string[];
+  startedAt: number;
+  endedAt: number;
+}
+
+/** Resumen de paralelismo de un nodo, listo para la vista. */
+export interface TNodeParallelism {
+  groupId: string;
+  /** Cantidad de agentes del grupo, incluido este nodo. */
+  size: number;
+}
+
 export interface TGraphNodeData extends Record<string, unknown> {
   sessionId: string;
+  /**
+   * `SessionInfo.time.created`: instante de creación de la sesión. Es estable
+   * (no depende de que los mensajes hayan cargado) y ordena los niveles de
+   * ejecución y las columnas dentro de un nivel.
+   */
+  createdAt: number | null;
+  /**
+   * `SessionInfo.time.idle ?? time.updated`: fin del intervalo de ejecución,
+   * estable y disponible apenas cargan las sesiones. Cierra la detección de
+   * solapamientos sin depender de los mensajes.
+   */
+  updatedAt: number | null;
   agentName: string;
   directory: string;
   model: ModelRef | null;
@@ -36,6 +68,8 @@ export interface TGraphNodeData extends Record<string, unknown> {
   metrics: TNodeMetrics;
   isRoot: boolean;
   currentTool: TCurrentTool | null;
+  /** `null` cuando el nodo no corrió en paralelo con ningún hermano. */
+  parallel: TNodeParallelism | null;
 }
 
 export interface TGraphNode {
