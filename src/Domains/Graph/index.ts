@@ -7,6 +7,7 @@ export * from './lib/buildViewNodes';
 export * from './lib/chainGraph';
 export * from './lib/executionLevels';
 export * from './lib/layoutGraph';
+export * from './lib/lineage';
 export * from './lib/nodeResize';
 export * from './lib/parallelism';
 export * from './lib/deriveMetrics';

@@ -22,6 +22,7 @@ import {
   executionRailX,
   type TExecutionPlan,
 } from '../lib/executionLevels';
+import { deriveLineage } from '../lib/lineage';
 import { useNodeResize } from '../Hooks/useNodeResize';
 import { AgentNode } from './AgentNode';
 import { InvocationEdge } from './InvocationEdge';
@@ -120,6 +121,12 @@ export const AgentGraph = ({
 
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
+  // Linaje del nodo seleccionado: ancestros + descendientes. `null` = sin foco.
+  const lineage = useMemo(
+    () => deriveLineage(graph, selectedNodeId),
+    [graph, selectedNodeId],
+  );
+
   const statusByLevel = useMemo(() => {
     const map: Record<number, TNodeStatus> = {};
     for (const node of graph.nodes) {
@@ -174,6 +181,9 @@ export const AgentGraph = ({
           x: node.position.x,
           y: (rowLayout.top[level] ?? 0) + EXECUTION_ROW_PAD,
         },
+        style: lineage
+          ? { ...node.style, opacity: lineage.nodeIds.has(node.id) ? 1 : 0.15 }
+          : node.style,
       };
     });
 
@@ -191,22 +201,33 @@ export const AgentGraph = ({
     rowLayout,
     statusByLevel,
     activeLevel,
+    lineage,
   ]);
 
   const edges = useMemo<Edge[]>(
     () =>
       graph.edges.map((edge) => {
         const column = plan.columnByNode[edge.source] ?? 0;
-        // Reposo: gris visible (no `--border`, que se pierde en dark). El hover
-        // traza las relaciones directas del nodo.
+        // Reposo: gris visible (no `--border`, que se pierde en dark).
         let color = 'hsl(var(--muted-foreground))';
         let strokeWidth = 1.25;
         let opacity = 0.45;
 
-        if (
+        if (lineage) {
+          // Foco activo: se refuerzan las aristas del linaje; el resto se atenúa
+          // pero sigue visible (la estructura no se borra).
+          if (lineage.edgeIds.has(edge.id)) {
+            color = 'hsl(var(--foreground))';
+            strokeWidth = 2;
+            opacity = 1;
+          } else {
+            opacity = 0.15;
+          }
+        } else if (
           hoveredNodeId !== null &&
           (edge.source === hoveredNodeId || edge.target === hoveredNodeId)
         ) {
+          // Sin foco: el hover traza las relaciones directas del nodo.
           color = 'hsl(var(--foreground))';
           strokeWidth = 1.6;
           opacity = 1;
@@ -227,7 +248,7 @@ export const AgentGraph = ({
           },
         };
       }),
-    [graph.edges, plan.columnByNode, hoveredNodeId],
+    [graph.edges, plan.columnByNode, lineage, hoveredNodeId],
   );
 
   return (
