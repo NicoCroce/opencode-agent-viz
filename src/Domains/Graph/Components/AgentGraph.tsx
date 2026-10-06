@@ -1,29 +1,30 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Background,
   Controls,
+  MarkerType,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
+  type Edge,
+  type EdgeTypes,
   type NodeTypes,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { cn } from '@app/Application/lib/utils';
-import {
-  NODE_HEIGHT,
-  NODE_WIDTH,
-  topologySignature,
-} from '../lib/layoutGraph';
-import { buildViewNodes } from '../lib/buildViewNodes';
+import { NODE_HEIGHT, NODE_WIDTH, topologySignature } from '../lib/layoutGraph';
 import { cardHeight } from '../lib/cardHeight';
+import { buildViewNodes } from '../lib/buildViewNodes';
 import type { TGraphModel, TGraphNode, TNodeStatus } from '../Graph.entity';
 import {
   EXECUTION_ROW_PAD,
   deriveRowLayout,
+  executionRailX,
   type TExecutionPlan,
 } from '../lib/executionLevels';
 import { useNodeResize } from '../Hooks/useNodeResize';
 import { AgentNode } from './AgentNode';
+import { InvocationEdge } from './InvocationEdge';
 import {
   ExecutionLanes,
   GUTTER_NODE_TYPE,
@@ -35,6 +36,10 @@ const nodeTypes = {
   agent: AgentNode,
   [GUTTER_NODE_TYPE]: GutterNode,
 } as unknown as NodeTypes;
+
+const edgeTypes = {
+  invocation: InvocationEdge,
+} as unknown as EdgeTypes;
 
 const STATUS_RANK: Record<TNodeStatus, number> = {
   idle: 0,
@@ -113,6 +118,8 @@ export const AgentGraph = ({
   const { overrides, onNodesChange } = useNodeResize(resetKey);
   const signature = useMemo(() => topologySignature(graph), [graph]);
 
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+
   const statusByLevel = useMemo(() => {
     const map: Record<number, TNodeStatus> = {};
     for (const node of graph.nodes) {
@@ -156,7 +163,8 @@ export const AgentGraph = ({
     );
 
     // El carril manda el `y` (alto acumulado); el `x` sigue siendo el de la
-    // columna dentro del nivel.
+    // columna dentro del nivel. Fuera del linaje, el nodo se atenúa (no se
+    // oculta: la estructura del grafo se conserva).
     const positioned = agentNodes.map((node) => {
       const level = plan.levelByNode[node.id];
       if (level === undefined) return node;
@@ -185,13 +193,51 @@ export const AgentGraph = ({
     activeLevel,
   ]);
 
+  const edges = useMemo<Edge[]>(
+    () =>
+      graph.edges.map((edge) => {
+        const column = plan.columnByNode[edge.source] ?? 0;
+        // Reposo: gris visible (no `--border`, que se pierde en dark). El hover
+        // traza las relaciones directas del nodo.
+        let color = 'hsl(var(--muted-foreground))';
+        let strokeWidth = 1.25;
+        let opacity = 0.45;
+
+        if (
+          hoveredNodeId !== null &&
+          (edge.source === hoveredNodeId || edge.target === hoveredNodeId)
+        ) {
+          color = 'hsl(var(--foreground))';
+          strokeWidth = 1.6;
+          opacity = 1;
+        }
+
+        return {
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          type: 'invocation',
+          data: { railX: executionRailX(column) },
+          style: { stroke: color, strokeWidth, opacity },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            width: 12,
+            height: 12,
+            color,
+          },
+        };
+      }),
+    [graph.edges, plan.columnByNode, hoveredNodeId],
+  );
+
   return (
     <ReactFlowProvider>
       <div className={cn('h-full w-full', className)}>
         <ReactFlow
           nodes={nodes}
-          edges={graph.edges}
+          edges={edges}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           colorMode="dark"
           fitView
           minZoom={0.2}
@@ -203,6 +249,11 @@ export const AgentGraph = ({
             if (String(node.type) === GUTTER_NODE_TYPE) return;
             onSelectNode(node.id);
           }}
+          onNodeMouseEnter={(_, node) => {
+            if (String(node.type) === GUTTER_NODE_TYPE) return;
+            setHoveredNodeId(node.id);
+          }}
+          onNodeMouseLeave={() => setHoveredNodeId(null)}
           onPaneClick={onClearSelection}
         >
           <Background gap={16} color="#232A34" />
