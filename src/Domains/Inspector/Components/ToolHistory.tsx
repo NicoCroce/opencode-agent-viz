@@ -5,7 +5,6 @@ import {
   faChevronUp,
 } from '@fortawesome/free-solid-svg-icons';
 import type { TToolHistoryEntry } from '../Inspector.entity';
-import { medianToolDurations } from '../lib/medianToolDurations';
 import { useToolHistory } from '../Hooks/useToolHistory';
 
 interface ToolHistoryProps {
@@ -18,10 +17,6 @@ const STATUS_COLOR: Record<string, string> = {
   error: 'text-status-error',
   pending: 'text-status-idle',
 };
-
-/** Etiqueta de recuento de llamadas, singular/plural. */
-const callsLabel = (calls: number): string =>
-  `${calls} ${calls === 1 ? 'llamada' : 'llamadas'}`;
 
 export const ToolHistory = ({ tools }: ToolHistoryProps) => {
   const { visibleTools, hiddenCount, canExpand, isExpanded, toggle } =
@@ -39,8 +34,6 @@ export const ToolHistory = ({ tools }: ToolHistoryProps) => {
       </Container>
     );
   }
-
-  const stats = medianToolDurations(tools);
 
   return (
     <Container space="small">
@@ -84,29 +77,6 @@ export const ToolHistory = ({ tools }: ToolHistoryProps) => {
           {isExpanded ? 'Ver menos' : `Ver ${hiddenCount} más`}
         </Button>
       ) : null}
-
-      <Container space="small" data-testid="tool-history-stats">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-          Duración mediana por herramienta
-        </span>
-        <Container space="small">
-          {stats.map((stat) => (
-            <div
-              key={stat.name}
-              className="flex items-center justify-between gap-2 border-b border-border py-1 last:border-b-0"
-            >
-              <span className="truncate font-mono text-xs text-foreground">
-                {`${stat.name} · ${callsLabel(stat.calls)}`}
-              </span>
-              <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
-                {stat.medianMs === null
-                  ? 'no disponible'
-                  : formatDuration(stat.medianMs)}
-              </span>
-            </div>
-          ))}
-        </Container>
-      </Container>
     </Container>
   );
 };

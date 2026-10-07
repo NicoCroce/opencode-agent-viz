@@ -4,17 +4,20 @@ import {
   StatusDot,
 } from '@app/Application/Components';
 import { NODE_STATUS_LABEL, folderName } from '@app/Application/Helpers';
-import { UNAVAILABLE } from '@app/Application/Helpers/formatDuration';
 import { useReasoningVisibility } from '@app/Application/Hooks';
 import type { TGraphNode } from '@app/Domains/Graph/Graph.entity';
 import { useInspectorData } from '../Hooks/useInspectorData';
+import { AdvancedSection } from './AdvancedSection';
 import { AnswersSection } from './AnswersSection';
+import { ErrorsSection } from './ErrorsSection';
 import { FileChanges } from './FileChanges';
-import { LoopBadge } from './LoopBadge';
 import { MetricsSection } from './MetricsSection';
+import { ModelSection } from './ModelSection';
 import { QuestionsSection } from './QuestionsSection';
 import { ResourceList } from './ResourceList';
+import { SubagentsSection } from './SubagentsSection';
 import { ToolHistory } from './ToolHistory';
+import { ToolStats } from './ToolStats';
 
 interface InspectorPanelProps {
   node: TGraphNode | null;
@@ -39,16 +42,16 @@ interface InspectorPanelProps {
   onOpenHistory?: () => void;
 }
 
-/** Fila etiqueta/valor: etiqueta a la izquierda, dato monoespaciado a la derecha. */
-const DetailRow = ({ label, value }: { label: string; value: string }) => (
-  <div className="flex min-w-0 items-baseline justify-between gap-3">
-    <span className="shrink-0 text-[11px] text-muted-foreground">{label}</span>
-    <span className="min-w-0 break-all text-right font-mono text-[11px] text-foreground">
-      {value}
-    </span>
-  </div>
-);
-
+/**
+ * Orquestador puro del panel de detalles (FR-001/SC-003).
+ *
+ * Con un nodo seleccionado compone las secciones de datos en el orden exacto
+ * identidad → Modelo → Métricas → Recursos → Duración mediana por herramienta →
+ * Subagentes → Archivos. El contenido técnico (Herramientas, Respuestas,
+ * Preguntas y permisos, Errores) se reintroduce dentro del desplegable
+ * "Avanzado" en US2 (FR-010..FR-015); el bloque `Subagentes` se compone con
+ * `SubagentsSection` (US3, FR-007/FR-008).
+ */
 export const InspectorPanel = ({
   node,
   parallelPeers = [],
@@ -123,123 +126,63 @@ export const InspectorPanel = ({
         ) : null}
       </Container>
 
-      {/* Respuestas y razonamiento del agente (FR-001/002/003) */}
-      <AnswersSection
-        entries={entries}
-        showReasoning={reasoningVisible}
-        onToggleReasoning={toggleReasoning}
-        onOpenHistory={onOpenHistory}
-        sessionId={node.data.sessionId}
-        renderCompactionContext={() => (
-          <CompactionContext
-            messages={context.messages}
-            isError={context.isError}
-            isLoading={context.isLoading}
-          />
-        )}
-      />
+      {/* Modelo: nombre y razonamiento (variante del modelo) (FR-003) */}
+      <ModelSection model={model} />
 
-      {/* Impacto del agente en el repositorio (FR-028..FR-030) */}
+      {/* Métricas: duración, costo, invocaciones, tokens y aviso de loop (FR-004) */}
+      <MetricsSection metrics={metrics} />
+
+      {/* Recursos configurados para el agente (FR-005) */}
+      <ResourceList resources={resources} />
+
+      {/* Duración mediana por herramienta (FR-006) */}
+      <ToolStats tools={tools} />
+
+      {/* Subagentes: tareas delegadas y agentes en paralelo (FR-007/FR-008) */}
+      <SubagentsSection tasks={tasks} parallelPeers={parallelPeers} />
+
+      {/* Impacto del agente en el repositorio (FR-009) */}
       <FileChanges
         changes={diff.changes}
         isError={diff.isError}
         isLoading={diff.isLoading}
       />
 
-      {/* Permisos, preguntas y cola (FR-031..FR-034) */}
-      <QuestionsSection
-        permissions={permissions.permissions}
-        questions={forms.questions}
-        queuedTurns={inbox.queuedTurns}
-        isError={forms.isError || permissions.isError || inbox.isError}
-        isLoading={forms.isLoading || permissions.isLoading || inbox.isLoading}
-      />
+      {/*
+        Contenido técnico agrupado bajo el desplegable "Avanzado" (FR-010..FR-015),
+        colapsado por defecto. Orden interno: Herramientas → Respuestas →
+        Preguntas y permisos → Errores (FR-011).
+      */}
+      <AdvancedSection>
+        <ToolHistory tools={tools} />
 
-      {/* Modelo: nombre y razonamiento (variante del modelo) */}
-      <Container space="small">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-          Modelo
-        </span>
-        <Container space="small">
-          <DetailRow
-            label="Nombre"
-            value={model ? `${model.providerID}/${model.id}` : UNAVAILABLE}
-          />
-          <DetailRow label="Razonamiento" value={model?.variant ?? UNAVAILABLE} />
-        </Container>
-      </Container>
-
-      <MetricsSection metrics={metrics} />
-
-      {parallelPeers.length > 0 ? (
-        <Container space="small">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            En paralelo ({parallelPeers.length + 1})
-          </span>
-          <Container space="small">
-            {parallelPeers.map((peer) => (
-              <div key={peer.id} className="flex min-w-0 items-center gap-2">
-                <StatusDot status={peer.data.status} />
-                <span className="min-w-0 truncate font-mono text-xs text-foreground">
-                  {peer.data.title ?? peer.data.agentName}
-                </span>
-              </div>
-            ))}
-          </Container>
-        </Container>
-      ) : null}
-
-      {metrics.hasLoop ? (
-        <LoopBadge
-          retryCount={metrics.retryCount}
-          evidence={metrics.loopEvidence}
+        <AnswersSection
+          entries={entries}
+          showReasoning={reasoningVisible}
+          onToggleReasoning={toggleReasoning}
+          onOpenHistory={onOpenHistory}
+          sessionId={node.data.sessionId}
+          renderCompactionContext={() => (
+            <CompactionContext
+              messages={context.messages}
+              isError={context.isError}
+              isLoading={context.isLoading}
+            />
+          )}
         />
-      ) : null}
 
-      <ResourceList resources={resources} />
+        <QuestionsSection
+          permissions={permissions.permissions}
+          questions={forms.questions}
+          queuedTurns={inbox.queuedTurns}
+          isError={forms.isError || permissions.isError || inbox.isError}
+          isLoading={
+            forms.isLoading || permissions.isLoading || inbox.isLoading
+          }
+        />
 
-      <ToolHistory tools={tools} />
-
-      <Container space="small">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-          Tareas del subagente
-        </span>
-        {tasks.length === 0 ? (
-          <p className="text-xs text-muted-foreground">
-            Sin tareas de subagente.
-          </p>
-        ) : (
-          <Container space="small">
-            {tasks.map((task) => (
-              <div key={task.id} className="flex items-center gap-2">
-                <span className="font-mono text-[11px] text-muted-foreground">
-                  {task.status}
-                </span>
-                <span className="truncate text-xs text-foreground">
-                  {task.description}
-                </span>
-              </div>
-            ))}
-          </Container>
-        )}
-      </Container>
-
-      <Container space="small">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-          Errores
-        </span>
-        {errors.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Sin errores.</p>
-        ) : (
-          <Container space="small">
-            {errors.map((error, index) => (
-              <p key={index} className="text-xs text-status-error">
-                {error.message}
-              </p>
-            ))}
-          </Container>
-        )}
-      </Container>
+        <ErrorsSection errors={errors} />
+      </AdvancedSection>
     </Container>
   );
 };

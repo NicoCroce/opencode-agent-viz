@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ToolHistory } from '../ToolHistory';
 import type { TToolHistoryEntry } from '../../Inspector.entity';
@@ -54,56 +54,5 @@ describe('ToolHistory', () => {
     expect(
       screen.getByRole('button', { name: /Ver 1 más/i }),
     ).toBeInTheDocument();
-  });
-
-  it('shows the median duration per tool alongside its call count', () => {
-    render(
-      <ToolHistory
-        tools={[
-          { name: 'read', status: 'completed', startedAt: 0, endedAt: 400 },
-          { name: 'read', status: 'completed', startedAt: 0, endedAt: 600 },
-          { name: 'bash', status: 'completed', startedAt: 0, endedAt: 100 },
-        ]}
-      />,
-    );
-
-    const stats = within(screen.getByTestId('tool-history-stats'));
-    expect(stats.getByText('read · 2 llamadas')).toBeInTheDocument();
-    expect(stats.getByText('500ms')).toBeInTheDocument();
-    expect(stats.getByText('bash · 1 llamada')).toBeInTheDocument();
-    expect(stats.getByText('100ms')).toBeInTheDocument();
-  });
-
-  it('shows "no disponible" when a tool has no timed executions', () => {
-    render(
-      <ToolHistory
-        tools={[
-          {
-            name: 'grep',
-            status: 'running',
-            startedAt: undefined,
-            endedAt: undefined,
-          },
-        ]}
-      />,
-    );
-
-    const stats = within(screen.getByTestId('tool-history-stats'));
-    expect(stats.getByText('grep · 1 llamada')).toBeInTheDocument();
-    expect(stats.getByText('no disponible')).toBeInTheDocument();
-  });
-
-  it('keeps the individual executions while showing the statistics', () => {
-    render(
-      <ToolHistory
-        tools={[
-          { name: 'read', status: 'completed', startedAt: 0, endedAt: 400 },
-          { name: 'read', status: 'error', startedAt: 0, endedAt: 600 },
-        ]}
-      />,
-    );
-
-    expect(screen.getAllByText('read')).toHaveLength(2);
-    expect(screen.getByText('read · 2 llamadas')).toBeInTheDocument();
   });
 });
