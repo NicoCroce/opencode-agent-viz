@@ -16,11 +16,12 @@ const session: SessionInfo = {
 const START = new Date(2024, 0, 15, 9, 5).getTime();
 const END = new Date(2024, 0, 15, 17, 42).getTime();
 
-const clock = (ms: number): string =>
-  new Date(ms).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+const pad = (value: number): string => String(value).padStart(2, '0');
+
+const stamp = (ms: number): string => {
+  const date = new Date(ms);
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
 
 // Los extremos del rango son requeridos por el SDK; se fuerzan a `null` para
 // cubrir la rama defensiva `"no disponible"` del helper (FR-016).
@@ -50,17 +51,20 @@ describe('SessionCard', () => {
     expect(screen.getByRole('img', { name: 'En curso' })).toBeInTheDocument();
   });
 
-  it('renders the title as the main line above the agent as the secondary line', () => {
+  it('stacks the title, then the date-time range, then the agent', () => {
     render(
       <SessionCard
-        item={{ session, agentName: 'develop' }}
+        item={{ session: sessionWithTime(START, END), agentName: 'develop' }}
+        status={{ type: 'idle' }}
         selected={false}
         onSelect={() => undefined}
       />,
     );
     const title = screen.getByText('Root session');
+    const range = screen.getByText(`${stamp(START)} – ${stamp(END)}`);
     const agent = screen.getByText('develop');
-    expect(isBefore(title, agent)).toBe(true);
+    expect(isBefore(title, range)).toBe(true);
+    expect(isBefore(range, agent)).toBe(true);
   });
 
   it('shows "agente no disponible" when the agent name is null', () => {
@@ -98,7 +102,7 @@ describe('SessionCard', () => {
       />,
     );
     expect(
-      screen.getByText(`${clock(START)} – ${clock(END)}`),
+      screen.getByText(`${stamp(START)} – ${stamp(END)}`),
     ).toBeInTheDocument();
   });
 
@@ -111,7 +115,7 @@ describe('SessionCard', () => {
       />,
     );
     expect(
-      screen.getByText(`${clock(START)} – ${clock(END)}`),
+      screen.getByText(`${stamp(START)} – ${stamp(END)}`),
     ).toBeInTheDocument();
   });
 
@@ -125,7 +129,7 @@ describe('SessionCard', () => {
       />,
     );
     expect(
-      screen.getByText(`${clock(START)} – en curso`),
+      screen.getByText(`${stamp(START)} – en curso`),
     ).toBeInTheDocument();
   });
 
@@ -144,7 +148,7 @@ describe('SessionCard', () => {
       />,
     );
     expect(
-      screen.getByText(`${clock(START)} – en curso`),
+      screen.getByText(`${stamp(START)} – en curso`),
     ).toBeInTheDocument();
   });
 
@@ -158,7 +162,7 @@ describe('SessionCard', () => {
       />,
     );
     expect(
-      screen.getByText(`${clock(START)} – no disponible`),
+      screen.getByText(`${stamp(START)} – no disponible`),
     ).toBeInTheDocument();
   });
 
@@ -172,7 +176,7 @@ describe('SessionCard', () => {
       />,
     );
     expect(
-      screen.getByText(`no disponible – ${clock(END)}`),
+      screen.getByText(`no disponible – ${stamp(END)}`),
     ).toBeInTheDocument();
   });
 });

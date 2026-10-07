@@ -1,10 +1,18 @@
-import { Container, StatusDot } from '@app/Application/Components';
-import { folderName } from '@app/Application/Helpers';
+import {
+  CompactionContext,
+  Container,
+  StatusDot,
+} from '@app/Application/Components';
+import { NODE_STATUS_LABEL, folderName } from '@app/Application/Helpers';
 import { UNAVAILABLE } from '@app/Application/Helpers/formatDuration';
-import type { TGraphNode, TNodeStatus } from '@app/Domains/Graph/Graph.entity';
+import { useReasoningVisibility } from '@app/Application/Hooks';
+import type { TGraphNode } from '@app/Domains/Graph/Graph.entity';
 import { useInspectorData } from '../Hooks/useInspectorData';
+import { AnswersSection } from './AnswersSection';
+import { FileChanges } from './FileChanges';
 import { LoopBadge } from './LoopBadge';
 import { MetricsSection } from './MetricsSection';
+import { QuestionsSection } from './QuestionsSection';
 import { ResourceList } from './ResourceList';
 import { ToolHistory } from './ToolHistory';
 
@@ -14,15 +22,22 @@ interface InspectorPanelProps {
   parallelPeers?: TGraphNode[];
   /** Nodo que invocó a `node` (relación padre → hijo), si lo hay. */
   invokedBy?: TGraphNode | null;
+  /**
+   * Visibilidad del razonamiento. Si se omite, el panel la gestiona localmente
+   * con `useReasoningVisibility`; US2 la controla desde `WorkspacePage` para
+   * que coincida con el overlay (contrato rich-text).
+   */
+  showReasoning?: boolean;
+  /** Alterna la visibilidad del razonamiento (FR-002). */
+  onToggleReasoning?: () => void;
+  /**
+   * Abre el histórico completo del agente (FR-008). Se reenvía a
+   * `AnswersSection`, cuyo botón "Ver histórico completo" lo dispara; el
+   * handler real vive en `WorkspacePage` (US2/T041). Sin handler, el botón
+   * queda visible pero inerte.
+   */
+  onOpenHistory?: () => void;
 }
-
-const STATUS_LABEL: Record<TNodeStatus, string> = {
-  running: 'En curso',
-  waiting: 'Esperando permiso',
-  done: 'Terminado',
-  error: 'Error',
-  idle: 'Inactivo',
-};
 
 /** Fila etiqueta/valor: etiqueta a la izquierda, dato monoespaciado a la derecha. */
 const DetailRow = ({ label, value }: { label: string; value: string }) => (
@@ -38,8 +53,28 @@ export const InspectorPanel = ({
   node,
   parallelPeers = [],
   invokedBy = null,
+  showReasoning,
+  onToggleReasoning,
+  onOpenHistory,
 }: InspectorPanelProps) => {
-  const { tools, errors, tasks, resources } = useInspectorData(node);
+  // Modo no controlado por defecto (US1); US2 puede imponer la visibilidad
+  // compartida con el overlay pasando `showReasoning`/`onToggleReasoning`.
+  const localReasoning = useReasoningVisibility(false);
+  const reasoningVisible = showReasoning ?? localReasoning.visible;
+  const toggleReasoning = onToggleReasoning ?? localReasoning.toggle;
+
+  const {
+    tools,
+    errors,
+    tasks,
+    resources,
+    entries,
+    diff,
+    forms,
+    permissions,
+    inbox,
+    context,
+  } = useInspectorData(node);
 
   if (!node) {
     return (
@@ -67,7 +102,7 @@ export const InspectorPanel = ({
           <StatusDot status={node.data.status} />
           <span className="text-foreground">{node.data.agentName}</span>
           <span aria-hidden>·</span>
-          <span>{STATUS_LABEL[node.data.status]}</span>
+          <span>{NODE_STATUS_LABEL[node.data.status]}</span>
         </span>
         <span
           className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground"
@@ -87,6 +122,38 @@ export const InspectorPanel = ({
           </span>
         ) : null}
       </Container>
+
+      {/* Respuestas y razonamiento del agente (FR-001/002/003) */}
+      <AnswersSection
+        entries={entries}
+        showReasoning={reasoningVisible}
+        onToggleReasoning={toggleReasoning}
+        onOpenHistory={onOpenHistory}
+        sessionId={node.data.sessionId}
+        renderCompactionContext={() => (
+          <CompactionContext
+            messages={context.messages}
+            isError={context.isError}
+            isLoading={context.isLoading}
+          />
+        )}
+      />
+
+      {/* Impacto del agente en el repositorio (FR-028..FR-030) */}
+      <FileChanges
+        changes={diff.changes}
+        isError={diff.isError}
+        isLoading={diff.isLoading}
+      />
+
+      {/* Permisos, preguntas y cola (FR-031..FR-034) */}
+      <QuestionsSection
+        permissions={permissions.permissions}
+        questions={forms.questions}
+        queuedTurns={inbox.queuedTurns}
+        isError={forms.isError || permissions.isError || inbox.isError}
+        isLoading={forms.isLoading || permissions.isLoading || inbox.isLoading}
+      />
 
       {/* Modelo: nombre y razonamiento (variante del modelo) */}
       <Container space="small">

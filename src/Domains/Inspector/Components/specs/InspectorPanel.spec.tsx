@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@app/test/renderWithProviders';
 import { InspectorPanel } from '../InspectorPanel';
 import type { TGraphNode } from '@app/Domains/Graph/Graph.entity';
@@ -16,7 +17,9 @@ const node: TGraphNode = {
     agentName: 'develop',
     directory: '/repo/opencode-agent-viz',
     model: { providerID: 'opencode', id: 'deepseek' },
-    status: 'done',
+    status: 'succeeded',
+    retry: null,
+    interruptReason: null,
     metrics: {
       durationMs: 3000,
       startedAt: 0,
@@ -95,5 +98,40 @@ describe('InspectorPanel', () => {
   it('does not render the parallel section when there are no peers', () => {
     renderWithProviders(<InspectorPanel node={node} />);
     expect(screen.queryByText(/En paralelo/)).not.toBeInTheDocument();
+  });
+
+  it('renders the answers section with an explicit empty state', () => {
+    renderWithProviders(<InspectorPanel node={node} />);
+
+    expect(screen.getByText('Respuestas')).toBeInTheDocument();
+    expect(screen.getByText('Sin respuestas todavía')).toBeInTheDocument();
+  });
+
+  it('toggles the reasoning visibility from the answers section', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<InspectorPanel node={node} />);
+
+    const toggle = screen.getByRole('button', { name: /razonamiento/i });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+    await user.click(toggle);
+
+    expect(
+      screen.getByRole('button', { name: /razonamiento/i }),
+    ).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('forwards onOpenHistory to the answers section button', async () => {
+    const user = userEvent.setup();
+    const onOpenHistory = vi.fn();
+    renderWithProviders(
+      <InspectorPanel node={node} onOpenHistory={onOpenHistory} />,
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Ver histórico completo' }),
+    );
+
+    expect(onOpenHistory).toHaveBeenCalledTimes(1);
   });
 });

@@ -18,3 +18,5 @@ export * from './Molecules/AlertDialog';
 export { Metric } from './Molecules/Metric';
 export { StatusDot } from './Molecules/StatusDot';
 export { DurationBar } from './Molecules/DurationBar';
+export { RichText } from './Molecules/RichText';
+export { CompactionContext } from './Molecules/CompactionContext';

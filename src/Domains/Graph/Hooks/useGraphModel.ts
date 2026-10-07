@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { useQueries } from '@tanstack/react-query';
+import { useEffect, useMemo } from 'react';
+import { useQueries, useQueryClient } from '@tanstack/react-query';
 import type { SessionInfo } from '@opencode/client';
 import { opencodeService } from '@app/Infrastructure/Services/opencodeClient';
 import { queryKeys } from '../../queryKeys';
@@ -12,12 +12,15 @@ import {
   type TExecutionPlan,
 } from '../lib/executionLevels';
 import { topologySignature } from '../lib/layoutGraph';
+import { isActiveStatus } from '../lib/nodeStatus';
 import { deriveParallelGroups } from '../lib/parallelism';
 import type {
+  TExecutionSignal,
   TGraphModel,
   TNodeParallelism,
   TParallelGroup,
 } from '../Graph.entity';
+import { deriveExecutionSignals, EMPTY_EXECUTION_SIGNAL } from './useExecutionSignals';
 import { useNow } from './useNow';
 
 export const filterSubtree = (
@@ -48,6 +51,29 @@ export const filterSubtree = (
   return result;
 };
 
+/** Compara dos señales campo a campo para evitar escrituras redundantes en caché. */
+const sameSignal = (a: TExecutionSignal, b: TExecutionSignal): boolean =>
+  (a.retry?.attempt ?? null) === (b.retry?.attempt ?? null) &&
+  (a.retry?.next ?? null) === (b.retry?.next ?? null) &&
+  a.compaction === b.compaction &&
+  a.outcome === b.outcome &&
+  a.interruptReason === b.interruptReason;
+
+/**
+ * Combina la siembra durable con la caché en vivo: los campos que ya reportó un
+ * evento en vivo ganan sobre los reconstruidos del log; el resto se completa con
+ * la siembra. Misma precedencia que `useExecutionSignals`.
+ */
+const mergeSignal = (
+  seed: TExecutionSignal,
+  live: TExecutionSignal | undefined,
+): TExecutionSignal => ({
+  retry: live?.retry ?? seed.retry,
+  compaction: live?.compaction ?? seed.compaction,
+  outcome: live?.outcome ?? seed.outcome,
+  interruptReason: live?.interruptReason ?? seed.interruptReason,
+});
+
 export interface UseGraphModelResult {
   graph: TGraphModel;
   /** Grupos de agentes que corrieron en paralelo en el subárbol visible. */
@@ -64,6 +90,7 @@ export const useGraphModel = (
   sessionId: string | null,
   directory: string | null,
 ): UseGraphModelResult => {
+  const queryClient = useQueryClient();
   const sessionsQuery = useGetSessions(directory);
   const statusQuery = useGetSessionStatus();
   const agentsQuery = useGetAgents(directory);
@@ -95,6 +122,109 @@ export const useGraphModel = (
     })),
   });
 
+  // Señales de ejecución (FR-018/FR-019) de TODO el subárbol: `useExecutionSignals`
+  // solo cubre una sesión y no se puede invocar un hook por nodo, así que se
+  // reutiliza su núcleo puro (`deriveExecutionSignals`) para sembrar el log
+  // durable de cada sesión y se lee la caché en vivo que parchea `eventReducer`.
+  const logQueries = useQueries({
+    queries: ids.map((id) => ({
+      queryKey: queryKeys.sessions.log(id),
+      queryFn: () => opencodeService.getSessionLog(id),
+      staleTime: Infinity,
+    })),
+  });
+
+  const seeds = useMemo(() => {
+    const map: Record<string, TExecutionSignal> = {};
+    ids.forEach((id, index) => {
+      const data = logQueries[index]?.data;
+      if (data) map[id] = deriveExecutionSignals(data, id);
+    });
+    return map;
+  }, [ids, logQueries]);
+
+  // Escribe la siembra en la caché en vivo una vez por sesión, para que los
+  // parches posteriores de `eventReducer` la preserven (su `updater` parte del
+  // valor cacheado). La escritura es idempotente: si la señal ya coincide, se
+  // devuelve el mismo objeto y no se notifica a los observadores.
+  useEffect(() => {
+    for (const id of ids) {
+      const seed = seeds[id];
+      if (!seed) continue;
+      queryClient.setQueryData<Record<string, TExecutionSignal>>(
+        queryKeys.sessions.execution(id),
+        (prev) => {
+          const current = prev?.[id];
+          const merged = mergeSignal(seed, current);
+          if (current && sameSignal(current, merged)) return prev;
+          return { ...(prev ?? {}), [id]: merged };
+        },
+      );
+    }
+  }, [queryClient, ids, seeds]);
+
+  // Lector reactivo de la caché en vivo, por sesión. El `queryFn` no se ejecuta
+  // (hay `initialData` y `staleTime: Infinity`); devuelve lo cacheado si por
+  // algún motivo se disparara.
+  const liveQueries = useQueries({
+    queries: ids.map((id) => ({
+      queryKey: queryKeys.sessions.execution(id),
+      queryFn: () =>
+        Promise.resolve(
+          queryClient.getQueryData<Record<string, TExecutionSignal>>(
+            queryKeys.sessions.execution(id),
+          ) ?? {},
+        ),
+      staleTime: Infinity,
+      initialData: {},
+    })),
+  });
+
+  const signals = useMemo(() => {
+    const map: Record<string, TExecutionSignal> = {};
+    ids.forEach((id, index) => {
+      map[id] =
+        liveQueries[index]?.data?.[id] ?? seeds[id] ?? EMPTY_EXECUTION_SIGNAL;
+    });
+    return map;
+  }, [ids, liveQueries, seeds]);
+
+  // Formularios (preguntas al usuario, FR-032): `session.form.list` no trae el
+  // estado resuelto, así que cada formulario se completa con `session.form.get`
+  // para saber si está `pending`/`answered`/`cancelled`.
+  const formListQueries = useQueries({
+    queries: ids.map((id) => ({
+      queryKey: queryKeys.sessions.forms(id),
+      queryFn: () => opencodeService.listSessionForms(id),
+      staleTime: Infinity,
+    })),
+  });
+
+  const formRefs = formListQueries.flatMap((query, index) =>
+    (query.data ?? []).map((form) => ({
+      sessionID: ids[index],
+      formID: form.id,
+    })),
+  );
+
+  const formDetailQueries = useQueries({
+    queries: formRefs.map((ref) => ({
+      queryKey: [...queryKeys.sessions.forms(ref.sessionID), ref.formID],
+      queryFn: () => opencodeService.getSessionForm(ref.sessionID, ref.formID),
+      staleTime: Infinity,
+    })),
+  });
+
+  // Inbox (FR-034): se entrega completo a `buildGraph` por nodo; la cola de
+  // turnos se muestra en el detalle del agente, no tiñe `TNodeStatus`.
+  const inboxQueries = useQueries({
+    queries: ids.map((id) => ({
+      queryKey: queryKeys.sessions.inbox(id),
+      queryFn: () => opencodeService.listSessionInbox(id),
+      staleTime: Infinity,
+    })),
+  });
+
   const messagesMap = useMemo(() => {
     const map: Record<string, TSessionMessageLike[]> = {};
     ids.forEach((id, index) => {
@@ -109,6 +239,16 @@ export const useGraphModel = (
     [permissionQueries],
   );
 
+  const forms = useMemo(
+    () => formDetailQueries.flatMap((query) => query.data ?? []),
+    [formDetailQueries],
+  );
+
+  const inbox = useMemo(
+    () => inboxQueries.flatMap((query) => query.data ?? []),
+    [inboxQueries],
+  );
+
   const model = useMemo(
     () =>
       buildGraph({
@@ -117,6 +257,9 @@ export const useGraphModel = (
         agents: agentsQuery.data ?? [],
         messages: messagesMap,
         permissions,
+        signals,
+        forms,
+        inbox,
         now,
       }),
     [
@@ -125,6 +268,9 @@ export const useGraphModel = (
       agentsQuery.data,
       messagesMap,
       permissions,
+      signals,
+      forms,
+      inbox,
       now,
     ],
   );
@@ -179,10 +325,10 @@ export const useGraphModel = (
     [model, positions, parallelByNode],
   );
 
+  // El nodo activo es el primero con un estado de ejecución en curso
+  // (running/retrying/compacting/esperas), no solo `running` (FR-017).
   const activeNodeId =
-    graph.nodes.find(
-      (n) => n.data.status === 'running' || n.data.status === 'waiting',
-    )?.id ?? null;
+    graph.nodes.find((node) => isActiveStatus(node.data.status))?.id ?? null;
 
   return {
     graph,

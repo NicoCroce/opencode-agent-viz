@@ -4,3 +4,6 @@ export * from './MetricsSection';
 export * from './ToolHistory';
 export * from './LoopBadge';
 export * from './ResourceList';
+export * from './AnswersSection';
+export * from './FileChanges';
+export * from './QuestionsSection';

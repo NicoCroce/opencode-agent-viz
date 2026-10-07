@@ -17,6 +17,8 @@ const model = (): TGraphModel => ({
         directory: '/repo',
         model: null,
         status: 'running',
+        retry: null,
+        interruptReason: null,
         metrics: {
           durationMs: null,
           startedAt: null,
@@ -45,7 +47,9 @@ const model = (): TGraphModel => ({
         agentName: 'explore',
         directory: '/repo',
         model: null,
-        status: 'done',
+        status: 'succeeded',
+        retry: null,
+        interruptReason: null,
         metrics: {
           durationMs: null,
           startedAt: null,
@@ -72,7 +76,7 @@ describe('topologySignature', () => {
   it('keeps a stable signature when only data changes', () => {
     const first = model();
     const second = model();
-    second.nodes[0].data.status = 'done';
+    second.nodes[0].data.status = 'succeeded';
     expect(topologySignature(first)).toBe(topologySignature(second));
   });
 

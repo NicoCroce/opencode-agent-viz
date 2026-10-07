@@ -6,3 +6,4 @@ export * from './formatCost';
 export * from './formatTokens';
 export * from './folderName';
 export * from './formatTimeRange';
+export * from './nodeStatusLabel';

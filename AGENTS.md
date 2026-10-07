@@ -93,7 +93,7 @@ Domains/[Domain]/
 ### 5. Servicio del SDK (Infrastructure/Services/)
 
 Crear `opencodeClient.ts` con:
-- `createOpencodeClient({ baseUrl: '/oc' })` (proxy de Vite a localhost:4096)
+- `createOpencodeClient({ baseUrl: '/oc' })` (proxy de Vite al background service de OpenCode vía `OPENCODE_URL`)
 - Métodos de wrapper: `fetchSessions()`, `subscribeEvents()`, etc.
 - Tipado fuerte con tipos del SDK
 

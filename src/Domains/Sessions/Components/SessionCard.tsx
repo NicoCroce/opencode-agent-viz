@@ -1,6 +1,6 @@
 import { cn } from '@app/Application/lib/utils';
 import { StatusDot } from '@app/Application/Components';
-import { formatTimeRange } from '@app/Application/Helpers';
+import { formatDateTimeRange } from '@app/Application/Helpers';
 import { toNodeStatus } from '@app/Domains/Graph/lib/nodeStatus';
 import type { TSessionStatus } from '../Session.entity';
 import type { TRootSessionItem } from '../Hooks/useRootSessions';
@@ -23,9 +23,15 @@ export const SessionCard = ({
     status,
     hasActivity: true,
     hasPermission: false,
-    hasError: false,
+    // La lista de sesiones raíz no carga permisos, formularios ni señales de
+    // ejecución por sesión; el estado se deriva solo de `SessionStatus` y de si
+    // hubo actividad (los 9 estados se detallan en el grafo/inspector).
+    hasPendingForm: false,
+    compaction: null,
+    outcome: null,
+    lastAssistantErrored: false,
   });
-  const timeRange = formatTimeRange({
+  const timeRange = formatDateTimeRange({
     startedAt: session.time.created,
     endedAt: session.time.updated,
     isRunning: status?.type === 'busy' || status?.type === 'retry',
@@ -48,9 +54,9 @@ export const SessionCard = ({
         <span className="truncate text-sm font-medium text-foreground">
           {session.title}
         </span>
-        <span className="ml-auto font-mono text-[11px] tabular-nums text-muted-foreground">
-          {timeRange}
-        </span>
+      </span>
+      <span className="truncate font-mono text-[11px] tabular-nums text-muted-foreground">
+        {timeRange}
       </span>
       <span className="truncate text-xs text-muted-foreground">
         {agentName ?? 'agente no disponible'}
