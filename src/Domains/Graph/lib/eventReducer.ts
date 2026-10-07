@@ -1,6 +1,7 @@
 import type {
   PermissionRequest,
   SessionInfo,
+  SessionMessageContentUpdated,
   SessionStatus,
   V2Event,
 } from '@opencode/client';
@@ -9,6 +10,7 @@ import type {
   TContentPart,
   TSessionMessage,
 } from '@app/Infrastructure/Services/opencodeClient';
+import type { TExecutionSignal } from '../Graph.entity';
 
 export type TSessionMessageCache = TSessionMessage[];
 
@@ -33,6 +35,13 @@ export type TQueryUpdate =
     };
 
 export type TEventUpdate = TQueryUpdate[];
+
+/**
+ * `session.message.content.updated` es un evento **durable**: llega por el log
+ * (`SessionEventDurable`) y no por el stream SSE (`V2Event`). El reducer acepta
+ * ambos para poder aplicar tambien las instantaneas consolidadas del log.
+ */
+export type TReducibleEvent = V2Event | SessionMessageContentUpdated;
 
 /* ------------------------------------------------------------------ */
 /* Helpers de cache                                                    */
@@ -150,6 +159,77 @@ const upsertToolPart = (
     );
     return withParts(message, [...rest, part]);
   });
+
+/* ------------------------------------------------------------------ */
+/* Contenido consolidado (text / reasoning)                            */
+/* ------------------------------------------------------------------ */
+
+const textPart = (text: string): TContentPart => ({ type: 'text', text });
+
+const reasoningPart = (text: string): TContentPart => ({
+  type: 'reasoning',
+  text,
+});
+
+/**
+ * Inserta/reemplaza una parte consolidada en la posicion `ordinal` del
+ * contenido del assistant (R6): los eventos `*.ended` traen el texto completo
+ * y su ordinal, y `content` se mantiene ordenado por el. Nunca se acumulan
+ * deltas (FR-005, Principio VII).
+ */
+const upsertContentPart = (
+  prev: unknown,
+  messageID: string,
+  ordinal: number,
+  part: TContentPart,
+): TSessionMessageCache =>
+  patchMessage(prev, messageID, (message) => {
+    const parts = [...message.parts];
+    if (ordinal < parts.length) {
+      parts[ordinal] = part;
+    } else {
+      parts.push(part);
+    }
+    return withParts(message, parts);
+  });
+
+/**
+ * `session.message.content.updated` trae la instantanea durable completa del
+ * contenido: es un reemplazo consolidado, no incremental (R6), asi que no
+ * viola FR-005.
+ */
+const replaceContent = (
+  prev: unknown,
+  messageID: string,
+  content: TContentPart[],
+): TSessionMessageCache =>
+  patchMessage(prev, messageID, (message) => withParts(message, content));
+
+/* ------------------------------------------------------------------ */
+/* Senales de ejecucion                                                */
+/* ------------------------------------------------------------------ */
+
+const EMPTY_SIGNAL: TExecutionSignal = {
+  retry: null,
+  compaction: null,
+  outcome: null,
+  interruptReason: null,
+};
+
+const signalsOf = (prev: unknown): Record<string, TExecutionSignal> =>
+  prev !== null && typeof prev === 'object'
+    ? (prev as Record<string, TExecutionSignal>)
+    : {};
+
+const patchExecution = (
+  prev: unknown,
+  sessionID: string,
+  patch: Partial<TExecutionSignal>,
+): Record<string, TExecutionSignal> => {
+  const signals = signalsOf(prev);
+  const current = signals[sessionID] ?? EMPTY_SIGNAL;
+  return { ...signals, [sessionID]: { ...current, ...patch } };
+};
 
 /* ------------------------------------------------------------------ */
 /* Construccion de partes de tool desde eventos                         */
@@ -273,7 +353,7 @@ const removePermission = (
 
 /* ------------------------------------------------------------------ */
 
-export const reduceEvent = (event: V2Event): TEventUpdate | null => {
+export const reduceEvent = (event: TReducibleEvent): TEventUpdate | null => {
   switch (event.type) {
     case 'server.connected':
       return [set(queryKeys.connection.state, () => 'connected')];
@@ -297,17 +377,38 @@ export const reduceEvent = (event: V2Event): TEventUpdate | null => {
       ];
 
     /* --- estado --- */
-    case 'session.status':
-      return [
+    case 'session.status': {
+      const { sessionID, status } = event.data;
+      const updates: TEventUpdate = [
         set(queryKeys.sessions.status(), (prev) =>
-          setStatus(prev, event.data.sessionID, event.data.status),
+          setStatus(prev, sessionID, status),
         ),
       ];
+      // `status.type === 'retry'` aporta `attempt`/`next` a las senales (R5).
+      if (status.type === 'retry') {
+        updates.push(
+          set(queryKeys.sessions.execution(sessionID), (prev) =>
+            patchExecution(prev, sessionID, {
+              retry: { attempt: status.attempt, next: status.next },
+            }),
+          ),
+        );
+      }
+      return updates;
+    }
 
     case 'session.idle':
       return [
         set(queryKeys.sessions.status(), (prev) =>
           setStatus(prev, event.data.sessionID, { type: 'idle' }),
+        ),
+        // El evento SSE `session.idle` no aporta `outcome`; solo limpia el
+        // estado activo (retry/compaction) al quedar la sesion ociosa (R5).
+        set(queryKeys.sessions.execution(event.data.sessionID), (prev) =>
+          patchExecution(prev, event.data.sessionID, {
+            retry: null,
+            compaction: null,
+          }),
         ),
       ];
 
@@ -319,11 +420,68 @@ export const reduceEvent = (event: V2Event): TEventUpdate | null => {
       ];
 
     case 'session.execution.succeeded':
+      return [
+        set(queryKeys.sessions.status(), (prev) =>
+          setStatus(prev, event.data.sessionID, { type: 'idle' }),
+        ),
+        set(queryKeys.sessions.execution(event.data.sessionID), (prev) =>
+          patchExecution(prev, event.data.sessionID, { outcome: 'succeeded' }),
+        ),
+      ];
+
     case 'session.execution.failed':
+      return [
+        set(queryKeys.sessions.status(), (prev) =>
+          setStatus(prev, event.data.sessionID, { type: 'idle' }),
+        ),
+        set(queryKeys.sessions.execution(event.data.sessionID), (prev) =>
+          patchExecution(prev, event.data.sessionID, { outcome: 'failed' }),
+        ),
+      ];
+
     case 'session.execution.interrupted':
       return [
         set(queryKeys.sessions.status(), (prev) =>
           setStatus(prev, event.data.sessionID, { type: 'idle' }),
+        ),
+        set(queryKeys.sessions.execution(event.data.sessionID), (prev) =>
+          patchExecution(prev, event.data.sessionID, {
+            outcome: 'interrupted',
+            interruptReason: event.data.reason,
+          }),
+        ),
+      ];
+
+    /* --- retry / compactacion (senales de ejecucion, FR-018/FR-019) --- */
+    case 'session.retry.scheduled':
+      return [
+        set(queryKeys.sessions.execution(event.data.sessionID), (prev) =>
+          patchExecution(prev, event.data.sessionID, {
+            retry: { attempt: event.data.attempt, next: event.data.at },
+          }),
+        ),
+      ];
+
+    case 'session.compaction.started':
+      return [
+        set(queryKeys.sessions.execution(event.data.sessionID), (prev) =>
+          patchExecution(prev, event.data.sessionID, { compaction: 'running' }),
+        ),
+      ];
+
+    case 'session.compaction.ended':
+      return [
+        set(queryKeys.sessions.execution(event.data.sessionID), (prev) =>
+          patchExecution(prev, event.data.sessionID, {
+            compaction: 'completed',
+          }),
+        ),
+      ];
+
+    case 'session.compaction.failed':
+      return [
+        set(queryKeys.sessions.execution(event.data.sessionID), (prev) =>
+          patchExecution(prev, event.data.sessionID, { compaction: 'failed' }),
         ),
       ];
 
@@ -356,6 +514,50 @@ export const reduceEvent = (event: V2Event): TEventUpdate | null => {
         ),
       ];
 
+    /* --- contenido consolidado (sin deltas, FR-005/FR-006) --- */
+    case 'session.text.ended':
+      return [
+        set(queryKeys.sessions.messages(event.data.sessionID), (prev) =>
+          upsertContentPart(
+            prev,
+            event.data.assistantMessageID,
+            event.data.ordinal,
+            textPart(event.data.text),
+          ),
+        ),
+      ];
+
+    case 'session.reasoning.ended':
+      return [
+        set(queryKeys.sessions.messages(event.data.sessionID), (prev) =>
+          upsertContentPart(
+            prev,
+            event.data.assistantMessageID,
+            event.data.ordinal,
+            reasoningPart(event.data.text),
+          ),
+        ),
+      ];
+
+    case 'session.message.content.updated':
+      return [
+        set(queryKeys.sessions.messages(event.data.sessionID), (prev) =>
+          replaceContent(
+            prev,
+            event.data.messageID,
+            event.data.content,
+          ),
+        ),
+      ];
+
+    /* --- deltas: se ignoran explicitamente (FR-005, Principio VII) --- */
+    case 'session.text.delta':
+    case 'session.reasoning.delta':
+    case 'session.tool.input.delta':
+    case 'session.tool.progress':
+    case 'session.compaction.delta':
+      return null;
+
     /* --- tools --- */
     case 'session.tool.input.started':
     case 'session.tool.called':
@@ -386,6 +588,22 @@ export const reduceEvent = (event: V2Event): TEventUpdate | null => {
           removePermission(prev, event.data.requestID),
         ),
       ];
+
+    /* --- inbox / forms: invalidar la query de la sesion para refetch --- */
+    case 'session.inbox.delivered':
+    case 'session.inbox.enqueued':
+    case 'session.inbox.cancelled':
+    case 'session.inbox.delivery.changed':
+      return [invalidate(queryKeys.sessions.inbox(event.data.sessionID))];
+
+    case 'form.created':
+      return [
+        invalidate(queryKeys.sessions.forms(event.data.form.sessionID)),
+      ];
+
+    case 'form.replied':
+    case 'form.cancelled':
+      return [invalidate(queryKeys.sessions.forms(event.data.sessionID))];
 
     default:
       return null;

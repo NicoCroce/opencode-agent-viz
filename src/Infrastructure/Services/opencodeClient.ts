@@ -1,13 +1,21 @@
 import { OpenCode } from '@opencode/client';
 import type {
   AgentInfo,
+  FileDiffInfo,
+  FormDetail,
+  FormInfo,
   InstructionEntryInfo,
   McpServer,
   PermissionRequest,
   Project,
+  SessionInboxInfo,
   SessionInfo,
+  SessionLogItem,
   SessionMessageInfo,
+  SessionStatsInfo,
+  SessionStatsInput,
   SessionStatus,
+  SessionTransferData,
   V2Event,
 } from '@opencode/client';
 
@@ -43,7 +51,8 @@ export interface TSessionMessage {
  * El cliente V2 resuelve cada ruta con `new URL(path, baseUrl)`, así que
  * `baseUrl` debe ser ABSOLUTA: un pathname relativo revienta con
  * `TypeError: Invalid URL`. En el browser apuntamos al proxy `/oc` de Vite,
- * que reescribe `/oc/api/...` -> `http://127.0.0.1:4096/api/...`.
+ * que reescribe `/oc/api/...` hacia el background service de OpenCode
+ * (configurable por `OPENCODE_URL`); el fallback 4096 aplica a SSR/tests.
  */
 export const resolveBaseUrl = (): string => {
   const base =
@@ -82,6 +91,34 @@ export interface OpenCodeService {
     id: string,
     directory?: string,
   ) => Promise<TSessionMessage[]>;
+  /**
+   * Histórico paginado por cursor, sin tope fijo (FR-013). Devuelve una página
+   * (200 mensajes) y el cursor de la siguiente; la primera página es la más
+   * reciente (`order: 'desc'`). El cursor ya fija la dirección, así que no se
+   * combina con `order`.
+   */
+  getHistoryMessages: (
+    id: string,
+    cursor?: string,
+  ) => Promise<{ messages: TSessionMessage[]; nextCursor: string | null }>;
+  /** Impacto del agente en el repositorio (FR-028..FR-030). */
+  getSessionDiff: (id: string) => Promise<FileDiffInfo[]>;
+  /** Agregado por proyecto/rango (expuesto, no cableado — R2/R10). */
+  getSessionStats: (input?: SessionStatsInput) => Promise<SessionStatsInfo>;
+  /** Preguntas al usuario de una sesión (FR-032). */
+  listSessionForms: (id: string) => Promise<FormInfo[]>;
+  getSessionForm: (id: string, formID: string) => Promise<FormDetail>;
+  /** Cola de turnos e items de inbox (FR-034). */
+  listSessionInbox: (id: string) => Promise<SessionInboxInfo[]>;
+  /** Contexto resultante de una compactación (FR-035). */
+  getSessionContext: (id: string) => Promise<SessionMessageInfo[]>;
+  /** Log durable (`follow: false`) para sembrar señales de ejecución (US3). */
+  getSessionLog: (id: string) => Promise<SessionLogItem[]>;
+  /** Export completo (expuesto, no cableado — R2/R3). */
+  exportSession: (
+    id: string,
+    sanitize?: boolean,
+  ) => Promise<SessionTransferData>;
   getSessionPermissions: (id: string) => Promise<PermissionRequest[]>;
   getSessionInstructions: (id: string) => Promise<InstructionEntryInfo[]>;
   listAgents: (directory?: string) => Promise<AgentInfo[]>;
@@ -131,6 +168,52 @@ export const opencodeService: OpenCodeService = {
       cursor = next.next;
     }
     return normalizeMessages(messages);
+  },
+  async getHistoryMessages(id, cursor) {
+    // Una sola página por llamada: el cursor se expone al `useInfiniteQuery`
+    // para la carga progresiva. La 1ª página es la más reciente (`desc`).
+    const { data, cursor: page } = await opencodeClient.message.list({
+      sessionID: id,
+      limit: MESSAGE_PAGE_SIZE,
+      ...(cursor === undefined ? { order: 'desc' as const } : { cursor }),
+    });
+    return {
+      messages: normalizeMessages(data),
+      nextCursor: page.next ?? null,
+    };
+  },
+  async getSessionDiff(id) {
+    return opencodeClient.session.diff({ sessionID: id });
+  },
+  async getSessionStats(input) {
+    return opencodeClient.session.stats(input);
+  },
+  async listSessionForms(id) {
+    return opencodeClient.session.form.list({ sessionID: id });
+  },
+  async getSessionForm(id, formID) {
+    return opencodeClient.session.form.get({ sessionID: id, formID });
+  },
+  async listSessionInbox(id) {
+    return opencodeClient.session.inbox.list({ sessionID: id });
+  },
+  async getSessionContext(id) {
+    return opencodeClient.session.context({ sessionID: id });
+  },
+  async getSessionLog(id) {
+    // `session.log` es un `AsyncIterable`; con `follow: false` termina solo y lo
+    // materializamos en un array para las señales de ejecución (US3).
+    const items: SessionLogItem[] = [];
+    for await (const item of opencodeClient.session.log({
+      sessionID: id,
+      follow: false,
+    })) {
+      items.push(item);
+    }
+    return items;
+  },
+  async exportSession(id, sanitize) {
+    return opencodeClient.session.export({ sessionID: id, sanitize });
   },
   async getSessionPermissions(id) {
     return opencodeClient.permission.list({ sessionID: id });
