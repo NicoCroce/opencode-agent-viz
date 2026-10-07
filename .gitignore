@@ -9,3 +9,4 @@ dist/
 coverage/
 .vitest/
 pnpm-lock.yaml
+pr-detail.md
