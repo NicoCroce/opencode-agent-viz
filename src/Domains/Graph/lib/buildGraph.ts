@@ -53,12 +53,21 @@ const resolveModel = (
   return null;
 };
 
+/**
+ * `true` si la ÚLTIMA respuesta assistant quedó en error (FR-020): su propio
+ * `error` o un tool fallido dentro de ese mismo mensaje. Un error viejo y ya
+ * superado no debe teñir toda la sesión (el nombre del campo,
+ * `lastAssistantErrored`, es literal: mira la última respuesta, no cualquiera).
+ */
 const hasError = (messages: TSessionMessageLike[] | undefined): boolean => {
   if (!messages) return false;
-  return messages.some(({ info, parts }) => {
-    if (info.type === "assistant" && info.error) return true;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const { info, parts } = messages[index];
+    if (info.type !== "assistant") continue;
+    if (info.error) return true;
     return parts.some((p) => p.type === "tool" && p.state.status === "error");
-  });
+  }
+  return false;
 };
 
 const currentTool = (
