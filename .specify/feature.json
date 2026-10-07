@@ -1,7 +1,1 @@
-{
-  "feature_key": "opencode-agent-viz",
-  "name": "OpenCode Agent Viz",
-  "description": "Real-time visualization of multi-agent executions",
-  "version": "0.0.0",
-  "feature_directory": "specs/002-viz-ux-refinements"
-}
+{"feature_directory":"specs/004-inspector-panel-layout"}

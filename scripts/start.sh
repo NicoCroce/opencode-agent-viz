@@ -1,62 +1,47 @@
 #!/usr/bin/env sh
-# Levanta OpenCode (puerto 4096) + Vite en un solo comando.
-# Al salir (Ctrl+C) detiene ambos procesos que arrancó este script.
+# Levanta SOLO Vite, apuntando el proxy /oc al background service de OpenCode.
+#
+# OpenCode moderno (1.18.34+) corre un "background service" al que se conecta el
+# TUI por defecto. La visualización DEBE observar ese mismo servidor: si se
+# levanta un `opencode serve` aparte, comparte la SQLite pero NO el bus de
+# eventos en memoria, así que los eventos SSE de tus sesiones nunca llegan al
+# browser (se ven recién al refrescar, que es una lectura de la DB).
 set -eu
 
-OPENCODE_PORT="${OPENCODE_PORT:-4096}"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+. "$SCRIPT_DIR/lib/opencode-service.sh"
 
-# La API V2 de OpenCode exige HTTP Basic (usuario `opencode`). Generamos una
-# password por arranque y la exportamos: `opencode serve` la toma de
-# OPENCODE_PASSWORD y Vite la hereda para inyectarla en el proxy `/oc`, así el
-# browser nunca ve ni maneja credenciales. Si ya viene seteada, se respeta.
-OPENCODE_PASSWORD="${OPENCODE_PASSWORD:-$(openssl rand -hex 32)}"
-export OPENCODE_PASSWORD
+opencode_service_resolve
 
-OC_PID=""
-VITE_PID=""
+if [ -z "$OPENCODE_URL" ]; then
+  printf 'El background service de OpenCode no está corriendo; iniciándolo...\n'
+  opencode service start >/dev/null 2>&1 || true
+  i=0
+  while [ "$i" -lt 20 ]; do
+    OPENCODE_URL="$(opencode_service_url)"
+    if [ -n "$OPENCODE_URL" ]; then
+      break
+    fi
+    i=$((i + 1))
+    sleep 0.5
+  done
+  export OPENCODE_URL
+fi
 
-cleanup() {
-  if [ -n "$VITE_PID" ] && kill -0 "$VITE_PID" 2>/dev/null; then
-    kill "$VITE_PID" 2>/dev/null || true
-    wait "$VITE_PID" 2>/dev/null || true
-  fi
-  if [ -n "$OC_PID" ] && kill -0 "$OC_PID" 2>/dev/null; then
-    printf '\nDeteniendo OpenCode (PID %s)...\n' "$OC_PID"
-    kill "$OC_PID" 2>/dev/null || true
-    wait "$OC_PID" 2>/dev/null || true
-  fi
-}
-trap cleanup EXIT INT TERM
-
-if lsof -nP -iTCP:"$OPENCODE_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-  printf 'El puerto %s ya está en uso. Detené ese proceso o usá OPENCODE_PORT=<otro>.\n' "$OPENCODE_PORT" >&2
+if [ -z "$OPENCODE_URL" ]; then
+  printf 'No se pudo determinar la URL del background service de OpenCode.\n' >&2
+  printf 'Verificá con `opencode service status` o pasá OPENCODE_URL manualmente.\n' >&2
   exit 1
 fi
 
-printf 'Levantando OpenCode en http://127.0.0.1:%s (auth habilitada)...\n' "$OPENCODE_PORT"
-opencode serve --port "$OPENCODE_PORT" &
-OC_PID=$!
-
-i=0
-while [ "$i" -lt 30 ]; do
-  if lsof -nP -iTCP:"$OPENCODE_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-    break
-  fi
-  if ! kill -0 "$OC_PID" 2>/dev/null; then
-    printf 'OpenCode terminó antes de escuchar en el puerto %s.\n' "$OPENCODE_PORT" >&2
-    exit 1
-  fi
-  i=$((i + 1))
-  sleep 0.5
-done
-
-if ! lsof -nP -iTCP:"$OPENCODE_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-  printf 'OpenCode no respondió en el puerto %s a tiempo.\n' "$OPENCODE_PORT" >&2
-  exit 1
+if [ -z "$OPENCODE_PASSWORD" ]; then
+  printf 'Aviso: no se encontró la password del service (%s).\n' "$OPCODE_SERVICE_JSON" >&2
+  printf 'El proxy /oc probablemente responda 401; pasá OPENCODE_PASSWORD manualmente.\n' >&2
 fi
 
-printf 'OpenCode listo. Levantando Vite ...\n'
-./node_modules/.bin/vite &
-VITE_PID=$!
+printf 'OpenCode service: %s\n' "$OPENCODE_URL"
+printf 'Levantando Vite (proxy /oc -> %s) ...\n' "$OPENCODE_URL"
 
-wait "$VITE_PID"
+# El background service es compartido con el TUI y otras sesiones: no lo
+# detenemos al salir. Ctrl+C sólo baja Vite.
+./node_modules/.bin/vite

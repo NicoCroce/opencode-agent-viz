@@ -57,7 +57,14 @@ export const cardHeight = (data: TGraphNodeData, width: number): number => {
     height += MODEL_GAP + modelLines * BODY_LINE;
   }
 
-  const footerLines = 2 + (data.currentTool ? 1 : 0);
+  // El pie suma, además del consumo y el rango horario, la herramienta en
+  // curso y —cuando existen— el reintento (FR-018) y el motivo de interrupción
+  // (FR-019), para que el card nunca los recorte.
+  const footerLines =
+    2 +
+    (data.currentTool ? 1 : 0) +
+    (data.retry ? 1 : 0) +
+    (data.status === 'interrupted' ? 1 : 0);
   height += FOOTER_PAD + footerLines * BODY_LINE + (footerLines - 1) * FOOTER_GAP;
 
   return Math.max(MIN_NODE_HEIGHT, Math.round(height));

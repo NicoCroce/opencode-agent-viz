@@ -23,6 +23,7 @@ import {
   type TExecutionPlan,
 } from '../lib/executionLevels';
 import { deriveLineage } from '../lib/lineage';
+import { isActiveStatus } from '../lib/nodeStatus';
 import { useNodeResize } from '../Hooks/useNodeResize';
 import { AgentNode } from './AgentNode';
 import { InvocationEdge } from './InvocationEdge';
@@ -42,12 +43,24 @@ const edgeTypes = {
   invocation: InvocationEdge,
 } as unknown as EdgeTypes;
 
+/**
+ * Rango de agregación por nivel de ejecución (FR-023): cuando un carril reúne
+ * varios agentes, se muestra el estado dominante. Los estados activos
+ * (esperas, en curso, reintentando, compactando) pesan más que los terminales,
+ * de modo que un nivel con algún agente activo se lee como "en curso"; dentro
+ * de los terminales, fallo/interrupción pesan más que terminada. Ver
+ * `contracts/execution-state-contract.md`.
+ */
 const STATUS_RANK: Record<TNodeStatus, number> = {
-  idle: 0,
-  done: 1,
-  error: 2,
-  waiting: 3,
-  running: 4,
+  created: 0,
+  succeeded: 1,
+  interrupted: 2,
+  failed: 3,
+  'waiting-permission': 4,
+  'waiting-input': 5,
+  running: 6,
+  retrying: 7,
+  compacting: 8,
 };
 
 const worseStatus = (
@@ -100,6 +113,12 @@ interface AgentGraphProps {
   onSelectNode: (id: string) => void;
   /** Clic en el fondo: vuelve al grafo completo. */
   onClearSelection: () => void;
+  /**
+   * Doble clic en un nodo `agent`: abre el histórico de su sesión (FR-008).
+   * Recibe el `node.id`, que es la sesión del agente. El clic simple sigue
+   * seleccionando el nodo (`onSelectNode`).
+   */
+  onOpenHistory?: (nodeId: string) => void;
   followNodeId?: string | null;
   /** Sesión raíz: al cambiar se limpian los tamaños elegidos por el usuario. */
   resetKey?: string | null;
@@ -112,6 +131,7 @@ export const AgentGraph = ({
   selectedNodeId,
   onSelectNode,
   onClearSelection,
+  onOpenHistory,
   followNodeId = null,
   resetKey = null,
   className,
@@ -138,9 +158,7 @@ export const AgentGraph = ({
   }, [graph.nodes, plan]);
 
   const activeLevel = useMemo(() => {
-    const active = graph.nodes.find(
-      (node) => node.data.status === 'running' || node.data.status === 'waiting',
-    );
+    const active = graph.nodes.find((node) => isActiveStatus(node.data.status));
     return active ? (plan.levelByNode[active.id] ?? null) : null;
   }, [graph.nodes, plan]);
 
@@ -269,6 +287,10 @@ export const AgentGraph = ({
           onNodeClick={(_, node) => {
             if (String(node.type) === GUTTER_NODE_TYPE) return;
             onSelectNode(node.id);
+          }}
+          onNodeDoubleClick={(_, node) => {
+            if (String(node.type) === GUTTER_NODE_TYPE) return;
+            onOpenHistory?.(node.id);
           }}
           onNodeMouseEnter={(_, node) => {
             if (String(node.type) === GUTTER_NODE_TYPE) return;

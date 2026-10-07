@@ -29,7 +29,9 @@ const node = (
     agentName: 'general',
     directory: '/repo',
     model: null,
-    status: 'done',
+    status: 'succeeded',
+    retry: null,
+    interruptReason: null,
     metrics: {
       durationMs: null,
       startedAt: createdAt,

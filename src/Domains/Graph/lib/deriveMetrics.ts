@@ -1,7 +1,13 @@
 import type { SessionInfo, SessionStatus } from '@opencode/client';
-import type { TGraphModel, TNodeMetrics, TTokenUsage } from '../Graph.entity';
+import type {
+  TGraphModel,
+  TNodeMetrics,
+  TNodeStatus,
+  TTokenUsage,
+} from '../Graph.entity';
 import type { TResourceUsage, TSessionSummary } from '../../Inspector/Inspector.entity';
 import type { TSessionMessage } from '@app/Infrastructure/Services/opencodeClient';
+import { isActiveStatus } from './nodeStatus';
 
 export type TSessionMessageLike = TSessionMessage;
 
@@ -150,8 +156,12 @@ export const summarizeSession = (
   root: SessionInfo,
   graph: TGraphModel,
   resourceUsage: TResourceUsage,
+  now: number,
 ): TSessionSummary => {
   const nodes = graph.nodes;
+  const statuses = nodes.map((n) => n.data.status);
+  const countStatus = (status: TNodeStatus): number =>
+    statuses.filter((candidate) => candidate === status).length;
 
   const durationMs = sumNullable(nodes.map((n) => n.data.metrics.durationMs));
   const cost = sumNullable(nodes.map((n) => n.data.metrics.cost));
@@ -179,6 +189,17 @@ export const summarizeSession = (
   const endValues = nodes
     .map((n) => n.data.metrics.endedAt)
     .filter((v): v is number => v !== null);
+
+  // Tiempo transcurrido de la sesión (FR-026): del primer inicio al último fin;
+  // mientras algún agente siga activo (corre, reintenta, compacta o espera), el
+  // fin es `now` para que la barra avance en vivo sin relayoutar (FR-027).
+  const sessionActive = statuses.some(isActiveStatus);
+  const elapsedMs =
+    startValues.length === 0
+      ? null
+      : (sessionActive || endValues.length === 0
+          ? now
+          : Math.max(...endValues)) - Math.min(...startValues);
 
   const agentInvocations: Record<string, number> = {};
   for (const node of nodes) {
@@ -208,11 +229,21 @@ export const summarizeSession = (
     metrics,
     agentCount: nodes.length,
     subagentCount: nodes.filter((n) => !n.data.isRoot).length,
-    runningCount: nodes.filter((n) => n.data.status === 'running').length,
-    waitingCount: nodes.filter((n) => n.data.status === 'waiting').length,
-    errorCount: nodes.filter((n) => n.data.status === 'error').length,
+    createdCount: countStatus('created'),
+    runningCount: countStatus('running'),
+    retryingCount: countStatus('retrying'),
+    compactingCount: countStatus('compacting'),
+    // Las dos esperas (permiso y respuesta) se agrupan en un solo contador
+    // (FR-024); se distinguen entre sí en el detalle del agente.
+    waitingCount: countStatus('waiting-permission') + countStatus('waiting-input'),
+    succeededCount: countStatus('succeeded'),
+    // `errorCount` cuenta solo `failed`: una interrupción no es un fallo
+    // propio y se reporta por separado (FR-019).
+    errorCount: countStatus('failed'),
+    interruptedCount: countStatus('interrupted'),
     loopCount: nodes.filter((n) => n.data.metrics.hasLoop).length,
     agentInvocations,
     resourceUsage,
+    elapsedMs,
   };
 };

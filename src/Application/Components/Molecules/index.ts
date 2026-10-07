@@ -16,3 +16,5 @@ export * from './AlertDialog';
 export * from './Metric';
 export * from './StatusDot';
 export * from './DurationBar';
+export * from './RichText';
+export * from './CompactionContext';

@@ -1,6 +1,20 @@
 import type { ModelRef } from '@opencode/client';
 
-export type TNodeStatus = 'idle' | 'running' | 'waiting' | 'error' | 'done';
+/**
+ * Estado de ejecución de un agente (FR-017). 9 valores que se derivan de
+ * forma pura en `lib/nodeStatus.ts` y se muestran de forma consistente entre
+ * nodo y detalle (FR-023). Ver `contracts/execution-state-contract.md`.
+ */
+export type TNodeStatus =
+  | 'created'
+  | 'running'
+  | 'retrying'
+  | 'compacting'
+  | 'waiting-permission'
+  | 'waiting-input'
+  | 'succeeded'
+  | 'failed'
+  | 'interrupted';
 
 export interface TTokenUsage {
   input: number | null;
@@ -67,6 +81,16 @@ export interface TGraphNodeData extends Record<string, unknown> {
   directory: string;
   model: ModelRef | null;
   status: TNodeStatus;
+  /**
+   * Reintento en curso (FR-018): presente solo cuando `status === 'retrying'`.
+   * `next` puede faltar (`null`) si el servidor no lo reporta (edge case).
+   */
+  retry: { attempt: number; next: number | null } | null;
+  /**
+   * Motivo de la interrupción (FR-019) cuando `status === 'interrupted'`;
+   * `null` → "no disponible" (edge case).
+   */
+  interruptReason: string | null;
   metrics: TNodeMetrics;
   isRoot: boolean;
   currentTool: TCurrentTool | null;
@@ -91,6 +115,19 @@ export interface TGraphEdge {
 export interface TGraphModel {
   nodes: TGraphNode[];
   edges: TGraphEdge[];
+}
+
+/**
+ * Señal de ejecución en vivo por sesión (FR-018/FR-019), cacheada en
+ * `queryKeys.sessions.execution(id)`. Se compone de la siembra durable
+ * (`getSessionLog`) y de los eventos en vivo reducidos de forma pura por
+ * `lib/eventReducer.ts`. Ver `contracts/execution-state-contract.md`.
+ */
+export interface TExecutionSignal {
+  retry: { attempt: number; next: number | null } | null;
+  compaction: 'running' | 'completed' | 'failed' | null;
+  outcome: 'succeeded' | 'failed' | 'interrupted' | null;
+  interruptReason: string | null;
 }
 
 /**

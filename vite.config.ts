@@ -3,10 +3,15 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
 /**
- * El server V2 de OpenCode exige HTTP Basic (usuario `opencode`). La password
- * la genera `scripts/start.sh` y llega por `OPENCODE_PASSWORD`; el proxy la
- * inyecta para que el browser no tenga que autenticarse.
+ * Proxy al background service de OpenCode (el mismo que usa el TUI), no a un
+ * `opencode serve` propio: sólo ese proceso emite los eventos SSE en vivo de
+ * tus sesiones. `scripts/start.sh` descubre la URL con `opencode service status`
+ * y la exporta por `OPENCODE_URL` (fallback 4096 para `pnpm dev` manual).
+ *
+ * El server V2 exige HTTP Basic (usuario `opencode`). La password llega por
+ * `OPENCODE_PASSWORD`; el proxy la inyecta para que el browser no se autentique.
  */
+const opencodeUrl = process.env.OPENCODE_URL ?? 'http://127.0.0.1:4096';
 const opencodePassword = process.env.OPENCODE_PASSWORD;
 const opencodeAuthHeader = opencodePassword
   ? `Basic ${Buffer.from(`opencode:${opencodePassword}`).toString('base64')}`
@@ -36,7 +41,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/oc': {
-        target: 'http://127.0.0.1:4096',
+        target: opencodeUrl,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/oc/, ''),
         configure: (proxy) => {

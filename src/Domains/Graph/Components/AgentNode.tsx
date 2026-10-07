@@ -8,23 +8,26 @@ import {
 } from '@xyflow/react';
 import { cn } from '@app/Application/lib/utils';
 import {
+  NODE_STATUS_LABEL,
   formatCost,
+  formatDateTimeRange,
   formatDuration,
-  formatTimeRange,
   formatTokens,
 } from '@app/Application/Helpers';
-import type { TGraphNodeData, TNodeStatus, TTokenUsage } from '../Graph.entity';
+import type { TGraphNodeData, TTokenUsage } from '../Graph.entity';
 import { MIN_NODE_HEIGHT, MIN_NODE_WIDTH } from '../lib/nodeResize';
+import { isActiveStatus } from '../lib/nodeStatus';
 import { NodeStatusRail } from './NodeStatusRail';
 
 type AgentFlowNode = Node<TGraphNodeData, 'agent'>;
 
-const STATUS_LABEL: Record<TNodeStatus, string> = {
-  running: 'En curso',
-  waiting: 'Esperando',
-  done: 'Terminado',
-  error: 'Error',
-  idle: 'Inactivo',
+const UNAVAILABLE_LABEL = 'no disponible';
+
+/** Reloj compacto `HH:mm` para el momento del próximo intento (FR-018). */
+const formatClock = (ms: number): string => {
+  const date = new Date(ms);
+  const pad = (value: number): string => String(value).padStart(2, '0');
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
 const totalTokens = (tokens: TTokenUsage | null): number | null => {
@@ -56,15 +59,31 @@ const resizeControlClassName = (selected: boolean): string =>
 const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) => {
   const { metrics } = data;
 
-  // Un nodo sigue "en curso" mientras corre o espera (FR-015).
-  const isRunning = data.status === 'running' || data.status === 'waiting';
-  const timeRange = formatTimeRange({
+  // Un nodo sigue activo mientras corre, reintenta, compacta o espera
+  // permiso/respuesta (FR-015/FR-017); un estado terminal ya no está activo.
+  const isRunning = isActiveStatus(data.status);
+  const timeRange = formatDateTimeRange({
     startedAt: metrics.startedAt,
     endedAt: metrics.endedAt,
     isRunning,
   });
   const parallel = data.parallel && data.parallel.size > 1 ? data.parallel : null;
   const tokens = totalTokens(metrics.tokens);
+
+  // Reintento (FR-018): número de intento y, si el servidor lo reporta, el
+  // momento del próximo. `next` ausente → "no disponible" (edge case).
+  const retryLabel = data.retry
+    ? `Intento ${data.retry.attempt} · próximo ${
+        data.retry.next !== null ? formatClock(data.retry.next) : UNAVAILABLE_LABEL
+      }`
+    : null;
+
+  // Motivo de la interrupción (FR-019): distingue una interrupción de un fallo
+  // propio. Motivo ausente → "no disponible".
+  const interruptLabel =
+    data.status === 'interrupted'
+      ? `Motivo: ${data.interruptReason ?? UNAVAILABLE_LABEL}`
+      : null;
 
   return (
     <div
@@ -104,8 +123,17 @@ const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) =>
                 {`∥${parallel.size}`}
               </span>
             ) : null}
+            {isRunning ? (
+              // Señal de progreso perceptible sin depender del texto en
+              // generación (FR-022): pulso CSS puro.
+              <span
+                data-testid="agent-progress"
+                aria-hidden
+                className="inline-block size-1.5 shrink-0 animate-pulse rounded-full bg-status-running"
+              />
+            ) : null}
             <span className="text-[11px] text-muted-foreground">
-              {STATUS_LABEL[data.status]}
+              {NODE_STATUS_LABEL[data.status]}
             </span>
           </span>
         </div>
@@ -124,7 +152,7 @@ const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) =>
           </span>
         ) : null}
 
-        {/* Pie: consumo resumido + rango horario + herramienta en curso */}
+        {/* Pie: consumo + rango horario + herramienta en curso + reintento/interrupción */}
         <div className="mt-auto flex min-w-0 flex-col gap-1 border-t border-border pt-1.5">
           <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 font-mono text-[11px] tabular-nums text-muted-foreground">
             <span>
@@ -144,6 +172,22 @@ const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) =>
               title={data.currentTool.name}
             >
               {data.currentTool.name}
+            </span>
+          ) : null}
+          {retryLabel ? (
+            <span
+              className="min-w-0 truncate font-mono text-[11px] tabular-nums text-status-running"
+              title={retryLabel}
+            >
+              {retryLabel}
+            </span>
+          ) : null}
+          {interruptLabel ? (
+            <span
+              className="min-w-0 truncate font-mono text-[11px] text-status-error"
+              title={interruptLabel}
+            >
+              {interruptLabel}
             </span>
           ) : null}
         </div>

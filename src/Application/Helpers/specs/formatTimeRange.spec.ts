@@ -1,11 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { formatTimeRange, type TTimeRangeInput } from '../formatTimeRange';
+import {
+  formatDateTimeRange,
+  formatTimeRange,
+  type TTimeRangeInput,
+} from '../formatTimeRange';
 
 const clock = (ms: number): string =>
   new Date(ms).toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
   });
+
+const pad = (value: number): string => String(value).padStart(2, '0');
+
+const stamp = (ms: number): string => {
+  const date = new Date(ms);
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
 
 const START = new Date(2024, 0, 15, 9, 5).getTime();
 const END = new Date(2024, 0, 15, 17, 42).getTime();
@@ -56,5 +67,35 @@ describe('formatTimeRange', () => {
     expect(clock(START)).toMatch(hhmm);
     expect(start).toMatch(hhmm);
     expect(end).toMatch(hhmm);
+  });
+});
+
+describe('formatDateTimeRange', () => {
+  it('formats both endpoints as `dd/mm HH:mm`', () => {
+    expect(formatDateTimeRange(input())).toBe(
+      `${stamp(START)} – ${stamp(END)}`,
+    );
+  });
+
+  it('shows "en curso" while running, even when endedAt is present', () => {
+    expect(formatDateTimeRange(input({ isRunning: true }))).toBe(
+      `${stamp(START)} – en curso`,
+    );
+  });
+
+  it('shows "no disponible" when an endpoint is missing', () => {
+    expect(formatDateTimeRange(input({ endedAt: null }))).toBe(
+      `${stamp(START)} – no disponible`,
+    );
+    expect(formatDateTimeRange(input({ startedAt: null }))).toBe(
+      `no disponible – ${stamp(END)}`,
+    );
+  });
+
+  it('includes the date, not just the clock', () => {
+    const [start, end] = formatDateTimeRange(input()).split(' – ');
+
+    expect(start).toMatch(/^\d{2}\/\d{2} \d{2}:\d{2}$/);
+    expect(end).toMatch(/^\d{2}\/\d{2} \d{2}:\d{2}$/);
   });
 });
