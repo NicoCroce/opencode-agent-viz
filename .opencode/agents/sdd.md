@@ -100,8 +100,12 @@ Informa al usuario la clasificación con el motivo en una frase, y permite cambi
 
 **commit/PR** (solo si verify pasó o el usuario aceptó continuar):
 1. Carga la skill `commit-conventions` y crea el commit con ese formato. No hagas commit en `main`; si estás en `main`, pregunta por la rama.
-2. Carga la skill `pr-detail` para generar `pr-detail.md` (título y cuerpo) comparando `main` con la rama actual.
-3. Muestra el título y el cuerpo, y pregunta antes de abrir el PR o hacer push. No abras el PR ni hagas push sin confirmación explícita.
+2. Carga la skill `pr-detail` para generar `pr-detail.md` (título y cuerpo) comparando la rama base con la rama actual.
+3. Muestra el título y el cuerpo, y pregunta antes de hacer push o abrir el PR. No hagas push ni abras el PR sin confirmación explícita.
+4. Con la confirmación, ejecuta `.opencode/scripts/bash/open-pr.sh "<título>" pr-detail.md <base_branch>` y lee el JSON `{method, pr_url, compare_url, error?}`. La `<base_branch>` es `main`, o la rama de la que depende la actual si el PR es apilado. El script hace `fetch` + `push -u` + `gh pr create` (con fallback a URL de compare) y borra `pr-detail.md`.
+   - `gh` → informa `pr_url`.
+   - `manual` → informa `compare_url` para abrir el PR a mano.
+   - `push_failed` → informa `error`, conserva `pr-detail.md` y permite reintentar solo el PR.
 
 ## Aprobación tras cada fase
 
