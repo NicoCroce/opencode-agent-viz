@@ -1,6 +1,7 @@
 import { Container, Metric } from '@app/Application/Components';
 import { formatCost, formatDuration, formatTokens } from '@app/Application/Helpers';
 import type { TNodeMetrics } from '@app/Domains/Graph/Graph.entity';
+import { LoopBadge } from './LoopBadge';
 
 interface MetricsSectionProps {
   metrics: TNodeMetrics;
@@ -36,5 +37,8 @@ export const MetricsSection = ({ metrics }: MetricsSectionProps) => (
         )}
       />
     </Container>
+    {metrics.hasLoop ? (
+      <LoopBadge retryCount={metrics.retryCount} evidence={metrics.loopEvidence} />
+    ) : null}
   </Container>
 );

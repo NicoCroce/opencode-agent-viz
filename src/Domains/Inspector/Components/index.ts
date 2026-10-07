@@ -7,3 +7,8 @@ export * from './ResourceList';
 export * from './AnswersSection';
 export * from './FileChanges';
 export * from './QuestionsSection';
+export * from './ModelSection';
+export * from './ToolStats';
+export * from './SubagentsSection';
+export * from './AdvancedSection';
+export * from './ErrorsSection';
