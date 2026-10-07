@@ -1,10 +1,11 @@
 import { StrictMode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { EventStreamProvider } from '../EventStreamProvider';
 import { ConnectionBadge } from '@app/Domains/Connection';
 import { queryKeys } from '@app/Domains/queryKeys';
+import { opencodeService } from '../Services/opencodeClient';
 
 vi.mock('@app/Infrastructure/Services/opencodeClient', () => ({
   opencodeService: {
@@ -37,6 +38,10 @@ const queryClient = () =>
   new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
 describe('EventStreamProvider', () => {
+  beforeEach(() => {
+    vi.mocked(opencodeService.getActiveSessions).mockResolvedValue({});
+  });
+
   it('applies streamed events into the query cache', async () => {
     const client = queryClient();
     render(
@@ -68,6 +73,27 @@ describe('EventStreamProvider', () => {
 
     await waitFor(() =>
       expect(screen.getByText('Conectado')).toBeInTheDocument(),
+    );
+  });
+
+  it('seeds the active sessions into the status cache on connect', async () => {
+    vi.mocked(opencodeService.getActiveSessions).mockResolvedValue({
+      ses_1: { type: 'busy' as const },
+    });
+    const client = queryClient();
+
+    render(
+      <QueryClientProvider client={client}>
+        <EventStreamProvider>
+          <div />
+        </EventStreamProvider>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() =>
+      expect(client.getQueryData(queryKeys.sessions.status())).toMatchObject({
+        ses_1: { type: 'busy' },
+      }),
     );
   });
 });

@@ -417,6 +417,17 @@ export const reduceEvent = (event: TReducibleEvent): TEventUpdate | null => {
         set(queryKeys.sessions.status(), (prev) =>
           setStatus(prev, event.data.sessionID, { type: 'busy' }),
         ),
+        // Una nueva ejecución arranca: el outcome/anomalía de la corrida previa
+        // ya no describe lo que pasa ahora. Sin este reset, `toNodeStatus`
+        // devolvería el `succeeded` viejo (el outcome gana sobre `busy`) mientras
+        // el agente vuelve a correr.
+        set(queryKeys.sessions.execution(event.data.sessionID), (prev) =>
+          patchExecution(prev, event.data.sessionID, {
+            outcome: null,
+            interruptReason: null,
+            retry: null,
+          }),
+        ),
       ];
 
     case 'session.execution.succeeded':
