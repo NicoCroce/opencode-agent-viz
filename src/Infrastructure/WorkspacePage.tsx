@@ -128,7 +128,7 @@ export const WorkspacePage = () => {
     () => graph.graph.nodes.some((node) => isActiveStatus(node.data.status)),
     [graph.graph.nodes],
   );
-  const now = useNow(1000, Boolean(id) && hasActiveNode);
+  const now = useNow({ enabled: Boolean(id) && hasActiveNode });
   const summary = useMemo(() => {
     const rootSession =
       items.find((item) => item.session.id === id)?.session ?? null;

@@ -1,4 +1,4 @@
-import { UNAVAILABLE } from './formatDuration';
+import { UNAVAILABLE } from './format/constants';
 
 export const formatTokens = (value: number | null | undefined): string => {
   if (value === null || value === undefined || Number.isNaN(value)) {

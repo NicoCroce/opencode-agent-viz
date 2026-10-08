@@ -1,26 +1,15 @@
 import { NODE_STATUS_LABEL } from '@app/Application/Helpers';
+import { NODE_STATUS_COLOR } from '@app/Application/Helpers/nodeStatusColor';
 import { cn } from '@app/Application/lib/utils';
 import type { TNodeStatus } from '@app/Domains/Graph/Graph.entity';
 
 /**
- * Color y etiqueta por estado (FR-017, 9 estados). Se reutilizan los tokens
- * semánticos existentes (plan.md): reintentando/compactando → `running`;
- * esperando permiso/respuesta → `waiting`; interrumpido comparte el tono
- * `error` pero con etiqueta propia ("Interrumpido"), nunca confundido con un
- * fallo propio (FR-019). Ver `contracts/execution-state-contract.md`.
+ * Punto de color por estado (FR-017, 9 estados). El mapa de color es la fuente
+ * única `NODE_STATUS_COLOR` (SH-03), compartida con `NodeStatusRail` y el punto
+ * del gutter, para que todas las vistas coincidan (FR-023); la etiqueta legible
+ * sigue siendo `NODE_STATUS_LABEL`. Ver
+ * `contracts/execution-state-contract.md`.
  */
-const STATUS_COLOR: Record<TNodeStatus, string> = {
-  created: 'bg-status-idle',
-  running: 'bg-status-running',
-  retrying: 'bg-status-running',
-  compacting: 'bg-status-running',
-  'waiting-permission': 'bg-status-waiting',
-  'waiting-input': 'bg-status-waiting',
-  succeeded: 'bg-status-done',
-  failed: 'bg-status-error',
-  interrupted: 'bg-status-error',
-};
-
 interface StatusDotProps {
   status: TNodeStatus;
   className?: string;
@@ -31,6 +20,6 @@ export const StatusDot = ({ status, className }: StatusDotProps) => (
     role="img"
     aria-label={NODE_STATUS_LABEL[status]}
     title={NODE_STATUS_LABEL[status]}
-    className={cn('inline-block size-2 shrink-0 rounded-full', STATUS_COLOR[status], className)}
+    className={cn('inline-block size-2 shrink-0 rounded-full', NODE_STATUS_COLOR[status], className)}
   />
 );

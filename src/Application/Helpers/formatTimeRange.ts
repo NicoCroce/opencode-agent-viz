@@ -1,10 +1,11 @@
+import { UNAVAILABLE_LABEL } from './format/constants';
+
 export interface TTimeRangeInput {
   startedAt: number | null;
   endedAt: number | null;
   isRunning: boolean;
 }
 
-const UNAVAILABLE_LABEL = 'no disponible';
 const RUNNING_LABEL = 'en curso';
 const RANGE_SEPARATOR = ' – ';
 

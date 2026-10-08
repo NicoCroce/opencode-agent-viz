@@ -1,4 +1,4 @@
-import { Select } from '@app/Application/Components';
+import { LabeledSelect } from '@app/Application/Components/Molecules/LabeledSelect';
 import { TIME_RANGES, type TTimeRange } from '../lib/sessionFilters';
 
 interface TimeRangeFilterProps {
@@ -25,10 +25,10 @@ const isTimeRange = (value: string): value is TTimeRange =>
  * Filtro temporal de recencia del listado de sesiones (feature 005,
  * FR-006..FR-009).
  *
- * Reutiliza el `Select` de `Application/Components` en modo **controlado**:
- * refleja el rango activo (`value`) y delega el cambio en `onChange`. Las
- * opciones provienen de `TIME_RANGES` (conjunto cerrado, FR-007), con `all`
- * ("Todo") como valor por defecto (FR-008).
+ * Reutiliza la molécula `LabeledSelect` (SH-15) sobre el `Select` compartido en
+ * modo **controlado**: refleja el rango activo (`value`) y delega el cambio en
+ * `onChange`. Las opciones provienen de `TIME_RANGES` (conjunto cerrado,
+ * FR-007), con `all` ("Todo") como valor por defecto (FR-008).
  *
  * El control se envuelve en un `<label>` con un texto solo-lectores que nombra
  * el propósito ("Filtrar por recencia"), porque el `Select` compartido no
@@ -36,18 +36,16 @@ const isTimeRange = (value: string): value is TTimeRange =>
  * (FR-021).
  *
  * Es presentación pura: no conoce la URL ni evalúa el rango (eso vive en
- * `sessionFilters.ts`); solo presenta y notifica (Principio V).
+ * `lib/timeRange.ts`); solo presenta y notifica (Principio V).
  */
 export const TimeRangeFilter = ({ value, onChange }: TimeRangeFilterProps) => (
-  <label>
-    <span className="sr-only">{RANGE_FILTER_LABEL}</span>
-    <Select
-      value={value}
-      onValueChange={(next) => {
-        if (isTimeRange(next)) onChange(next);
-      }}
-      options={RANGE_OPTIONS}
-      placeholder={RANGE_PLACEHOLDER}
-    />
-  </label>
+  <LabeledSelect
+    label={RANGE_FILTER_LABEL}
+    value={value}
+    onChange={(next) => {
+      if (isTimeRange(next)) onChange(next);
+    }}
+    options={RANGE_OPTIONS}
+    placeholder={RANGE_PLACEHOLDER}
+  />
 );

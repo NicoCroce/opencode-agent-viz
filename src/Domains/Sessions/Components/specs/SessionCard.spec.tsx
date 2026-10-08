@@ -51,6 +51,22 @@ describe('SessionCard', () => {
     expect(screen.getByRole('img', { name: 'En curso' })).toBeInTheDocument();
   });
 
+  it('uses an explicitly provided nodeStatus over the derived one', () => {
+    render(
+      <SessionCard
+        item={{ session, agentName: 'develop' }}
+        status={{ type: 'busy' }}
+        nodeStatus="failed"
+        selected={false}
+        onSelect={() => undefined}
+      />,
+    );
+    expect(screen.getByRole('img', { name: 'Fallida' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('img', { name: 'En curso' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('stacks the title, then the date-time range, then the agent', () => {
     render(
       <SessionCard
