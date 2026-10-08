@@ -51,6 +51,19 @@ const assistant = (
   return { info, parts: info.content };
 };
 
+/** Parte de tool fallida, para ejercitar `hasError` sobre la última respuesta. */
+const toolError = {
+  type: "tool",
+  id: "tool_1",
+  name: "bash",
+  state: {
+    status: "error",
+    input: {},
+    error: { type: "unknown", message: "boom" },
+  },
+  time: { created: 1, completed: 2 },
+} as unknown as SessionMessageAssistant["content"][number];
+
 const signal = (
   overrides: Partial<TExecutionSignal> = {},
 ): TExecutionSignal => ({
@@ -337,6 +350,29 @@ describe("buildGraph", () => {
           messages: {
             root: [assistant({ error: { type: "api", message: "boom" } })],
           },
+        }),
+      );
+      expect(graph.nodes[0].data.status).toBe("failed");
+    });
+
+    it("un error viejo no tiñe si la última respuesta assistant está limpia", () => {
+      const graph = buildGraph(
+        baseInput({
+          messages: {
+            root: [
+              assistant({ error: { type: "api", message: "boom" } }),
+              assistant({ id: "msg_2" }),
+            ],
+          },
+        }),
+      );
+      expect(graph.nodes[0].data.status).toBe("succeeded");
+    });
+
+    it("un tool fallido en la última respuesta sí marca failed", () => {
+      const graph = buildGraph(
+        baseInput({
+          messages: { root: [assistant({ content: [toolError] })] },
         }),
       );
       expect(graph.nodes[0].data.status).toBe("failed");

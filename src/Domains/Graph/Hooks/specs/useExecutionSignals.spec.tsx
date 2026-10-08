@@ -72,6 +72,15 @@ const interruptedNoReason = {
   data: { sessionID: SESSION_ID },
 } as unknown as SessionLogItem;
 
+/** Nueva ejecución sobre la misma sesión: debe limpiar el outcome anterior. */
+const execStarted: SessionLogItem = {
+  id: 'evt_exec_start',
+  created: 430,
+  type: 'session.execution.started',
+  durable: durable(7),
+  data: { sessionID: SESSION_ID },
+};
+
 /* ------------------------------------------------------------------ */
 /* Eventos en vivo (los reduce `eventReducer` y los aplica el stream)   */
 /* ------------------------------------------------------------------ */
@@ -166,6 +175,24 @@ describe('useExecutionSignals', () => {
 
     await waitFor(() => expect(result.current.outcome).toBe('succeeded'));
     expect(result.current.retry).toBeNull();
+  });
+
+  it('clears the previous outcome when the log shows a new execution started', async () => {
+    // Corrida previa exitosa, una compactación posterior y el arranque de una
+    // nueva ejecución: el outcome viejo ya no describe el estado actual.
+    getSessionLog.mockResolvedValue([
+      execSucceeded,
+      compactionStarted,
+      execStarted,
+    ]);
+
+    const { result } = renderSignals();
+
+    // La compactación confirma que el log se sembró...
+    await waitFor(() => expect(result.current.compaction).toBe('running'));
+    // ...y el arranque posterior limpia el outcome de la corrida anterior.
+    expect(result.current.outcome).toBeNull();
+    expect(result.current.interruptReason).toBeNull();
   });
 
   it('applies live events on top of the durable seed', async () => {

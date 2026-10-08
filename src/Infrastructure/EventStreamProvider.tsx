@@ -27,12 +27,72 @@ export const useEventStream = (): EventStreamContextValue =>
 
 const FLUSH_INTERVAL_MS = 100;
 const MAX_ATTEMPTS = 5;
+/**
+ * Cada cuánto se re-siembra la foto de sesiones activas (`session.active()`).
+ * V2 no emite un evento de "arranque" fiable por ejecución, así que sin este
+ * refresco una sesión que empieza a correr después del montaje nunca recibe
+ * `busy` y el grafo la deriva como terminada.
+ */
+const ACTIVE_POLL_MS = 2500;
+
+/**
+ * Aplica la foto de `session.active()` sobre el mapa de estados y reconcilia
+ * los `busy` que ya no están activos.
+ *
+ * V2 no emite `session.idle`, así que el único cierre fiable de una ejecución es
+ * un `session.execution.*` terminal. Si ese evento se pierde (o el server deja
+ * de reportar la sesión), el `busy` quedaría pegado para siempre y el nodo nunca
+ * pasaría a un estado terminal. Por eso el poll degrada a `idle` lo que dejó de
+ * estar activo.
+ *
+ * `reset` reemplaza el mapa entero (snapshot autoritativo al conectar) y no
+ * reconcilia. En modo incremental, un `busy` ausente del seed no se degrada al
+ * primer sondeo: se anota en `missing` y recién al segundo se marca `idle`, para
+ * no oscilar cuando el request de `active()` quedó en vuelo justo al arrancar
+ * una ejecución.
+ */
+export const applyActiveSeed = (
+  prev: Record<string, SessionStatus>,
+  seed: Record<string, SessionStatus>,
+  { reset, missing }: { reset: boolean; missing: Set<string> },
+): Record<string, SessionStatus> => {
+  const next: Record<string, SessionStatus> = reset ? {} : { ...prev };
+
+  for (const [id, status] of Object.entries(seed)) {
+    // El seed solo sabe `running`; no pisa el detalle `retry` de los eventos.
+    if (!reset && next[id]?.type === 'retry') continue;
+    next[id] = status;
+  }
+
+  if (reset) {
+    missing.clear();
+    return next;
+  }
+
+  const activeIds = new Set(Object.keys(seed));
+  for (const [id, status] of Object.entries(next)) {
+    if (status.type !== 'busy' || activeIds.has(id)) {
+      missing.delete(id);
+      continue;
+    }
+    if (missing.has(id)) {
+      next[id] = { type: 'idle' };
+      missing.delete(id);
+    } else {
+      missing.add(id);
+    }
+  }
+
+  return next;
+};
 
 export const EventStreamProvider = ({ children }: { children: ReactNode }) => {
   const queryClient = useQueryClient();
   const [state, setState] = useState<TConnectionState>('reconnecting');
   const bufferRef = useRef<V2Event[]>([]);
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Sesiones `busy` ausentes del último sondeo (gracia antes de degradarlas). */
+  const missingActiveRef = useRef<Set<string>>(new Set());
 
   const flush = useCallback(() => {
     const events = bufferRef.current;
@@ -59,22 +119,44 @@ export const EventStreamProvider = ({ children }: { children: ReactNode }) => {
     }, FLUSH_INTERVAL_MS);
   }, [flush]);
 
-  // Siembra el mapa global de estados. V2 eliminó `session.status`: la única
-  // foto inicial es `session.active()`, que devuelve las sesiones en curso.
-  // A partir de ahí los eventos `session.status`/`session.idle` lo refinan.
+  // Siembra/refresca el mapa global de estados desde `session.active()`. V2
+  // eliminó `session.status`: la única foto del estado en curso es
+  // `session.active()`, que devuelve las sesiones que están corriendo. El seed
+  // se vuelve a pedir periódicamente y al (re)conectar porque los eventos de
+  // arranque no siempre llegan: sin esto, una sesión que empieza a correr
+  // después del montaje queda sin `busy` y el grafo la deriva como `succeeded`.
+  //
+  // `reset` reemplaza el mapa completo (snapshot autoritativo: se usa al
+  // conectar); sin `reset` solo agrega/actualiza las activas y preserva el
+  // detalle `retry` que aportan los eventos.
+  const refreshActive = useCallback(
+    async (reset: boolean) => {
+      try {
+        const seed = await opencodeService.getActiveSessions();
+        const key = queryKeys.sessions.status();
+        const prev =
+          queryClient.getQueryData<Record<string, SessionStatus>>(key) ?? {};
+        queryClient.setQueryData(
+          key,
+          applyActiveSeed(prev, seed, {
+            reset,
+            missing: missingActiveRef.current,
+          }),
+        );
+      } catch {
+        // Sin respuesta: el SSE reintenta y el siguiente tick lo vuelve a probar.
+      }
+    },
+    [queryClient],
+  );
+
   useEffect(() => {
-    let active = true;
-    void opencodeService.getActiveSessions().then((seed) => {
-      if (!active) return;
-      queryClient.setQueryData<Record<string, SessionStatus>>(
-        queryKeys.sessions.status(),
-        (prev) => ({ ...seed, ...(prev ?? {}) }),
-      );
-    });
-    return () => {
-      active = false;
-    };
-  }, [queryClient]);
+    void refreshActive(true);
+    const timer = setInterval(() => {
+      void refreshActive(false);
+    }, ACTIVE_POLL_MS);
+    return () => clearInterval(timer);
+  }, [refreshActive]);
 
   // Un unico stream SSE global: `GET /api/event` no acepta `location`, asi que
   // el server emite para todos los proyectos y cada evento trae el suyo.
@@ -89,6 +171,8 @@ export const EventStreamProvider = ({ children }: { children: ReactNode }) => {
           setState('reconnecting');
           const stream = opencodeService.subscribeEvents(controller.signal);
           setState('connected');
+          // Foto autoritativa de las sesiones activas al (re)conectar.
+          void refreshActive(true);
           attempt = 0;
 
           for await (const event of stream) {
@@ -131,7 +215,7 @@ export const EventStreamProvider = ({ children }: { children: ReactNode }) => {
         flushTimerRef.current = null;
       }
     };
-  }, [scheduleFlush, queryClient]);
+  }, [scheduleFlush, queryClient, refreshActive]);
 
   return (
     <EventStreamContext.Provider value={{ state }}>

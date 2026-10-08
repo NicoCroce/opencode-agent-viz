@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { V2Event } from '@opencode/client';
+import type { SessionStatus, V2Event } from '@opencode/client';
 import { reduceEvent } from '../eventReducer';
 import type { TReducibleEvent } from '../eventReducer';
 import { queryKeys } from '../../../queryKeys';
@@ -237,6 +237,14 @@ const execInterrupted: V2Event = {
   data: { sessionID: 'ses_1', reason: 'user' },
 };
 
+const execStarted: V2Event = {
+  id: 'evt_exec_start',
+  created: 403,
+  type: 'session.execution.started',
+  durable: { aggregateID: 'ses_1', seq: 63, version: 1 },
+  data: { sessionID: 'ses_1' },
+};
+
 const sessionIdle: V2Event = {
   id: 'evt_idle',
   created: 500,
@@ -460,6 +468,26 @@ describe('reduceEvent', () => {
     expect(cache['ses_1'].retry).toBeNull();
     expect(cache['ses_1'].compaction).toBeNull();
     expect(cache['ses_1'].outcome).toBe('failed');
+  });
+
+  it('marks busy and clears the previous outcome when a new execution starts', () => {
+    let cache = applyExecution(undefined, execSucceeded);
+    cache = applyExecution(cache, execInterrupted);
+    expect(cache['ses_1'].outcome).toBe('interrupted');
+
+    cache = applyExecution(cache, execStarted);
+
+    // La sesión vuelve a correr: `busy` y sin outcome viejo que lo tape.
+    expect(cache['ses_1'].outcome).toBeNull();
+    expect(cache['ses_1'].interruptReason).toBeNull();
+    expect(cache['ses_1'].retry).toBeNull();
+
+    const statuses = applyKey(
+      {},
+      execStarted,
+      queryKeys.sessions.status(),
+    ) as Record<string, SessionStatus>;
+    expect(statuses['ses_1']).toEqual({ type: 'busy' });
   });
 
   it('invalidates inbox and forms caches on their events', () => {
