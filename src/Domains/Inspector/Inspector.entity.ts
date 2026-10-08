@@ -4,7 +4,7 @@ import type {
   SessionInboxInfo,
   SessionMessageInfo,
 } from '@opencode/client';
-import type { TGraphNode, TNodeMetrics } from '../Graph/Graph.entity';
+import type { TNodeMetrics } from '../Graph/Graph.entity';
 
 /** `McpServer.status` es una unión discriminada por `status`. */
 export type TMcpStatus = McpServer['status']['status'];
@@ -142,15 +142,6 @@ export interface TTaskEntry {
   sessionID: string | null;
   startedAt?: number;
   endedAt?: number;
-}
-
-export interface TNodeDetail {
-  node: TGraphNode;
-  metrics: TNodeMetrics;
-  tools: TToolHistoryEntry[];
-  tasks: TTaskEntry[];
-  errors: { message: string; at: number }[];
-  resources: TResourceUsage;
 }
 
 export interface TSessionSummary {
