@@ -7,12 +7,17 @@ import type {
   SessionStatus,
 } from "@opencode/client";
 import type {
+  TEnrichmentState,
   TExecutionSignal,
   TGraphEdge,
   TGraphModel,
   TGraphNode,
 } from "../Graph.entity";
-import { deriveMetrics, type TSessionMessageLike } from "./deriveMetrics";
+import {
+  deriveMetricBase,
+  resolveMetrics,
+  type TSessionMessageLike,
+} from "./deriveMetrics";
 import { toNodeStatus } from "./nodeStatus";
 
 export interface BuildGraphInput {
@@ -40,49 +45,17 @@ export interface BuildGraphInput {
    * (FR-034) se muestra en el detalle del agente, no en `TNodeStatus`.
    */
   inbox: SessionInboxInfo[];
+  /**
+   * Estado de carga del detalle para los nodos producidos (data-model §2.2,
+   * contrato de carga §1.1/§1.2): `'pending'` en la fase estructural (métricas/
+   * señales/permisos/formularios aún sin fusionar) y `'ready'` cuando el
+   * enriquecimiento completó el lote del nodo. Es **opcional** con default
+   * `'ready'` para preservar la firma y la paridad actual (FR-007): los
+   * consumidores previos no pasan el campo y obtienen el grafo enriquecido.
+   */
+  enrichment?: TEnrichmentState;
   now: number;
 }
-
-const resolveModel = (
-  messages: TSessionMessageLike[] | undefined,
-): TGraphNode["data"]["model"] => {
-  if (!messages) return null;
-  for (const { info } of messages) {
-    if (info.type === "assistant") return info.model;
-  }
-  return null;
-};
-
-/**
- * `true` si la ÚLTIMA respuesta assistant quedó en error (FR-020): su propio
- * `error` o un tool fallido dentro de ese mismo mensaje. Un error viejo y ya
- * superado no debe teñir toda la sesión (el nombre del campo,
- * `lastAssistantErrored`, es literal: mira la última respuesta, no cualquiera).
- */
-const hasError = (messages: TSessionMessageLike[] | undefined): boolean => {
-  if (!messages) return false;
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const { info, parts } = messages[index];
-    if (info.type !== "assistant") continue;
-    if (info.error) return true;
-    return parts.some((p) => p.type === "tool" && p.state.status === "error");
-  }
-  return false;
-};
-
-const currentTool = (
-  messages: TSessionMessageLike[] | undefined,
-): { name: string; state: string } | null => {
-  if (!messages) return null;
-  let found: { name: string; state: string } | null = null;
-  for (const { parts } of messages) {
-    for (const part of parts) {
-      if (part.type !== "tool") continue;
-      found = { name: part.name, state: part.state.status };
-    }
-  }
-  return found;
-};
 
 /** Un formulario cuenta como pendiente solo si su estado resuelto es `pending`. */
 const hasPendingForm = (forms: FormDetail[], sessionId: string): boolean =>
@@ -98,6 +71,7 @@ export const buildGraph = ({
   permissions,
   signals,
   forms,
+  enrichment = "ready",
   now,
 }: BuildGraphInput): TGraphModel => {
   const nodes: TGraphNode[] = sessions.map((session) => {
@@ -112,11 +86,11 @@ export const buildGraph = ({
       session.agent ?? (session.parentID === undefined ? "root" : "subagent");
     const agent = agents.find((a) => a.id === agentName);
 
-    const metrics = deriveMetrics({
-      messages: sessionMessages ?? [],
-      status: sessionStatus,
-      now,
-    });
+    // La base de métricas es independiente del reloj (R3) y expone además
+    // `model`/`currentTool`/`lastAssistantErrored`, que antes recorrían los
+    // mensajes por separado; `resolveMetrics` solo añade `durationMs`.
+    const base = deriveMetricBase(sessionMessages ?? []);
+    const metrics = resolveMetrics(base, sessionStatus, now, 0);
 
     const status = toNodeStatus({
       status: sessionStatus,
@@ -125,7 +99,7 @@ export const buildGraph = ({
       hasPendingForm: hasPendingForm(forms, session.id),
       compaction: signal?.compaction ?? null,
       outcome: signal?.outcome ?? null,
-      lastAssistantErrored: hasError(sessionMessages),
+      lastAssistantErrored: base.lastAssistantErrored,
     });
 
     return {
@@ -139,7 +113,7 @@ export const buildGraph = ({
         updatedAt: session.time.idle ?? session.time.updated,
         agentName,
         directory: session.location.directory,
-        model: resolveModel(sessionMessages) ?? agent?.model ?? null,
+        model: base.model ?? agent?.model ?? null,
         status,
         // `retry`/`interruptReason` solo se exponen cuando el estado los hace
         // pertinentes (FR-018/FR-019); si la señal no los trae se cae al
@@ -155,10 +129,11 @@ export const buildGraph = ({
           status === "interrupted" ? (signal?.interruptReason ?? null) : null,
         metrics,
         isRoot: session.parentID === undefined,
-        currentTool: currentTool(sessionMessages),
+        currentTool: base.currentTool,
         // El paralelismo es una propiedad de la vista (depende del subárbol y
         // de `now`); se completa en `useGraphModel`.
         parallel: null,
+        enrichment,
       },
     };
   });

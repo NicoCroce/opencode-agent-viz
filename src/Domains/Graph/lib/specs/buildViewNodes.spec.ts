@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { TGraphNode, TNodeSizeOverride } from '../../Graph.entity';
 import { EMPTY_METRICS } from '../../Graph.entity';
 import { NODE_WIDTH } from '../layoutGraph';
 import { cardHeight } from '../cardHeight';
+import * as cardHeightModule from '../cardHeight';
 import { buildViewNodes } from '../buildViewNodes';
 
 // Contrato: `specs/002-viz-ux-refinements/contracts/graph-view-contract.md`
@@ -127,5 +128,76 @@ describe('buildViewNodes', () => {
 
     expect(input).toEqual(snapshotNodes);
     expect(overrides).toEqual(snapshotOverrides);
+  });
+});
+
+// C5 — contrato de render §3: `buildViewNodes` calcula `height` una sola vez
+// (`override?.height ?? cardHeight(data, width)`) y lo devuelve ya resuelto, de
+// modo que el consumidor no tenga que recalcularlo.
+//
+// La otra mitad de C5 —que `AgentGraph` reutilice ese `node.height` y NO vuelva
+// a llamar `cardHeight` en su `heightByNode`— no es verificable desde este spec
+// (vive en `Components/AgentGraph.tsx`). Queda pendiente de T028 (eliminar la
+// llamada de `AgentGraph.tsx:171`) y se comprueba en `AgentGraph.spec.tsx`
+// (T024). Este bloque cierra el límite del builder: una llamada a `cardHeight`
+// por nodo, nunca cuando el alto viene de un override.
+describe('buildViewNodes — altura calculada una sola vez (C5)', () => {
+  const spyOnCardHeight = () => vi.spyOn(cardHeightModule, 'cardHeight');
+
+  it('returns the height already calculated by cardHeight when there is no override', () => {
+    const cardHeightSpy = spyOnCardHeight();
+    const root = node('root', 40, 80);
+
+    const [view] = buildViewNodes([root], {}, null, false);
+
+    expect(cardHeightSpy).toHaveBeenCalledTimes(1);
+    expect(cardHeightSpy).toHaveBeenCalledWith(root.data, NODE_WIDTH);
+    expect(typeof view.height).toBe('number');
+    // El alto devuelto es exactamente el de esa única llamada: no se recalcula.
+    expect(view.height).toBe(cardHeightSpy.mock.results[0].value);
+  });
+
+  it('does not call cardHeight when the node height comes from an override', () => {
+    const cardHeightSpy = spyOnCardHeight();
+
+    const [view] = buildViewNodes(
+      [node('root')],
+      { root: override({ height: 250 }) },
+      null,
+      false,
+    );
+
+    expect(cardHeightSpy).not.toHaveBeenCalled();
+    expect(view.height).toBe(250);
+  });
+
+  it('computes cardHeight exactly once per node without recalculating it', () => {
+    const cardHeightSpy = spyOnCardHeight();
+    const nodes = [node('root'), node('child'), node('grandchild')];
+
+    const views = buildViewNodes(nodes, {}, null, false);
+
+    expect(cardHeightSpy).toHaveBeenCalledTimes(nodes.length);
+    views.forEach((view, index) => {
+      expect(view.height).toBe(cardHeightSpy.mock.results[index].value);
+    });
+  });
+
+  it('mixes overrides and computed heights without extra cardHeight calls', () => {
+    const cardHeightSpy = spyOnCardHeight();
+    const root = node('root');
+    const child = node('child');
+
+    const views = buildViewNodes(
+      [root, child],
+      { child: override({ height: 300 }) },
+      null,
+      false,
+    );
+
+    expect(cardHeightSpy).toHaveBeenCalledTimes(1);
+    expect(cardHeightSpy).toHaveBeenCalledWith(root.data, NODE_WIDTH);
+    expect(views[0].height).toBe(cardHeightSpy.mock.results[0].value);
+    expect(views[1].height).toBe(300);
   });
 });

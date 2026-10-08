@@ -1,6 +1,8 @@
-import type { SessionInfo, SessionStatus } from '@opencode/client';
+import type { ModelRef, SessionInfo, SessionStatus } from '@opencode/client';
 import type {
+  TCurrentTool,
   TGraphModel,
+  TMetricBase,
   TNodeMetrics,
   TNodeStatus,
   TTokenUsage,
@@ -58,16 +60,26 @@ const accumulateTokens = (
   seen.cacheWrite = true;
 };
 
-export const deriveMetrics = ({
-  messages,
-  status,
-  subtaskInvocations = 0,
-  now,
-}: DeriveMetricsInput): TNodeMetrics => {
+/**
+ * Deriva la base de métricas de una sesión **sin depender del reloj** (R3):
+ * recorre `messages` una sola vez y expone `startedAt`/`endedAt`/`cost`/`tokens`/
+ * `retryCount`/`hasLoop`/`loopEvidence` y, reutilizando el mismo recorrido,
+ * `model`, `currentTool` y `lastAssistantErrored`. No calcula `durationMs`
+ * (eso depende de `now` y lo resuelve `resolveMetrics`).
+ */
+export const deriveMetricBase = (
+  messages: TSessionMessageLike[],
+): TMetricBase => {
   let startedAt: number | null = null;
   let endedAt: number | null = null;
   let cost = 0;
   let sawCost = false;
+  let retryCount = 0;
+  const loopEvidence: string[] = [];
+  let model: ModelRef | null = null;
+  let sawAssistant = false;
+  let currentTool: TCurrentTool | null = null;
+  let lastAssistantErrored = false;
 
   const acc: TokenAccumulator = {
     input: 0,
@@ -84,11 +96,21 @@ export const deriveMetrics = ({
     cacheWrite: false,
   };
 
-  let retryCount = 0;
-  const loopEvidence: string[] = [];
+  for (const { info, parts } of messages) {
+    // El último tool de la sesión gana (mismo recorrido que `buildGraph`).
+    for (const part of parts) {
+      if (part.type === 'tool') {
+        currentTool = { name: part.name, state: part.state.status };
+      }
+    }
 
-  for (const { info } of messages) {
     if (info.type !== 'assistant') continue;
+
+    // La primera respuesta assistant aporta el `model` (como `resolveModel`).
+    if (!sawAssistant) {
+      model = info.model;
+      sawAssistant = true;
+    }
 
     const { created, completed } = info.time;
     if (startedAt === null || created < startedAt) startedAt = created;
@@ -107,14 +129,13 @@ export const deriveMetrics = ({
       retryCount += 1;
       loopEvidence.push(info.retry.error.message);
     }
-  }
 
-  if (status?.type === 'retry') {
-    retryCount += Math.max(status.attempt, 1);
-    loopEvidence.push(status.message);
+    // `lastAssistantErrored` mira la ÚLTIMA respuesta assistant (FR-020): su
+    // propio `error` o un tool fallido dentro de ese mismo mensaje.
+    lastAssistantErrored = info.error
+      ? true
+      : parts.some((p) => p.type === 'tool' && p.state.status === 'error');
   }
-
-  const durationMs = startedAt === null ? null : (endedAt ?? now) - startedAt;
 
   const hasTokens =
     seen.input ||
@@ -134,17 +155,67 @@ export const deriveMetrics = ({
     : null;
 
   return {
-    durationMs,
     startedAt,
     endedAt,
     cost: sawCost ? cost : null,
     tokens,
+    retryCount,
+    hasLoop: retryCount > 0,
+    loopEvidence,
+    model,
+    currentTool,
+    lastAssistantErrored,
+  };
+};
+
+/**
+ * Resuelve el `TNodeMetrics` completo a partir de la base memoizada (R3):
+ * solo `durationMs = (endedAt ?? now) - startedAt` depende del reloj, más el
+ * `retry` del `status` y las invocaciones del subárbol. O(1) por nodo y tick.
+ */
+export const resolveMetrics = (
+  base: TMetricBase,
+  status: SessionStatus | undefined,
+  now: number,
+  subtaskInvocations: number,
+): TNodeMetrics => {
+  const retryCount =
+    status?.type === 'retry'
+      ? base.retryCount + Math.max(status.attempt, 1)
+      : base.retryCount;
+  const loopEvidence =
+    status?.type === 'retry'
+      ? [...base.loopEvidence, status.message]
+      : base.loopEvidence;
+
+  const durationMs =
+    base.startedAt === null ? null : (base.endedAt ?? now) - base.startedAt;
+
+  return {
+    durationMs,
+    startedAt: base.startedAt,
+    endedAt: base.endedAt,
+    cost: base.cost,
+    tokens: base.tokens,
     invocations: subtaskInvocations,
     retryCount,
     hasLoop: retryCount > 0,
     loopEvidence,
   };
 };
+
+/**
+ * Envoltorio de objeto equivalente `{ messages, status, subtaskInvocations, now }`
+ * (firma que ya usa `buildGraph`): compone `deriveMetricBase` + `resolveMetrics`
+ * sin cambiar a ningún consumidor (Principio V, R3).
+ */
+export const deriveMetrics = ({
+  messages,
+  status,
+  subtaskInvocations = 0,
+  now,
+}: DeriveMetricsInput): TNodeMetrics =>
+  resolveMetrics(deriveMetricBase(messages), status, now, subtaskInvocations);
 
 const sumNullable = (values: (number | null)[]): number | null => {
   const present = values.filter((v): v is number => v !== null);

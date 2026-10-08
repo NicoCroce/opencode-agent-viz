@@ -93,3 +93,87 @@ describe('useNodeResize', () => {
     expect(result.current.overrides['node-1']).toBeDefined();
   });
 });
+
+/**
+ * Paridad de resize al cambiar de sesión (FR-007, SC-006; escenario 3 de la
+ * Historia 4): el tamaño/posición elegido por el usuario no se filtra entre
+ * sesiones y, al volver a una sesión ya visitada, el reseteo se comporta como
+ * hoy (el estado de vista no persiste por sesión).
+ */
+describe('useNodeResize — paridad de resize al cambiar de sesión (FR-007)', () => {
+  it('clears both the resized dimensions and the position on a session change', () => {
+    const { result, rerender } = renderHook(
+      ({ resetKey }: { resetKey: string | null }) => useNodeResize(resetKey),
+      { initialProps: { resetKey: 'session-a' } },
+    );
+
+    act(() => result.current.onNodesChange(resizeChanges('node-1')));
+    expect(result.current.overrides['node-1']).toMatchObject({
+      width: 300,
+      height: 200,
+      x: 40,
+      y: 30,
+    });
+
+    rerender({ resetKey: 'session-b' });
+
+    expect(result.current.overrides).toEqual({});
+    expect(result.current.overrides['node-1']).toBeUndefined();
+  });
+
+  it('does not leak the previous session sizes into the new session', () => {
+    const { result, rerender } = renderHook(
+      ({ resetKey }: { resetKey: string | null }) => useNodeResize(resetKey),
+      { initialProps: { resetKey: 'session-a' } },
+    );
+
+    act(() => result.current.onNodesChange(resizeChanges('node-a')));
+    rerender({ resetKey: 'session-b' });
+    act(() => result.current.onNodesChange(resizeChanges('node-b')));
+
+    expect(result.current.overrides['node-b']).toBeDefined();
+    expect(result.current.overrides['node-a']).toBeUndefined();
+    expect(Object.keys(result.current.overrides)).toEqual(['node-b']);
+  });
+
+  it('does not restore the previous sizes when returning to a visited session', () => {
+    const { result, rerender } = renderHook(
+      ({ resetKey }: { resetKey: string | null }) => useNodeResize(resetKey),
+      { initialProps: { resetKey: 'session-a' } },
+    );
+
+    act(() => result.current.onNodesChange(resizeChanges('node-1')));
+    rerender({ resetKey: 'session-b' });
+    rerender({ resetKey: 'session-a' });
+
+    // Igual que hoy: al volver a una sesión visitada no se restaura su resize.
+    expect(result.current.overrides).toEqual({});
+  });
+
+  it('keeps the reset override map stable while staying in the same session', () => {
+    const { result, rerender } = renderHook(
+      ({ resetKey }: { resetKey: string | null }) => useNodeResize(resetKey),
+      { initialProps: { resetKey: 'session-a' } },
+    );
+
+    act(() => result.current.onNodesChange(resizeChanges('node-1')));
+    rerender({ resetKey: 'session-b' });
+    const afterReset = result.current.overrides;
+    rerender({ resetKey: 'session-b' });
+
+    expect(result.current.overrides).toBe(afterReset);
+  });
+
+  it('clears overrides when the reset key becomes null', () => {
+    const initialProps: { resetKey: string | null } = { resetKey: 'session-a' };
+    const { result, rerender } = renderHook(
+      ({ resetKey }: { resetKey: string | null }) => useNodeResize(resetKey),
+      { initialProps },
+    );
+
+    act(() => result.current.onNodesChange(resizeChanges('node-1')));
+    rerender({ resetKey: null });
+
+    expect(result.current.overrides).toEqual({});
+  });
+});
