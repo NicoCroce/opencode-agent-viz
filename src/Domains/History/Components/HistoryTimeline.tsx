@@ -1,6 +1,8 @@
-import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
+import { useRef, type CSSProperties, type ReactNode } from 'react';
 import { EmptyState, HistoryEntry } from '@app/Application/Components';
 import type { THistoryEntry } from '../History.entity';
+import { useHistorySentinel } from '../Hooks/useHistorySentinel';
+import { HistoryLoadError } from './HistoryLoadError';
 
 interface HistoryTimelineProps {
   /** Entradas del histórico en orden cronológico ascendente (`buildHistory`). */
@@ -60,28 +62,14 @@ export const HistoryTimeline = ({
   renderCompactionContext,
 }: HistoryTimelineProps) => {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  // Mantiene la última función sin re-crear el observer en cada render.
-  const fetchNextPageRef = useRef(fetchNextPage);
 
-  useEffect(() => {
-    fetchNextPageRef.current = fetchNextPage;
+  useHistorySentinel({
+    sentinelRef,
+    hasNextPage,
+    isFetchingNextPage,
+    isFetchNextPageError,
+    fetchNextPage,
   });
-
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel || !hasNextPage || isFetchingNextPage || isFetchNextPageError) {
-      return;
-    }
-    if (typeof IntersectionObserver === 'undefined') return;
-
-    const observer = new IntersectionObserver((observed) => {
-      if (observed.some((entry) => entry.isIntersecting)) {
-        fetchNextPageRef.current();
-      }
-    });
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, isFetchNextPageError]);
 
   if (entries.length === 0) {
     return (
@@ -108,14 +96,7 @@ export const HistoryTimeline = ({
         </div>
       ) : null}
 
-      {isFetchNextPageError ? (
-        <p
-          role="alert"
-          className="rounded-flat border border-status-error px-2 py-1 text-xs text-status-error"
-        >
-          No se pudo cargar más actividad; puede faltar contenido.
-        </p>
-      ) : null}
+      {isFetchNextPageError ? <HistoryLoadError /> : null}
 
       <div className="flex flex-col gap-3">
         {entries.map((entry) => (

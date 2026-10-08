@@ -1,42 +1,30 @@
-import { Container, StatusDot } from '@app/Application/Components';
+import { Container } from '@app/Application/Components';
 import {
-  NODE_STATUS_LABEL,
-  UNAVAILABLE,
   formatCost,
   formatDuration,
   formatTokens,
+  totalTokens,
 } from '@app/Application/Helpers';
-import type { TNodeStatus, TTokenUsage } from '../Graph.entity';
-import type { TSessionSummary } from '../../Inspector/Inspector.entity';
+import type { TNodeMetrics } from '../Graph.entity';
+import {
+  buildSummaryCounters,
+  type TSummaryCounts,
+} from '../lib/summaryCounters';
+import { SummaryCounterBadge } from './SummaryCounterBadge';
+import { SummaryMetric } from './SummaryMetric';
 
+/**
+ * Datos que la barra consume: contadores por estado (`TSummaryCounts`) + coste,
+ * tokens y tiempo. Tipo estructural local para no importar `TSessionSummary` de
+ * `Inspector` desde un componente (AGENTS §8.3); `TSessionSummary` lo satisface
+ * sin tocar a sus consumidores.
+ */
 export interface SessionSummaryBarProps {
-  summary: TSessionSummary;
+  summary: TSummaryCounts & {
+    metrics: Pick<TNodeMetrics, 'cost' | 'tokens'>;
+    elapsedMs: number | null;
+  };
 }
-
-interface Counter {
-  status: TNodeStatus;
-  label: string;
-  count: number;
-  /** Se muestra siempre aunque esté en 0 (FR-024: en curso/esperando/error). */
-  always: boolean;
-}
-
-/** Total de tokens consumidos (entrada + salida + razonamiento), o `null`. */
-const totalTokens = (tokens: TTokenUsage | null): number | null => {
-  if (!tokens) return null;
-  const values = [tokens.input, tokens.output, tokens.reasoning].filter(
-    (value): value is number => value !== null,
-  );
-  return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) : null;
-};
-
-/** Dato ausente → "no disponible" (FR-038), nunca un valor inventado ni un hueco. */
-const Unavailable = () => (
-  <span className="text-muted-foreground" aria-label="no disponible">
-    {UNAVAILABLE}
-    <span className="sr-only"> no disponible</span>
-  </span>
-);
 
 /**
  * Barra de resumen agregado de la sesión (FR-024..FR-027): contadores por
@@ -48,66 +36,14 @@ const Unavailable = () => (
  * Los contadores de en curso, esperando y con error se muestran siempre
  * (FR-024); el resto de estados solo cuando tienen agentes. Las dos esperas se
  * agrupan bajo "Esperando" y una interrupción nunca se cuenta como error
- * (FR-019).
+ * (FR-019). La construcción de contadores vive en `buildSummaryCounters`.
  */
 export const SessionSummaryBar = ({ summary }: SessionSummaryBarProps) => {
-  const allCounters: Counter[] = [
-    {
-      status: 'running',
-      label: NODE_STATUS_LABEL.running,
-      count: summary.runningCount,
-      always: true,
-    },
-    {
-      status: 'waiting-permission',
-      label: 'Esperando',
-      count: summary.waitingCount,
-      always: true,
-    },
-    {
-      status: 'failed',
-      label: NODE_STATUS_LABEL.failed,
-      count: summary.errorCount,
-      always: true,
-    },
-    {
-      status: 'retrying',
-      label: NODE_STATUS_LABEL.retrying,
-      count: summary.retryingCount,
-      always: false,
-    },
-    {
-      status: 'compacting',
-      label: NODE_STATUS_LABEL.compacting,
-      count: summary.compactingCount,
-      always: false,
-    },
-    {
-      status: 'succeeded',
-      label: NODE_STATUS_LABEL.succeeded,
-      count: summary.succeededCount,
-      always: false,
-    },
-    {
-      status: 'interrupted',
-      label: NODE_STATUS_LABEL.interrupted,
-      count: summary.interruptedCount,
-      always: false,
-    },
-    {
-      status: 'created',
-      label: NODE_STATUS_LABEL.created,
-      count: summary.createdCount,
-      always: false,
-    },
-  ];
-
-  const counters = allCounters.filter(
+  const counters = buildSummaryCounters(summary).filter(
     (counter) => counter.always || counter.count > 0,
   );
 
   const tokens = totalTokens(summary.metrics.tokens);
-  const cost = summary.metrics.cost;
 
   return (
     <Container
@@ -117,47 +53,22 @@ export const SessionSummaryBar = ({ summary }: SessionSummaryBarProps) => {
       className="min-w-0 overflow-hidden whitespace-nowrap font-mono text-[11px] tabular-nums text-muted-foreground"
     >
       {counters.map((counter) => (
-        <span
-          key={counter.status}
-          data-status={counter.status}
-          className="flex shrink-0 items-center gap-1"
-        >
-          <StatusDot status={counter.status} />
-          <span className="text-foreground">{counter.count}</span>
-          <span>{counter.label}</span>
-        </span>
+        <SummaryCounterBadge key={counter.status} counter={counter} />
       ))}
 
       <span aria-hidden>·</span>
 
-      <span className="flex shrink-0 items-center gap-1">
-        <span>Costo</span>
-        {cost === null ? (
-          <Unavailable />
-        ) : (
-          <span className="text-foreground">{formatCost(cost)}</span>
-        )}
-      </span>
-
-      <span className="flex shrink-0 items-center gap-1">
-        <span>Tokens</span>
-        {tokens === null ? (
-          <Unavailable />
-        ) : (
-          <span className="text-foreground">{formatTokens(tokens)}</span>
-        )}
-      </span>
-
-      <span className="flex shrink-0 items-center gap-1">
-        <span>Tiempo</span>
-        {summary.elapsedMs === null ? (
-          <Unavailable />
-        ) : (
-          <span className="text-foreground">
-            {formatDuration(summary.elapsedMs)}
-          </span>
-        )}
-      </span>
+      <SummaryMetric
+        label="Costo"
+        value={summary.metrics.cost}
+        format={formatCost}
+      />
+      <SummaryMetric label="Tokens" value={tokens} format={formatTokens} />
+      <SummaryMetric
+        label="Tiempo"
+        value={summary.elapsedMs}
+        format={formatDuration}
+      />
     </Container>
   );
 };
