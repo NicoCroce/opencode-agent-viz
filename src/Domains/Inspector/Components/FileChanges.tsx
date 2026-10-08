@@ -1,9 +1,6 @@
 import { useState } from 'react';
-import {
-  Container,
-  EmptyScreenError,
-  Skeleton,
-} from '@app/Application/Components';
+import { Container } from '@app/Application/Components';
+import { SectionFrame } from '@app/Application/Components/Molecules';
 import type { TFileChange } from '../Inspector.entity';
 
 interface FileChangesProps {
@@ -47,70 +44,57 @@ export const FileChanges = ({
     changes.find((change) => change.file === selectedFile) ?? null;
 
   return (
-    <Container space="small">
-      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        Archivos
-      </span>
-
-      {isError ? <EmptyScreenError /> : null}
-
-      {!isError && isLoading ? (
-        <Container space="small">
-          <Skeleton className="h-4 w-full rounded-flat" />
-          <Skeleton className="h-4 w-4/5 rounded-flat" />
-        </Container>
-      ) : null}
-
-      {!isError && !isLoading && changes.length === 0 ? (
-        <p className="text-xs text-muted-foreground">Sin cambios de archivos</p>
-      ) : null}
-
-      {!isError && !isLoading && changes.length > 0 ? (
-        <Container space="small">
-          <Container space="none">
-            {changes.map((change) => (
-              <button
-                key={change.file}
-                type="button"
-                aria-pressed={change.file === selectedFile}
-                onClick={() =>
-                  setSelectedFile((current) =>
-                    current === change.file ? null : change.file,
-                  )
-                }
-                className="flex w-full min-w-0 items-center justify-between gap-2 border-b border-border py-1 text-left last:border-b-0"
+    <SectionFrame
+      title="Archivos"
+      isError={isError}
+      isLoading={isLoading}
+      isEmpty={changes.length === 0}
+      emptyLabel="Sin cambios de archivos"
+    >
+      <Container space="small">
+        <Container space="none">
+          {changes.map((change) => (
+            <button
+              key={change.file}
+              type="button"
+              aria-pressed={change.file === selectedFile}
+              onClick={() =>
+                setSelectedFile((current) =>
+                  current === change.file ? null : change.file,
+                )
+              }
+              className="flex w-full min-w-0 items-center justify-between gap-2 border-b border-border py-1 text-left last:border-b-0"
+            >
+              <span className="min-w-0 truncate font-mono text-xs text-foreground">
+                {change.file}
+              </span>
+              <span
+                className={`shrink-0 font-mono text-[11px] ${STATUS_COLOR[change.status] ?? 'text-muted-foreground'}`}
               >
-                <span className="min-w-0 truncate font-mono text-xs text-foreground">
-                  {change.file}
-                </span>
-                <span
-                  className={`shrink-0 font-mono text-[11px] ${STATUS_COLOR[change.status] ?? 'text-muted-foreground'}`}
-                >
-                  {STATUS_LABEL[change.status] ?? change.status}
-                </span>
-                <span className="shrink-0 font-mono text-[11px] tabular-nums text-status-done">
-                  +{change.additions}
-                </span>
-                <span className="shrink-0 font-mono text-[11px] tabular-nums text-status-error">
-                  -{change.deletions}
-                </span>
-              </button>
-            ))}
-          </Container>
-
-          {selected ? (
-            selected.patch.trim().length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                parche no disponible
-              </p>
-            ) : (
-              <pre className="max-h-64 overflow-auto rounded-flat border border-border bg-surface-1 p-2 font-mono text-[11px] text-foreground">
-                {selected.patch}
-              </pre>
-            )
-          ) : null}
+                {STATUS_LABEL[change.status] ?? change.status}
+              </span>
+              <span className="shrink-0 font-mono text-[11px] tabular-nums text-status-done">
+                +{change.additions}
+              </span>
+              <span className="shrink-0 font-mono text-[11px] tabular-nums text-status-error">
+                -{change.deletions}
+              </span>
+            </button>
+          ))}
         </Container>
-      ) : null}
-    </Container>
+
+        {selected ? (
+          selected.patch.trim().length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              parche no disponible
+            </p>
+          ) : (
+            <pre className="max-h-64 overflow-auto rounded-flat border border-border bg-surface-1 p-2 font-mono text-[11px] text-foreground">
+              {selected.patch}
+            </pre>
+          )
+        ) : null}
+      </Container>
+    </SectionFrame>
   );
 };

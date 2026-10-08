@@ -1,25 +1,30 @@
 import { useMemo, useState } from 'react';
-import type { SessionInfo } from '@opencode/client';
 import {
   useGetAgents,
   useGetSessions,
   useGetSessionStatus,
 } from '../../Sessions/Sessions.service';
-import {
-  EMPTY_METRICS,
-  type TGraphModel,
-  type TNodeParallelism,
-  type TParallelGroup,
-} from '../Graph.entity';
-import { buildGraph } from '../lib/buildGraph';
+import { type TGraphModel, type TParallelGroup } from '../Graph.entity';
+import { assembleStructuralGraph } from '../lib/assembleStructuralGraph';
+import { buildStructuralModel } from '../lib/buildStructuralModel';
 import {
   deriveExecutionLevels,
   layoutExecution,
   type TExecutionPlan,
 } from '../lib/executionLevels';
+import { filterSubtree } from '../lib/filterSubtree';
+import { indexPositions } from '../lib/indexPositions';
 import { topologySignature } from '../lib/layoutGraph';
 import { isActiveStatus } from '../lib/nodeStatus';
+import { toParallelByNode } from '../lib/parallelByNode';
 import { deriveParallelGroups } from '../lib/parallelism';
+
+/**
+ * El BFS del subárbol (`filterSubtree`) vive en `lib/` como función pura
+ * (DC-16); se reexporta desde aquí para conservar la API pública que
+ * `useGraphModel` y el barrel de `Hooks` ya exponían.
+ */
+export { filterSubtree };
 
 /**
  * Modelo **estructural** del grafo (contrato de carga §1.1, data-model §3): la
@@ -47,41 +52,6 @@ export interface UseGraphStructureResult {
   error: Error | null;
 }
 
-/**
- * BFS del subárbol desde `rootId` siguiendo `parentID`, con índice `Map` para
- * resolver en O(n) (R4). Es la misma construcción estructural que necesita el
- * modelo por fases; vive aquí porque esta es la fase que posee la topología.
- */
-export const filterSubtree = (
-  sessions: SessionInfo[],
-  rootId: string | null,
-): SessionInfo[] => {
-  if (!rootId) return [];
-  const byId = new Map<string, SessionInfo>();
-  const byParent = new Map<string, SessionInfo[]>();
-  for (const session of sessions) {
-    if (!byId.has(session.id)) byId.set(session.id, session);
-    if (session.parentID === undefined) continue;
-    const list = byParent.get(session.parentID) ?? [];
-    list.push(session);
-    byParent.set(session.parentID, list);
-  }
-
-  const result: SessionInfo[] = [];
-  const queue = [rootId];
-  const seen = new Set<string>();
-  while (queue.length > 0) {
-    const id = queue.shift() as string;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    const session = byId.get(id);
-    if (!session) continue;
-    result.push(session);
-    for (const child of byParent.get(id) ?? []) queue.push(child.id);
-  }
-  return result;
-};
-
 export const useGraphStructure = (
   sessionId: string | null,
   directory: string | null,
@@ -102,31 +72,16 @@ export const useGraphStructure = (
   // tick (FR-006/SC-005); el reloj en vivo lo resuelve el enriquecimiento.
   const [now] = useState(() => Date.now());
 
-  const model = useMemo<TGraphModel>(() => {
-    const structural = buildGraph({
-      sessions: related,
-      statuses: statusQuery.data ?? {},
-      agents: agentsQuery.data ?? [],
-      // Sin contenido: la estructura no depende de mensajes/log/permisos/etc.
-      messages: {},
-      permissions: [],
-      signals: {},
-      forms: [],
-      inbox: [],
-      enrichment: 'pending',
-      now,
-    });
-    // `buildGraph` con contenido vacío ya produce métricas vacías salvo por el
-    // `retryCount`/`loopEvidence` derivados del `SessionStatus` retry; se fija
-    // `EMPTY_METRICS` para que la fase estructural sea exactamente vacía.
-    return {
-      ...structural,
-      nodes: structural.nodes.map((node) => ({
-        ...node,
-        data: { ...node.data, metrics: EMPTY_METRICS },
-      })),
-    };
-  }, [related, statusQuery.data, agentsQuery.data, now]);
+  const model = useMemo(
+    () =>
+      buildStructuralModel({
+        sessions: related,
+        statuses: statusQuery.data ?? {},
+        agents: agentsQuery.data ?? [],
+        now,
+      }),
+    [related, statusQuery.data, agentsQuery.data, now],
+  );
 
   const signature = topologySignature(model);
 
@@ -138,15 +93,13 @@ export const useGraphStructure = (
     [signature],
   );
 
-  const positions = useMemo(() => {
-    const laidOut = layoutExecution(model, executionPlan);
-    return Object.fromEntries(
-      laidOut.nodes.map((node) => [node.id, node.position]),
-    );
+  const positions = useMemo(
+    () => indexPositions(layoutExecution(model, executionPlan).nodes),
     // Intentionally keyed by topology signature, not by `model` identity:
     // status/metrics updates must not trigger a relayout (Principio VII).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signature]);
+    [signature],
+  );
 
   // El paralelismo se apoya en los tiempos de sesión (`createdAt`/`updatedAt`),
   // que ya son estructurales; se completa en el enriquecimiento si hace falta.
@@ -155,25 +108,13 @@ export const useGraphStructure = (
     [model, now],
   );
 
-  const parallelByNode = useMemo(() => {
-    const map: Record<string, TNodeParallelism> = {};
-    for (const group of parallelGroups) {
-      for (const id of group.nodeIds) {
-        map[id] = { groupId: group.id, size: group.nodeIds.length };
-      }
-    }
-    return map;
-  }, [parallelGroups]);
+  const parallelByNode = useMemo(
+    () => toParallelByNode(parallelGroups),
+    [parallelGroups],
+  );
 
   const graph = useMemo<TGraphModel>(
-    () => ({
-      edges: model.edges,
-      nodes: model.nodes.map((node) => ({
-        ...node,
-        position: positions[node.id] ?? node.position,
-        data: { ...node.data, parallel: parallelByNode[node.id] ?? null },
-      })),
-    }),
+    () => assembleStructuralGraph(model, positions, parallelByNode),
     [model, positions, parallelByNode],
   );
 

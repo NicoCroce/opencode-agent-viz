@@ -1,17 +1,12 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faCircleInfo,
-  faTriangleExclamation,
-  faCircleCheck,
-  IconDefinition,
-} from '@fortawesome/free-solid-svg-icons';
-import {
   Alert as UIAlert,
   AlertDescription,
 } from '@app/Application/Components/ui/alert';
 import { cn } from '@/Application/lib/utils';
 import { Container } from '@app/Application/Components/Layout';
+import { ALERT_VARIANT_ICON } from './alertVariants';
 
 const alertVariants = cva(
   'relative w-full rounded-lg border px-4 py-3 text-sm',
@@ -47,13 +42,6 @@ const iconVariants = cva('h-4 w-4', {
   },
 });
 
-const defaultIcons: Record<string, IconDefinition> = {
-  info: faCircleInfo,
-  error: faTriangleExclamation,
-  warning: faTriangleExclamation,
-  success: faCircleCheck,
-};
-
 interface AlertProps extends VariantProps<typeof alertVariants> {
   message: string;
   title?: string;
@@ -68,7 +56,7 @@ export const Alert = ({
   className,
   showIcon = true,
 }: AlertProps) => {
-  const icon = defaultIcons[variant || 'info'];
+  const icon = ALERT_VARIANT_ICON[variant || 'info'];
 
   return (
     <UIAlert

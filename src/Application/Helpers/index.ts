@@ -10,6 +10,7 @@ export * from './outcomeLabel';
 export * from './toolStatus';
 export * from './totalTokens';
 export * from './formatModelRef';
+export * from './formatToolInput';
 export * from './questionState';
 export * from './queryKey';
 export * from './array';
