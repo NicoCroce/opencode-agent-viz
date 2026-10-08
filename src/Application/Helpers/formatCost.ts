@@ -1,4 +1,4 @@
-import { UNAVAILABLE } from './formatDuration';
+import { UNAVAILABLE } from './format/constants';
 
 export const formatCost = (
   value: number | null | undefined,

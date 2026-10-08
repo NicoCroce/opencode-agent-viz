@@ -1,15 +1,13 @@
 import { Button, Container } from '@app/Application/Components';
 import {
   DEFAULT_TIME_RANGE,
-  TIME_RANGES,
+  summarizeProjects,
+  timeRangeLabel,
   type TProjectOption,
   type TTimeRange,
 } from '../lib/sessionFilters';
 import { ProjectFilter } from './ProjectFilter';
 import { TimeRangeFilter } from './TimeRangeFilter';
-
-/** Resumen del proyecto cuando no hay ninguna marca (FR-003). */
-const ALL_PROJECTS_LABEL = 'Todos';
 
 /** Etiqueta de la acción que devuelve el listado a su estado sin filtrar (FR-012). */
 const CLEAR_FILTERS_LABEL = 'Limpiar filtros';
@@ -21,16 +19,6 @@ const CLEAR_FILTERS_LABEL = 'Limpiar filtros';
  * para que tecnologías de asistencia y tests distingan ambas acciones (FR-021).
  */
 const CLEAR_FILTERS_ACCESSIBLE_NAME = 'Limpiar filtros de la barra';
-
-/** Resumen del filtro de proyecto: `Todos`, `1 proyecto` o `N proyectos`. */
-const projectsSummary = (count: number): string => {
-  if (count === 0) return ALL_PROJECTS_LABEL;
-  return count === 1 ? '1 proyecto' : `${count} proyectos`;
-};
-
-/** Etiqueta visible del rango activo (`Última hora`, `Todo`, …) (FR-007). */
-const rangeSummary = (range: TTimeRange): string =>
-  TIME_RANGES.find((option) => option.value === range)?.label ?? 'Todo';
 
 interface SessionFilterBarProps {
   /** Catálogo de proyectos con al menos una sesión (FR-004), sin filtrar. */
@@ -103,7 +91,7 @@ export const SessionFilterBar = ({
         <span
           className="text-[11px] uppercase tracking-wide text-muted-foreground"
         >
-          {`${projectsSummary(selectedProjects.length)} · ${rangeSummary(range)}`}
+          {`${summarizeProjects(selectedProjects.length)} · ${timeRangeLabel(range)}`}
         </span>
         <Button
           variant="link"

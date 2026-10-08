@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
+import { STORE_KEY } from '../Hooks/useGlobalStore';
 
 export const registerEventViewport = (queryClient: QueryClient) => {
   setStoreIsMobile(window.innerWidth, queryClient);
@@ -10,6 +11,6 @@ export const registerEventViewport = (queryClient: QueryClient) => {
 
 const setStoreIsMobile = (width: number, queryClient: QueryClient) => {
   const isMobile = width <= 768;
-  if (queryClient.getQueryData(['isMobile']) !== isMobile)
-    queryClient.setQueryData(['isMobile'], isMobile);
+  if (queryClient.getQueryData([STORE_KEY.isMobile]) !== isMobile)
+    queryClient.setQueryData([STORE_KEY.isMobile], isMobile);
 };

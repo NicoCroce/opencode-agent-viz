@@ -1,5 +1,7 @@
 import type { SessionMessageInfo } from '@opencode/client';
+import { Container } from '../Layout';
 import { EmptyScreenError } from './EmptyScreenError';
+import { SectionHeading } from './SectionHeading';
 import { Skeleton } from '../ui/skeleton';
 
 interface CompactionContextProps {
@@ -43,6 +45,10 @@ const previewMessage = (message: SessionMessageInfo): string => {
  * renderiza los estados obligatorios en orden: error → loading → vacío → datos
  * (Principio VI). Así `HistoryEntry` puede mostrar el contexto sin que un
  * componente de `Application` importe el service de un dominio.
+ *
+ * No usa `SectionFrame`: sus estados no comparten raíz (el error no envuelve, y
+ * `data-testid`/el encabezado solo existen con datos), así que forzarlo rompería
+ * el contrato observable. Consume `SectionHeading` y `Container`.
  */
 export const CompactionContext = ({
   messages,
@@ -57,10 +63,10 @@ export const CompactionContext = ({
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-1">
+      <Container space="none" className="gap-1!">
         <Skeleton className="h-4 w-40 rounded-flat" />
         <Skeleton className="h-10 w-full rounded-flat" />
-      </div>
+      </Container>
     );
   }
 
@@ -73,14 +79,17 @@ export const CompactionContext = ({
   }
 
   return (
-    <div className="flex flex-col gap-1" data-testid="compaction-context">
-      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        Contexto resultante
-      </span>
+    <Container
+      space="none"
+      className="gap-1!"
+      data-testid="compaction-context"
+    >
+      <SectionHeading>Contexto resultante</SectionHeading>
       {messages.map((message, index) => (
-        <div
+        <Container
           key={`${message.id}-${index}`}
-          className="flex flex-col gap-0.5 border-l-2 border-border pl-2"
+          space="none"
+          className="gap-0.5! border-l-2 border-border pl-2"
         >
           <span className="font-mono text-[11px] text-muted-foreground">
             {message.type}
@@ -88,8 +97,8 @@ export const CompactionContext = ({
           <p className="whitespace-pre-wrap break-words text-xs text-foreground">
             {previewMessage(message) || 'sin contenido'}
           </p>
-        </div>
+        </Container>
       ))}
-    </div>
+    </Container>
   );
 };

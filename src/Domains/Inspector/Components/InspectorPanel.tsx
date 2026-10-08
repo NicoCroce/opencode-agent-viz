@@ -1,16 +1,13 @@
-import {
-  CompactionContext,
-  Container,
-  StatusDot,
-} from '@app/Application/Components';
-import { NODE_STATUS_LABEL, folderName } from '@app/Application/Helpers';
-import { useReasoningVisibility } from '@app/Application/Hooks';
+import { CompactionContext, Container } from '@app/Application/Components';
 import type { TGraphNode } from '@app/Domains/Graph/Graph.entity';
+import { useControlledReasoning } from '../Hooks/useControlledReasoning';
 import { useInspectorData } from '../Hooks/useInspectorData';
 import { AdvancedSection } from './AdvancedSection';
 import { AnswersSection } from './AnswersSection';
 import { ErrorsSection } from './ErrorsSection';
 import { FileChanges } from './FileChanges';
+import { InspectorEmptyPrompt } from './InspectorEmptyPrompt';
+import { InspectorIdentity } from './InspectorIdentity';
 import { MetricsSection } from './MetricsSection';
 import { ModelSection } from './ModelSection';
 import { QuestionsSection } from './QuestionsSection';
@@ -27,7 +24,7 @@ interface InspectorPanelProps {
   invokedBy?: TGraphNode | null;
   /**
    * Visibilidad del razonamiento. Si se omite, el panel la gestiona localmente
-   * con `useReasoningVisibility`; US2 la controla desde `WorkspacePage` para
+   * con `useControlledReasoning`; US2 la controla desde `WorkspacePage` para
    * que coincida con el overlay (contrato rich-text).
    */
   showReasoning?: boolean;
@@ -62,9 +59,8 @@ export const InspectorPanel = ({
 }: InspectorPanelProps) => {
   // Modo no controlado por defecto (US1); US2 puede imponer la visibilidad
   // compartida con el overlay pasando `showReasoning`/`onToggleReasoning`.
-  const localReasoning = useReasoningVisibility(false);
-  const reasoningVisible = showReasoning ?? localReasoning.visible;
-  const toggleReasoning = onToggleReasoning ?? localReasoning.toggle;
+  const { visible: reasoningVisible, toggle: toggleReasoning } =
+    useControlledReasoning(showReasoning, onToggleReasoning);
 
   const {
     tools,
@@ -80,16 +76,7 @@ export const InspectorPanel = ({
   } = useInspectorData(node);
 
   if (!node) {
-    return (
-      <Container space="small" className="p-4">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-          Inspector
-        </span>
-        <p className="text-xs text-muted-foreground">
-          Selecciona un nodo del grafo para ver su detalle.
-        </p>
-      </Container>
-    );
+    return <InspectorEmptyPrompt />;
   }
 
   const { metrics, model } = node.data;
@@ -97,34 +84,7 @@ export const InspectorPanel = ({
   return (
     <Container space="medium" className="overflow-auto p-4">
       {/* Identidad: título completo (sin cortar) + agente + estado + directorio */}
-      <Container space="small">
-        <span className="text-sm font-semibold leading-snug text-foreground">
-          {node.data.title ?? node.data.agentName}
-        </span>
-        <span className="flex min-w-0 items-center gap-2 font-mono text-[11px] text-muted-foreground">
-          <StatusDot status={node.data.status} />
-          <span className="text-foreground">{node.data.agentName}</span>
-          <span aria-hidden>·</span>
-          <span>{NODE_STATUS_LABEL[node.data.status]}</span>
-        </span>
-        <span
-          className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground"
-          title={node.data.directory}
-        >
-          <span aria-hidden className="text-accent">
-            #
-          </span>
-          <span className="truncate">{folderName(node.data.directory)}</span>
-        </span>
-        {invokedBy ? (
-          <span className="min-w-0 truncate font-mono text-[11px] text-muted-foreground">
-            Invocado por{' '}
-            <span className="text-foreground">
-              {invokedBy.data.title ?? invokedBy.data.agentName}
-            </span>
-          </span>
-        ) : null}
-      </Container>
+      <InspectorIdentity node={node} invokedBy={invokedBy} />
 
       {/* Modelo: nombre y razonamiento (variante del modelo) (FR-003) */}
       <ModelSection model={model} />

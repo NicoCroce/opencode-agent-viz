@@ -4,7 +4,7 @@ import type { TExecutionPlan } from '../lib/executionLevels';
 import { isActiveStatus } from '../lib/nodeStatus';
 import { useGraphEnrichment } from './useGraphEnrichment';
 import { useGraphStructure } from './useGraphStructure';
-import { DEFAULT_NOW_INTERVAL_MS, useNow } from './useNow';
+import { useNow } from './useNow';
 
 /**
  * El BFS del subárbol (`filterSubtree`) vive ahora en `useGraphStructure`, la
@@ -65,7 +65,7 @@ export const useGraphModel = (
     () => enriched.nodes.some((node) => isActiveStatus(node.data.status)),
     [enriched],
   );
-  const now = useNow(DEFAULT_NOW_INTERVAL_MS, hasActiveNode);
+  const now = useNow({ enabled: hasActiveNode });
   const graph = useMemo<TGraphModel>(() => {
     const nodes = enriched.nodes.map((node) => {
       const { metrics } = node.data;

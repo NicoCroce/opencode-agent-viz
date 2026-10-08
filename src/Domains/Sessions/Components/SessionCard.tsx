@@ -1,13 +1,19 @@
 import { cn } from '@app/Application/lib/utils';
 import { StatusDot } from '@app/Application/Components';
 import { formatDateTimeRange } from '@app/Application/Helpers';
-import { toNodeStatus } from '@app/Domains/Graph/lib/nodeStatus';
 import type { TSessionStatus } from '../Session.entity';
 import type { TRootSessionItem } from '../Hooks/useRootSessions';
+import { useSessionNodeStatus } from '../Hooks/useSessionNodeStatus';
 
 interface SessionCardProps {
   item: TRootSessionItem;
   status?: TSessionStatus;
+  /**
+   * Estado de ejecución ya derivado (presentación pura). Si se omite, se deriva
+   * de `status` con `useSessionNodeStatus` (el cross-domain vive en el hook,
+   * AGENTS §8.3).
+   */
+  nodeStatus?: ReturnType<typeof useSessionNodeStatus>;
   selected: boolean;
   onSelect: (id: string) => void;
 }
@@ -15,22 +21,13 @@ interface SessionCardProps {
 export const SessionCard = ({
   item,
   status,
+  nodeStatus,
   selected,
   onSelect,
 }: SessionCardProps) => {
   const { session, agentName } = item;
-  const nodeStatus = toNodeStatus({
-    status,
-    hasActivity: true,
-    hasPermission: false,
-    // La lista de sesiones raíz no carga permisos, formularios ni señales de
-    // ejecución por sesión; el estado se deriva solo de `SessionStatus` y de si
-    // hubo actividad (los 9 estados se detallan en el grafo/inspector).
-    hasPendingForm: false,
-    compaction: null,
-    outcome: null,
-    lastAssistantErrored: false,
-  });
+  const derivedNodeStatus = useSessionNodeStatus(status);
+  const resolvedNodeStatus = nodeStatus ?? derivedNodeStatus;
   const timeRange = formatDateTimeRange({
     startedAt: session.time.created,
     endedAt: session.time.updated,
@@ -50,7 +47,7 @@ export const SessionCard = ({
       )}
     >
       <span className="flex items-center gap-2">
-        <StatusDot status={nodeStatus} />
+        <StatusDot status={resolvedNodeStatus} />
         <span className="truncate text-sm font-medium text-foreground">
           {session.title}
         </span>
