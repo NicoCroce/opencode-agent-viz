@@ -7,10 +7,9 @@ Real-time visualization of multi-agent executions in OpenCode.
 ### Prerequisites
 
 - Node 22+, pnpm 9+
-- OpenCode 1.18.34+. La visualización debe conectarse al **background service**
-  (el mismo servidor que usa el TUI), no a un `opencode serve` aparte: ambos
-  comparten la base de datos, pero sólo el proceso que ejecuta tus sesiones
-  emite sus eventos SSE en vivo.
+- **OpenCode 2.0.22+** (V2 line). The viewer consumes the V2 API through
+  `@opencode/client` 2.0.22; a 1.x server does not expose those endpoints
+  (`session.active`, flat messages, `limit` of 200 per page, etc.).
 
 ### Installation
 
@@ -19,18 +18,55 @@ pnpm install
 pnpm start
 ```
 
-`pnpm start` resuelve la URL del service con `opencode service status` y toma la
-password de `~/.config/opencode/service.json`, exportándolas como
-`OPENCODE_URL` / `OPENCODE_PASSWORD`. El proxy de Vite reenvía `/oc` a ese
-servidor e inyecta la autenticación.
+### Connecting to OpenCode
 
-Si preferís correr Vite solo (`pnpm dev`), exportá esas variables y apuntá al
-background service; el default es `http://127.0.0.1:4096`:
+The viewer is **read-only** and connects to the OpenCode **background service**:
+the same process the TUI connects to, **not** a separate `opencode serve`. Both
+share the SQLite database, but only the process running your sessions emits its
+SSE events live; against a separate server the events only arrive on refresh
+(which is a read of the DB).
+
+Steps:
+
+```bash
+# 1. Check that the version is >= 2.0.22
+opencode --version
+
+# 2. Make sure the background service is running
+opencode service status
+opencode service start    # only if it is not running
+
+# 3. Start the viewer (resolves URL + password and starts Vite)
+pnpm start
+```
+
+`pnpm start` (`scripts/start.sh`) discovers the URL with `opencode service status`,
+takes the password from `~/.config/opencode/service.json` and exports them as
+`OPENCODE_URL` / `OPENCODE_PASSWORD`. The Vite `/oc` proxy forwards to the
+service and injects the `Authorization: Basic` header (user `opencode`), so the
+browser never handles credentials.
+
+If events do not arrive live (they only show up on refresh), it is almost always
+because you are pointing at a different `opencode serve` than the one running
+your sessions: make sure `OPENCODE_URL` is the background service's.
+
+#### Connection variables
+
+| Variable | Source | Description |
+|----------|--------|-------------|
+| `OPENCODE_URL` | `opencode service status` | URL of the background service (e.g. `http://127.0.0.1:49374`). Fallback when starting Vite standalone: `http://127.0.0.1:4096`. |
+| `OPENCODE_PASSWORD` | `~/.config/opencode/service.json` | Password of the V2 server (HTTP Basic). If missing, `/oc` responds **401**. |
+
+To run Vite standalone (`pnpm dev`) against the background service, export both
+variables (if the password is missing, calls to `/oc` will fail with 401):
 
 ```bash
 OPENCODE_URL=http://127.0.0.1:49374 \
 OPENCODE_PASSWORD=... pnpm dev
 ```
+
+The status indicator in the UI (`ConnectionBadge`) reflects the SSE connection:
+**connected / reconnecting / disconnected**.
 
 ### Commands
 
