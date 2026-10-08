@@ -1,4 +1,5 @@
 import { Container } from '@app/Application/Components';
+import { SectionHeading } from '@app/Application/Components/Molecules';
 import { folderName } from '@app/Application/Helpers';
 import type { TSessionStatus } from '../Session.entity';
 import type { TSessionGroup } from '../Hooks/useRootSessions';
@@ -33,8 +34,8 @@ export const SessionList = ({
 
       return (
         <Container key={group.directory || 'sin-carpeta'} space="small">
-          <span
-            className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+          <SectionHeading
+            className="flex items-center gap-1.5"
             title={group.directory}
           >
             <span aria-hidden className="text-accent">
@@ -50,7 +51,7 @@ export const SessionList = ({
                 <span className="sr-only"> {countLabel}</span>
               </span>
             ) : null}
-          </span>
+          </SectionHeading>
           <Container space="small">
             {group.items.map((item) => (
               <SessionCard

@@ -5,7 +5,7 @@
 import clsx from 'clsx';
 import { Title } from '../Molecules/Title';
 import { Container } from './Container';
-import { useDevice, useGlobalStore } from '@app/Application/Hooks';
+import { STORE_KEY, useDevice, useGlobalStore } from '@app/Application/Hooks';
 import { useEffect } from 'react';
 
 interface PageProps {
@@ -32,7 +32,7 @@ export const Page = ({
     'w-full flex flex-col gap-4 md:gap-6 mx-auto',
     small,
   );
-  const { setQueryData } = useGlobalStore('backButtonEnabled');
+  const { setQueryData } = useGlobalStore(STORE_KEY.backButtonEnabled);
 
   useEffect(() => {
     setQueryData(backButton);
