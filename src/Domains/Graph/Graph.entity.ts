@@ -36,6 +36,39 @@ export interface TNodeMetrics {
   loopEvidence: string[];
 }
 
+/**
+ * Base de métricas de un nodo **independiente del reloj** (data-model §2.1):
+ * resultado de `deriveMetricBase(messages)`, memoizable por identidad de
+ * `messages`. No incluye `durationMs` ni `invocations` (dependen de `now` y de
+ * la señal de ejecución); eso lo resuelve `resolveMetrics(base, status, now,
+ * subtaskInvocations)`.
+ *
+ * Expone además `model`, `currentTool` y `lastAssistantErrored`, que consume
+ * `buildGraph` para `data.model`, `data.currentTool` y el cálculo de `hasError`;
+ * **no** forman parte de `TNodeMetrics`.
+ */
+export interface TMetricBase {
+  startedAt: number | null;
+  endedAt: number | null;
+  cost: number | null;
+  tokens: TTokenUsage | null;
+  retryCount: number;
+  hasLoop: boolean;
+  loopEvidence: string[];
+  model: ModelRef | null;
+  currentTool: TCurrentTool | null;
+  lastAssistantErrored: boolean;
+}
+
+/**
+ * Estado de carga del detalle de un nodo (data-model §2.2). `'pending'` al
+ * construir la estructura (métricas/señales/permisos/formularios aún sin
+ * fusionar); `'ready'` cuando el enriquecimiento completó el lote que contiene
+ * el nodo. Nunca regresa de `'ready'` a `'pending'` dentro de una misma visita
+ * (evita parpadeo); un refetch de datos por evento no lo degrada.
+ */
+export type TEnrichmentState = 'pending' | 'ready';
+
 export interface TCurrentTool {
   name: string;
   state: string;
@@ -96,6 +129,13 @@ export interface TGraphNodeData extends Record<string, unknown> {
   currentTool: TCurrentTool | null;
   /** `null` cuando el nodo no corrió en paralelo con ningún hermano. */
   parallel: TNodeParallelism | null;
+  /**
+   * Estado de carga del detalle (data-model §2.2). En la fase estructural vale
+   * `'pending'`; pasa a `'ready'` cuando el enriquecimiento del nodo fusiona sus
+   * métricas/señales/permisos/formularios. Es estado de vista: no participa de
+   * la paridad de negocio (FR-007) ni se degrada de `'ready'` a `'pending'`.
+   */
+  enrichment?: TEnrichmentState;
 }
 
 export interface TGraphNode {

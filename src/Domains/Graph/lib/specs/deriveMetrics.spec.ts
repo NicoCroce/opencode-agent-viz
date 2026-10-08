@@ -1,15 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import type { SessionInfo, SessionMessageAssistant } from '@opencode/client';
+import type {
+  SessionInfo,
+  SessionMessageAssistant,
+  SessionStatus,
+} from '@opencode/client';
 import type { TSessionMessage } from '@app/Infrastructure/Services/opencodeClient';
 import type { TResourceUsage } from '@app/Domains/Inspector/Inspector.entity';
 import {
   EMPTY_METRICS,
   type TGraphModel,
   type TGraphNode,
+  type TMetricBase,
   type TNodeMetrics,
   type TNodeStatus,
 } from '../../Graph.entity';
-import { deriveMetrics, summarizeSession } from '../deriveMetrics';
+import {
+  deriveMetricBase,
+  deriveMetrics,
+  resolveMetrics,
+  summarizeSession,
+} from '../deriveMetrics';
 
 const tokens = (
   input: number,
@@ -44,6 +54,17 @@ const message = (
   const info = assistant(overrides);
   return { info, parts: info.content };
 };
+
+const toolPart = (
+  name: string,
+  status: string,
+): SessionMessageAssistant['content'][number] =>
+  ({
+    type: 'tool',
+    id: 'tool_1',
+    name,
+    state: { status },
+  }) as unknown as SessionMessageAssistant['content'][number];
 
 describe('deriveMetrics', () => {
   it('computes a fixed duration when the assistant message completed', () => {
@@ -116,6 +137,116 @@ describe('deriveMetrics', () => {
       subtaskInvocations: 12,
     });
     expect(metrics.hasLoop).toBe(false);
+  });
+});
+
+describe('deriveMetricBase', () => {
+  it('derives the clock-independent base from messages', () => {
+    const base = deriveMetricBase([
+      message({ time: { created: 1000, completed: 4000 } }),
+    ]);
+
+    expect(base.startedAt).toBe(1000);
+    expect(base.endedAt).toBe(4000);
+    expect(base.cost).toBeCloseTo(0.02, 5);
+    expect(base.tokens).toEqual({
+      input: 100,
+      output: 50,
+      reasoning: 10,
+      cacheRead: 5,
+      cacheWrite: 2,
+    });
+    expect(base.retryCount).toBe(0);
+    expect(base.hasLoop).toBe(false);
+    expect(base.loopEvidence).toEqual([]);
+  });
+
+  it('does not resolve the duration (clock-independent)', () => {
+    const base = deriveMetricBase([message()]);
+
+    expect('durationMs' in base).toBe(false);
+  });
+
+  it('is stable across calls for the same messages', () => {
+    const messages = [message()];
+
+    expect(deriveMetricBase(messages)).toEqual(deriveMetricBase(messages));
+  });
+
+  it('keeps null metrics without assistant messages', () => {
+    const base = deriveMetricBase([]);
+
+    expect(base.startedAt).toBeNull();
+    expect(base.endedAt).toBeNull();
+    expect(base.cost).toBeNull();
+    expect(base.tokens).toBeNull();
+  });
+
+  it('exposes model, currentTool and lastAssistantErrored', () => {
+    const base = deriveMetricBase([
+      message({ content: [toolPart('read', 'completed')] }),
+    ]);
+
+    expect(base.model).toEqual({ providerID: 'opencode', id: 'deepseek' });
+    expect(base.currentTool).toEqual({ name: 'read', state: 'completed' });
+    expect(base.lastAssistantErrored).toBe(false);
+  });
+
+  it('marks the last assistant output as errored on a failed tool', () => {
+    const base = deriveMetricBase([
+      message({ content: [toolPart('bash', 'error')] }),
+    ]);
+
+    expect(base.lastAssistantErrored).toBe(true);
+  });
+});
+
+describe('resolveMetrics', () => {
+  const base = (overrides: Partial<TMetricBase> = {}): TMetricBase => ({
+    ...deriveMetricBase([message()]),
+    ...overrides,
+  });
+
+  it('computes a fixed duration from endedAt', () => {
+    const metrics = resolveMetrics(base(), undefined, 9999, 0);
+
+    expect(metrics.durationMs).toBe(3000);
+    expect(metrics.startedAt).toBe(1000);
+    expect(metrics.endedAt).toBe(4000);
+  });
+
+  it('uses now as the end when endedAt is missing', () => {
+    const metrics = resolveMetrics(base({ endedAt: null }), undefined, 5000, 0);
+
+    expect(metrics.durationMs).toBe(4000);
+    expect(metrics.endedAt).toBeNull();
+  });
+
+  it('returns a null duration without a start', () => {
+    const metrics = resolveMetrics(base({ startedAt: null }), undefined, 5000, 0);
+
+    expect(metrics.durationMs).toBeNull();
+  });
+
+  it('adds the retry attempt of the status', () => {
+    const retry: SessionStatus = {
+      type: 'retry',
+      attempt: 2,
+      message: 'rate limited',
+      next: 1234,
+    };
+
+    const metrics = resolveMetrics(base(), retry, 4000, 0);
+
+    expect(metrics.retryCount).toBe(2);
+    expect(metrics.hasLoop).toBe(true);
+    expect(metrics.loopEvidence).toContain('rate limited');
+  });
+
+  it('uses the subtask invocations for the count', () => {
+    const metrics = resolveMetrics(base(), undefined, 4000, 3);
+
+    expect(metrics.invocations).toBe(3);
   });
 });
 

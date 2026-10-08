@@ -18,6 +18,7 @@ import type { TGraphNodeData, TTokenUsage } from '../Graph.entity';
 import { MIN_NODE_HEIGHT, MIN_NODE_WIDTH } from '../lib/nodeResize';
 import { isActiveStatus } from '../lib/nodeStatus';
 import { NodeStatusRail } from './NodeStatusRail';
+import { useNodeFocus } from './NodeFocusContext';
 
 type AgentFlowNode = Node<TGraphNodeData, 'agent'>;
 
@@ -59,6 +60,18 @@ const resizeControlClassName = (selected: boolean): string =>
 const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) => {
   const { metrics } = data;
 
+  // Resaltado de foco leído por contexto (contrato de render §1.2/§2): el hover
+  // **no** atenúa el nodo —solo afecta a las aristas—, así que la opacidad
+  // depende exclusivamente del linaje del nodo seleccionado: `1` dentro del
+  // linaje y `0.15` fuera. Sin selección no hay atenuación (sin estilo en línea).
+  const { selectedNodeId, lineageNodeIds } = useNodeFocus();
+  const focusOpacity =
+    selectedNodeId === null
+      ? undefined
+      : lineageNodeIds.has(id)
+        ? 1
+        : 0.15;
+
   // Un nodo sigue activo mientras corre, reintenta, compacta o espera
   // permiso/respuesta (FR-015/FR-017); un estado terminal ya no está activo.
   const isRunning = isActiveStatus(data.status);
@@ -87,6 +100,7 @@ const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) =>
 
   return (
     <div
+      style={focusOpacity === undefined ? undefined : { opacity: focusOpacity }}
       className={cn(
         'group relative h-full w-full min-w-0 rounded-flat border bg-surface-2',
         selected ? 'border-accent' : 'border-border',

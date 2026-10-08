@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Button,
   CompactionContext,
@@ -12,6 +13,13 @@ import {
   useEscapeKey,
   useReasoningVisibility,
 } from '@app/Application/Hooks';
+import {
+  PERF_METRIC,
+  perfMark,
+  perfMeasure,
+  type TPerfMetricName,
+} from '@app/Application/Helpers';
+import { queryKeys } from '@app/Domains/queryKeys';
 import {
   SessionList,
   SessionListSkeleton,
@@ -29,6 +37,7 @@ import {
   AgentGraph,
   GraphSkeleton,
   SessionSummaryBar,
+  isActiveStatus,
   summarizeSession,
   useChainSelection,
   useFollowMode,
@@ -74,10 +83,52 @@ export const WorkspacePage = () => {
   const graph = useGraphModel(id ?? null, directory);
   const follow = useFollowMode(graph.activeNodeId);
 
+  // Instrumentación de apertura/revisita (FR-011, contrato de instrumentación
+  // §4): al cambiar de sesión se decide la medida según si la **estructura** del
+  // subárbol ya estaba en el caché de consultas (`graph.session.open` si no,
+  // `graph.session.revisit` si sí). La medida se registra cuando el grafo tiene
+  // nodos, es decir, cuando la estructura está disponible.
+  const queryClient = useQueryClient();
+  const pendingSessionPerf = useRef<TPerfMetricName | null>(null);
+
+  useEffect(() => {
+    if (!id || !directory) {
+      pendingSessionPerf.current = null;
+      return;
+    }
+    const cached =
+      queryClient.getQueryData(queryKeys.sessions.list(directory)) !== undefined;
+    const metric = cached
+      ? PERF_METRIC.sessionRevisit
+      : PERF_METRIC.sessionOpen;
+    pendingSessionPerf.current = metric;
+    perfMark(`${metric}.start`);
+  }, [id, directory, queryClient]);
+
+  useEffect(() => {
+    const metric = pendingSessionPerf.current;
+    if (!metric || graph.isLoading || graph.isError) return;
+    if (graph.graph.nodes.length === 0) return;
+    perfMeasure(metric, `${metric}.start`, {
+      nodeCount: graph.graph.nodes.length,
+      phase: metric === PERF_METRIC.sessionOpen ? 'structure' : 'cache',
+    });
+    pendingSessionPerf.current = null;
+  }, [graph.isLoading, graph.isError, graph.graph.nodes]);
+
   // Resumen agregado de la sesión (FR-024..FR-027) sobre los nodos ya cargados
   // en el grafo. `now` avanza en vivo para que el tiempo transcurrido se
   // actualice en el sitio sin relayoutar el grafo (FR-027).
-  const now = useNow(1000, Boolean(id));
+  //
+  // El tick solo se activa si hay al menos un nodo en curso (`isActiveStatus`),
+  // igual que el reloj del modelo (FR-006, SC-005, R3): sin actividad, `now` no
+  // altera ningún dato del resumen, así que no hay `setInterval` ni re-renders
+  // innecesarios (Principio VII).
+  const hasActiveNode = useMemo(
+    () => graph.graph.nodes.some((node) => isActiveStatus(node.data.status)),
+    [graph.graph.nodes],
+  );
+  const now = useNow(1000, Boolean(id) && hasActiveNode);
   const summary = useMemo(() => {
     const rootSession =
       items.find((item) => item.session.id === id)?.session ?? null;

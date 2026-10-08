@@ -4,6 +4,11 @@ import { render, screen } from '@testing-library/react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { NODE_STATUS_LABEL } from '@app/Application/Helpers';
 import { AgentNode } from '../AgentNode';
+import {
+  EMPTY_NODE_FOCUS,
+  NodeFocusProvider,
+  type TNodeFocus,
+} from '../NodeFocusContext';
 import type {
   TGraphNodeData,
   TNodeMetrics,
@@ -55,6 +60,46 @@ const renderAgentNode = (overrides: Partial<ComponentProps<typeof AgentNode>> = 
       <AgentNode {...props} {...overrides} />
     </ReactFlowProvider>,
   );
+
+/**
+ * Monta el nodo dentro de un `NodeFocusProvider` con el foco indicado, para
+ * verificar el resaltado por contexto (contrato de render §2).
+ */
+const renderAgentNodeWithFocus = (focus: TNodeFocus) =>
+  render(
+    <ReactFlowProvider>
+      <NodeFocusProvider value={focus}>
+        <AgentNode {...props} />
+      </NodeFocusProvider>
+    </ReactFlowProvider>,
+  );
+
+const nodeFocus = (overrides: Partial<TNodeFocus> = {}): TNodeFocus => ({
+  selectedNodeId: null,
+  lineageNodeIds: new Set<string>(),
+  lineageEdgeIds: new Set<string>(),
+  hoveredNodeId: null,
+  ...overrides,
+});
+
+/** Elemento raíz del card (el único con `bg-surface-2`): recibe la opacidad de foco. */
+const getCard = (container: HTMLElement): HTMLElement => {
+  const card = container.querySelector('.bg-surface-2');
+  if (!(card instanceof HTMLElement)) {
+    throw new Error('No se encontró el card del AgentNode');
+  }
+  return card;
+};
+
+/**
+ * Opacidad efectiva del nodo. El contrato de render §2 expresa el resaltado como
+ * `opacity` numérica (`1` dentro del linaje, `0.15` fuera); `AgentNode` la
+ * aplica como estilo en línea sobre el card. Sin foco no hay atenuación (`1`).
+ */
+const nodeOpacity = (container: HTMLElement): number => {
+  const raw = getCard(container).style.opacity;
+  return raw === '' ? 1 : Number(raw);
+};
 
 const pad = (value: number): string => String(value).padStart(2, '0');
 
@@ -361,5 +406,77 @@ describe('AgentNode — interrupción (US3, FR-019)', () => {
     });
 
     expect(screen.queryByText(/Motivo:/)).not.toBeInTheDocument();
+  });
+});
+
+describe('AgentNode — foco por contexto (T025, C4)', () => {
+  it('keeps the node fully opaque outside a NodeFocusProvider (EMPTY_NODE_FOCUS)', () => {
+    const { container } = renderAgentNode();
+
+    expect(nodeOpacity(container)).toBe(1);
+  });
+
+  it('defines EMPTY_NODE_FOCUS without selection, lineage or hover', () => {
+    expect(EMPTY_NODE_FOCUS.selectedNodeId).toBeNull();
+    expect(EMPTY_NODE_FOCUS.lineageNodeIds.size).toBe(0);
+    expect(EMPTY_NODE_FOCUS.lineageEdgeIds.size).toBe(0);
+    expect(EMPTY_NODE_FOCUS.hoveredNodeId).toBeNull();
+  });
+
+  it('keeps the node fully opaque when there is no selection', () => {
+    const { container } = renderAgentNodeWithFocus(nodeFocus());
+
+    expect(nodeOpacity(container)).toBe(1);
+  });
+
+  it('keeps the node fully opaque when it belongs to the selected lineage', () => {
+    const { container } = renderAgentNodeWithFocus(
+      nodeFocus({ selectedNodeId: 'root', lineageNodeIds: new Set(['root']) }),
+    );
+
+    expect(nodeOpacity(container)).toBe(1);
+  });
+
+  it('dims the node to 0.15 when it is outside the selected lineage', () => {
+    const { container } = renderAgentNodeWithFocus(
+      nodeFocus({
+        selectedNodeId: 'other',
+        lineageNodeIds: new Set(['other']),
+      }),
+    );
+
+    expect(nodeOpacity(container)).toBe(0.15);
+  });
+
+  it('ignores hover on the node when there is no selection (hover only affects edges)', () => {
+    const { container } = renderAgentNodeWithFocus(
+      nodeFocus({ hoveredNodeId: 'root' }),
+    );
+
+    expect(nodeOpacity(container)).toBe(1);
+  });
+
+  it('lets lineage take precedence over hover on the same node', () => {
+    const { container } = renderAgentNodeWithFocus(
+      nodeFocus({
+        selectedNodeId: 'other',
+        lineageNodeIds: new Set(['other']),
+        hoveredNodeId: 'root',
+      }),
+    );
+
+    expect(nodeOpacity(container)).toBe(0.15);
+  });
+
+  it('keeps a lineage node fully opaque even while hovered', () => {
+    const { container } = renderAgentNodeWithFocus(
+      nodeFocus({
+        selectedNodeId: 'root',
+        lineageNodeIds: new Set(['root']),
+        hoveredNodeId: 'root',
+      }),
+    );
+
+    expect(nodeOpacity(container)).toBe(1);
   });
 });

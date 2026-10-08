@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
   Controls,
@@ -12,9 +12,10 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { cn } from '@app/Application/lib/utils';
+import { PERF_METRIC, perfMark, perfMeasure } from '@app/Application/Helpers';
 import { NODE_HEIGHT, NODE_WIDTH, topologySignature } from '../lib/layoutGraph';
-import { cardHeight } from '../lib/cardHeight';
 import { buildViewNodes } from '../lib/buildViewNodes';
+import { reconcileGraphModel } from '../lib/reconcileGraph';
 import type { TGraphModel, TGraphNode, TNodeStatus } from '../Graph.entity';
 import {
   EXECUTION_ROW_PAD,
@@ -27,6 +28,11 @@ import { isActiveStatus } from '../lib/nodeStatus';
 import { useNodeResize } from '../Hooks/useNodeResize';
 import { AgentNode } from './AgentNode';
 import { InvocationEdge } from './InvocationEdge';
+import {
+  EMPTY_NODE_FOCUS,
+  NodeFocusProvider,
+  type TNodeFocus,
+} from './NodeFocusContext';
 import {
   ExecutionLanes,
   GUTTER_NODE_TYPE,
@@ -42,6 +48,14 @@ const nodeTypes = {
 const edgeTypes = {
   invocation: InvocationEdge,
 } as unknown as EdgeTypes;
+
+/**
+ * Marcas de inicio de una transición de interacción (contrato de instrumentación
+ * §4). La medida `graph.interaction` se resuelve en el efecto posterior al commit
+ * —"pintado siguiente"—, nunca por `mousemove`/frame (criterio P5).
+ */
+const INTERACTION_HOVER_MARK = 'graph.interaction.hover.start';
+const INTERACTION_SELECT_MARK = 'graph.interaction.select.start';
 
 /**
  * Rango de agregación por nivel de ejecución (FR-023): cuando un carril reúne
@@ -137,41 +151,83 @@ export const AgentGraph = ({
   className,
 }: AgentGraphProps) => {
   const { overrides, onNodesChange } = useNodeResize(resetKey);
-  const signature = useMemo(() => topologySignature(graph), [graph]);
+
+  // Identidad estable del modelo (R4, contrato de render §1.1): aunque el padre
+  // entregue un `TGraphModel` nuevo por referencia, se reutilizan los nodos y
+  // aristas sin cambios para que React Flow no re-renderice de más. Se ajusta el
+  // estado durante el render (patrón recomendado por React) para no mostrar un
+  // modelo intermedio.
+  const [previousGraph, setPreviousGraph] = useState(graph);
+  const [stableGraph, setStableGraph] = useState(graph);
+  if (previousGraph !== graph) {
+    setPreviousGraph(graph);
+    setStableGraph(reconcileGraphModel(stableGraph, graph));
+  }
+
+  const signature = useMemo(
+    () =>
+      topologySignature({
+        nodes: stableGraph.nodes,
+        edges: stableGraph.edges,
+      }),
+    [stableGraph.nodes, stableGraph.edges],
+  );
 
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
   // Linaje del nodo seleccionado: ancestros + descendientes. `null` = sin foco.
+  // Se publica por contexto (no por `data`/`style`) para no reconstruir los
+  // arrays que consume React Flow (contrato de render §1.2/§2).
   const lineage = useMemo(
-    () => deriveLineage(graph, selectedNodeId),
-    [graph, selectedNodeId],
+    () =>
+      deriveLineage(
+        { nodes: stableGraph.nodes, edges: stableGraph.edges },
+        selectedNodeId,
+      ),
+    [stableGraph.nodes, stableGraph.edges, selectedNodeId],
+  );
+
+  const focus = useMemo<TNodeFocus>(
+    () => ({
+      selectedNodeId,
+      lineageNodeIds: lineage?.nodeIds ?? EMPTY_NODE_FOCUS.lineageNodeIds,
+      lineageEdgeIds: lineage?.edgeIds ?? EMPTY_NODE_FOCUS.lineageEdgeIds,
+      hoveredNodeId,
+    }),
+    [selectedNodeId, lineage, hoveredNodeId],
   );
 
   const statusByLevel = useMemo(() => {
     const map: Record<number, TNodeStatus> = {};
-    for (const node of graph.nodes) {
+    for (const node of stableGraph.nodes) {
       const level = plan.levelByNode[node.id];
       if (level === undefined) continue;
       map[level] = worseStatus(map[level], node.data.status);
     }
     return map;
-  }, [graph.nodes, plan]);
+  }, [stableGraph.nodes, plan]);
 
   const activeLevel = useMemo(() => {
-    const active = graph.nodes.find((node) => isActiveStatus(node.data.status));
+    const active = stableGraph.nodes.find((node) =>
+      isActiveStatus(node.data.status),
+    );
     return active ? (plan.levelByNode[active.id] ?? null) : null;
-  }, [graph.nodes, plan]);
+  }, [stableGraph.nodes, plan]);
 
-  // Alto real de cada nodo: el override de resize o el alto calculado según el
-  // contenido (`cardHeight`), para que el carril acompañe al card.
+  // Nodos de vista con su `height` ya resuelto por `buildViewNodes` (contrato de
+  // render §3): el carril reutiliza ese alto y NO vuelve a llamar `cardHeight`.
+  const viewNodes = useMemo(
+    () => buildViewNodes(stableGraph.nodes, overrides, null, false),
+    [stableGraph.nodes, overrides],
+  );
+
   const heightByNode = useMemo(() => {
     const map: Record<string, number> = {};
-    for (const node of graph.nodes) {
-      map[node.id] =
-        overrides[node.id]?.height ?? cardHeight(node.data, NODE_WIDTH);
+    for (const node of viewNodes) {
+      map[node.id] = node.height ?? NODE_HEIGHT;
     }
     return map;
-  }, [graph.nodes, overrides]);
+  }, [viewNodes]);
 
   // Cada carril crece en proporción al nodo más alto de su nivel.
   const rowLayout = useMemo(
@@ -180,17 +236,10 @@ export const AgentGraph = ({
   );
 
   const nodes = useMemo<TGraphNode[]>(() => {
-    const agentNodes = buildViewNodes(
-      graph.nodes,
-      overrides,
-      selectedNodeId,
-      false,
-    );
-
     // El carril manda el `y` (alto acumulado); el `x` sigue siendo el de la
-    // columna dentro del nivel. Fuera del linaje, el nodo se atenúa (no se
-    // oculta: la estructura del grafo se conserva).
-    const positioned = agentNodes.map((node) => {
+    // columna dentro del nivel. El resaltado de linaje/hover va por contexto, no
+    // por `style`, así el array se mantiene estable frente a la interacción.
+    const positioned = viewNodes.map((node) => {
       const level = plan.levelByNode[node.id];
       if (level === undefined) return node;
       return {
@@ -199,9 +248,6 @@ export const AgentGraph = ({
           x: node.position.x,
           y: (rowLayout.top[level] ?? 0) + EXECUTION_ROW_PAD,
         },
-        style: lineage
-          ? { ...node.style, opacity: lineage.nodeIds.has(node.id) ? 1 : 0.15 }
-          : node.style,
       };
     });
 
@@ -211,45 +257,15 @@ export const AgentGraph = ({
       ...positioned,
       ...buildGutterNodes(plan, rowLayout, statusByLevel, activeLevel),
     ] as unknown as TGraphNode[];
-  }, [
-    graph.nodes,
-    overrides,
-    selectedNodeId,
-    plan,
-    rowLayout,
-    statusByLevel,
-    activeLevel,
-    lineage,
-  ]);
+  }, [viewNodes, plan, rowLayout, statusByLevel, activeLevel]);
 
   const edges = useMemo<Edge[]>(
     () =>
-      graph.edges.map((edge) => {
+      stableGraph.edges.map((edge) => {
         const column = plan.columnByNode[edge.source] ?? 0;
-        // Reposo: gris visible (no `--border`, que se pierde en dark).
-        let color = 'hsl(var(--muted-foreground))';
-        let strokeWidth = 1.25;
-        let opacity = 0.45;
-
-        if (lineage) {
-          // Foco activo: se refuerzan las aristas del linaje; el resto se atenúa
-          // pero sigue visible (la estructura no se borra).
-          if (lineage.edgeIds.has(edge.id)) {
-            color = 'hsl(var(--foreground))';
-            strokeWidth = 2;
-            opacity = 1;
-          } else {
-            opacity = 0.15;
-          }
-        } else if (
-          hoveredNodeId !== null &&
-          (edge.source === hoveredNodeId || edge.target === hoveredNodeId)
-        ) {
-          // Sin foco: el hover traza las relaciones directas del nodo.
-          color = 'hsl(var(--foreground))';
-          strokeWidth = 1.6;
-          opacity = 1;
-        }
+        // Reposo: gris visible (no `--border`, que se pierde en dark). El
+        // resaltado de hover/linaje lo resuelve `InvocationEdge` por contexto.
+        const color = 'hsl(var(--muted-foreground))';
 
         return {
           id: edge.id,
@@ -257,7 +273,7 @@ export const AgentGraph = ({
           target: edge.target,
           type: 'invocation',
           data: { railX: executionRailX(column) },
-          style: { stroke: color, strokeWidth, opacity },
+          style: { stroke: color, strokeWidth: 1.25, opacity: 0.45 },
           markerEnd: {
             type: MarkerType.ArrowClosed,
             width: 12,
@@ -266,50 +282,77 @@ export const AgentGraph = ({
           },
         };
       }),
-    [graph.edges, plan.columnByNode, lineage, hoveredNodeId],
+    [stableGraph.edges, plan.columnByNode],
   );
+
+  // Medición de interacción por transición (contrato de instrumentación §4,
+  // criterio P5): se marca al cambiar el foco y se mide en el commit siguiente
+  // ("pintado siguiente"), nunca por frame. Los refs permiten ignorar el montaje.
+  const previousHoverRef = useRef(hoveredNodeId);
+  useEffect(() => {
+    if (previousHoverRef.current === hoveredNodeId) return;
+    previousHoverRef.current = hoveredNodeId;
+    perfMark(INTERACTION_HOVER_MARK);
+    perfMeasure(PERF_METRIC.interaction, INTERACTION_HOVER_MARK, {
+      nodeCount: stableGraph.nodes.length,
+      kind: 'hover',
+    });
+  }, [hoveredNodeId, stableGraph.nodes.length]);
+
+  const previousSelectedRef = useRef(selectedNodeId);
+  useEffect(() => {
+    if (previousSelectedRef.current === selectedNodeId) return;
+    previousSelectedRef.current = selectedNodeId;
+    perfMark(INTERACTION_SELECT_MARK);
+    perfMeasure(PERF_METRIC.interaction, INTERACTION_SELECT_MARK, {
+      nodeCount: stableGraph.nodes.length,
+      kind: 'select',
+    });
+  }, [selectedNodeId, stableGraph.nodes.length]);
 
   return (
     <ReactFlowProvider>
-      <div className={cn('h-full w-full', className)}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          colorMode="dark"
-          fitView
-          minZoom={0.2}
-          nodesDraggable={false}
-          nodesConnectable={false}
-          proOptions={{ hideAttribution: true }}
-          onNodesChange={onNodesChange}
-          onNodeClick={(_, node) => {
-            if (String(node.type) === GUTTER_NODE_TYPE) return;
-            onSelectNode(node.id);
-          }}
-          onNodeDoubleClick={(_, node) => {
-            if (String(node.type) === GUTTER_NODE_TYPE) return;
-            onOpenHistory?.(node.id);
-          }}
-          onNodeMouseEnter={(_, node) => {
-            if (String(node.type) === GUTTER_NODE_TYPE) return;
-            setHoveredNodeId(node.id);
-          }}
-          onNodeMouseLeave={() => setHoveredNodeId(null)}
-          onPaneClick={onClearSelection}
-        >
-          <Background gap={16} color="#232A34" />
-          <Controls showInteractive={false} />
-          <ExecutionLanes
-            plan={plan}
-            rowLayout={rowLayout}
-            activeLevel={activeLevel}
-          />
-        </ReactFlow>
-        <FitViewController signature={signature} />
-        <FollowController nodeId={followNodeId} />
-      </div>
+      <NodeFocusProvider value={focus}>
+        <div className={cn('h-full w-full', className)}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            colorMode="dark"
+            fitView
+            minZoom={0.2}
+            nodesDraggable={false}
+            nodesConnectable={false}
+            proOptions={{ hideAttribution: true }}
+            onNodesChange={onNodesChange}
+            onNodeClick={(_, node) => {
+              if (String(node.type) === GUTTER_NODE_TYPE) return;
+              onSelectNode(node.id);
+            }}
+            onNodeDoubleClick={(_, node) => {
+              if (String(node.type) === GUTTER_NODE_TYPE) return;
+              onOpenHistory?.(node.id);
+            }}
+            onNodeMouseEnter={(_, node) => {
+              if (String(node.type) === GUTTER_NODE_TYPE) return;
+              setHoveredNodeId(node.id);
+            }}
+            onNodeMouseLeave={() => setHoveredNodeId(null)}
+            onPaneClick={onClearSelection}
+          >
+            <Background gap={16} color="#232A34" />
+            <Controls showInteractive={false} />
+            <ExecutionLanes
+              plan={plan}
+              rowLayout={rowLayout}
+              activeLevel={activeLevel}
+            />
+          </ReactFlow>
+          <FitViewController signature={signature} />
+          <FollowController nodeId={followNodeId} />
+        </div>
+      </NodeFocusProvider>
     </ReactFlowProvider>
   );
 };
