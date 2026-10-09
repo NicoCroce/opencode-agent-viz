@@ -71,7 +71,7 @@ export const GraphPane = ({
         {follow.enabled ? 'Siguiendo' : 'Seguir'}
       </Button>
     </Container>
-    <Container block className="min-h-0 flex-1">
+    <Container block className="min-h-0 min-w-0 flex-1">
       {graph.isError ? (
         <EmptyScreenError message={graph.error?.message} />
       ) : graph.isLoading ? (
