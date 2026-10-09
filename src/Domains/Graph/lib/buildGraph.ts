@@ -7,6 +7,7 @@ import type {
   SessionStatus,
 } from "@opencode/client";
 import type {
+  TActivityMap,
   TEnrichmentState,
   TExecutionSignal,
   TGraphEdge,
@@ -51,6 +52,14 @@ export interface BuildGraphInput {
    * consumidores previos no pasan el campo y obtienen el grafo enriquecido.
    */
   enrichment?: TEnrichmentState;
+  /**
+   * Marca de última actividad observada por sesión
+   * (`queryKeys.sessions.activity()`). Se propaga a `toGraphNode` para ampliar
+   * el fin del intervalo de cada nodo (`updatedAt = max(lista, actividad)`,
+   * contract session-activity §4). **Opcional** para preservar la paridad de
+   * los consumidores previos: sin marca, `updatedAt` cae a `SessionInfo.time`.
+   */
+  activity?: TActivityMap;
   now: number;
 }
 
@@ -63,6 +72,7 @@ export const buildGraph = ({
   signals,
   forms,
   enrichment = "ready",
+  activity,
   now,
 }: BuildGraphInput): TGraphModel => {
   const nodes: TGraphNode[] = sessions.map((session) =>
@@ -74,6 +84,7 @@ export const buildGraph = ({
       signals,
       forms,
       enrichment,
+      activity,
       now,
     }),
   );

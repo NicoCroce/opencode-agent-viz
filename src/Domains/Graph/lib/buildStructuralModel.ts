@@ -1,5 +1,5 @@
 import type { AgentInfo, SessionInfo, SessionStatus } from '@opencode/client';
-import { EMPTY_METRICS, type TGraphModel } from '../Graph.entity';
+import { EMPTY_METRICS, type TActivityMap, type TGraphModel } from '../Graph.entity';
 import { buildGraph } from './buildGraph';
 
 export interface BuildStructuralModelInput {
@@ -7,6 +7,14 @@ export interface BuildStructuralModelInput {
   sessions: SessionInfo[];
   statuses: Record<string, SessionStatus>;
   agents: AgentInfo[];
+  /**
+   * Marca de última actividad observada por sesión
+   * (`queryKeys.sessions.activity()`); se reenvía a `buildGraph` para ampliar el
+   * fin del intervalo (`updatedAt = max(lista, actividad)`, contract
+   * session-activity §4). **Opcional**: sin marca, la fase estructural cae a
+   * `SessionInfo.time`.
+   */
+  activity?: TActivityMap;
   /** Reloj estable de la fase estructural (no avanza por tick). */
   now: number;
 }
@@ -26,6 +34,7 @@ export const buildStructuralModel = ({
   sessions,
   statuses,
   agents,
+  activity,
   now,
 }: BuildStructuralModelInput): TGraphModel => {
   const structural = buildGraph({
@@ -39,6 +48,7 @@ export const buildStructuralModel = ({
     forms: [],
     inbox: [],
     enrichment: 'pending',
+    activity,
     now,
   });
   return {

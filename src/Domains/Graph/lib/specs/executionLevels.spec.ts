@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { TGraphModel, TGraphNode } from '../../Graph.entity';
 import { NODE_CARD_HEIGHT } from '../layoutGraph';
+import { executionInterval, nodeInterval } from '../execution/nodeInterval';
 import {
   EXECUTION_GUTTER,
   EXECUTION_RAIL_OFFSET,
@@ -147,6 +148,100 @@ describe('deriveExecutionLevels', () => {
     expect(level1.startedAt).toBe(100);
     expect(level1.endedAt).toBe(400);
   });
+
+  it('gives sequential siblings consecutive, distinct levels (FR-005)', () => {
+    // A lanza B, espera a que termine (fin 200) y recién entonces lanza C
+    // (inicio 300): no hay solape → niveles consecutivos distintos.
+    const sequential = model(
+      [node('A', 0, 20), node('B', 100, 200), node('C', 300, 400)],
+      { B: 'A', C: 'A' },
+    );
+
+    const plan = deriveExecutionLevels(sequential, 1000);
+
+    expect(plan.levels.map((level) => level.nodeIds)).toEqual([
+      ['A'],
+      ['B'],
+      ['C'],
+    ]);
+    expect(plan.levelByNode.B).toBe(1);
+    expect(plan.levelByNode.C).toBe(2);
+    expect(plan.levelByNode.B).not.toBe(plan.levelByNode.C);
+  });
+
+  it('places a concurrent batch of siblings on a single shared level (FR-001)', () => {
+    const concurrent = model(
+      [node('A', 0, 20), node('B', 100, 300), node('C', 100, 200)],
+      { B: 'A', C: 'A' },
+    );
+
+    const plan = deriveExecutionLevels(concurrent, 1000);
+
+    expect(plan.levels.map((level) => level.nodeIds)).toEqual([['A'], ['B', 'C']]);
+    expect(plan.levelByNode.B).toBe(plan.levelByNode.C);
+    expect(plan.levels[1].parallel).toBe(true);
+  });
+
+  it('leaves earlier batches on higher rows than later ones (FR-005)', () => {
+    // Dos tandas paralelas consecutivas: la primera (B1/B2) arriba, la segunda
+    // (C1/C2) abajo; cada tanda comparte su fila.
+    const twoBatches = model(
+      [
+        node('A', 0, 20),
+        node('B1', 100, 300),
+        node('B2', 120, 280),
+        node('C1', 400, 600),
+        node('C2', 420, 580),
+      ],
+      { B1: 'A', B2: 'A', C1: 'A', C2: 'A' },
+    );
+
+    const plan = deriveExecutionLevels(twoBatches, 1000);
+
+    expect(plan.levels.map((level) => level.nodeIds)).toEqual([
+      ['A'],
+      ['B1', 'B2'],
+      ['C1', 'C2'],
+    ]);
+    expect(plan.levelByNode.B1).toBeLessThan(plan.levelByNode.C1);
+
+    const laidOut = layoutExecution(twoBatches, plan);
+    const y = (id: string): number =>
+      laidOut.nodes.find((candidate) => candidate.id === id)?.position.y ?? -1;
+    expect(y('B1')).toBeLessThan(y('C1'));
+  });
+
+  it('orders rows by start time regardless of the model order (FR-005, FR-006)', () => {
+    // El hermano tardío aparece primero en el modelo; aun así el temprano queda
+    // arriba porque el orden de filas es temporal, no de entrada.
+    const unordered = model(
+      [node('A', 0, 20), node('late', 400, 500), node('early', 100, 200)],
+      { late: 'A', early: 'A' },
+    );
+
+    const plan = deriveExecutionLevels(unordered, 1000);
+
+    expect(plan.levels.map((level) => level.nodeIds)).toEqual([
+      ['A'],
+      ['early'],
+      ['late'],
+    ]);
+    expect(plan.levelByNode.early).toBeLessThan(plan.levelByNode.late);
+  });
+
+  it('breaks column ties by id for a deterministic order (FR-006)', () => {
+    // Mismo instante de inicio: el desempate estable por id define las columnas.
+    const tied = model(
+      [node('A', 0, 10), node('b', 100, 200), node('a', 100, 200)],
+      { a: 'A', b: 'A' },
+    );
+
+    const plan = deriveExecutionLevels(tied, 1000);
+
+    expect(plan.levels[1].nodeIds).toEqual(['a', 'b']);
+    expect(plan.columnByNode.a).toBe(0);
+    expect(plan.columnByNode.b).toBe(1);
+  });
 });
 
 describe('layoutExecution', () => {
@@ -222,5 +317,17 @@ describe('executionRailX', () => {
     // El riel de la columna 0 cae después de la espina y antes del nodo.
     expect(executionRailX(0)).toBeGreaterThan(EXECUTION_GUTTER);
     expect(executionRailX(0)).toBeLessThan(executionColumnX(0));
+  });
+});
+
+describe('interval clamp on terminated nodes (nodeInterval.ts JSDoc)', () => {
+  it('clamps nodeInterval when the real end precedes the start', () => {
+    // Un terminado con fin anterior al inicio no debe producir un intervalo
+    // invertido: se conserva el clamp `Math.max(inicio, fin)`.
+    expect(nodeInterval(node('X', 500, 100), 999)).toEqual([500, 500]);
+  });
+
+  it('clamps executionInterval when the real end precedes the start', () => {
+    expect(executionInterval(node('X', 500, 100))).toEqual([500, 500]);
   });
 });

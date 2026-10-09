@@ -94,6 +94,16 @@ export interface TNodeParallelism {
   size: number;
 }
 
+/**
+ * Marca de última actividad observada por sesión (FR-009), cacheada en
+ * `queryKeys.sessions.activity()`. Estado de vista en caché (TanStack Query),
+ * hermana de `sessions.status()`: `[sessionID]` = último instante de actividad
+ * (ms), con `max` acumulado (nunca retrocede). Se compone de los eventos en vivo
+ * reducidos de forma pura por `reduceActivity`. No se persiste ni se envía al
+ * servidor. Ver `contracts/session-activity-contract.md` §1.
+ */
+export type TActivityMap = Record<string, number>;
+
 export interface TGraphNodeData extends Record<string, unknown> {
   sessionId: string;
   /** Título de la tarea/sesión; reemplaza al agente en el nodo. */
@@ -105,9 +115,11 @@ export interface TGraphNodeData extends Record<string, unknown> {
    */
   createdAt: number | null;
   /**
-   * `SessionInfo.time.idle ?? time.updated`: fin del intervalo de ejecución,
-   * estable y disponible apenas cargan las sesiones. Cierra la detección de
-   * solapamientos sin depender de los mensajes.
+   * Fin del intervalo de ejecución:
+   * `max(SessionInfo.time.idle ?? time.updated ?? 0, activity[sessionId] ?? 0)`.
+   * La lista de sesiones es estable y disponible apenas cargan; la marca de
+   * actividad (`TActivityMap`, FR-009) mantiene fresco el fin en vivo. Cierra la
+   * detección de solapamientos sin depender de los mensajes.
    */
   updatedAt: number | null;
   agentName: string;

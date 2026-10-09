@@ -1,6 +1,6 @@
 import type { SessionInfo, SessionStatus } from '@opencode/client';
 import type { TSessionMessage } from '@app/Infrastructure/Services/opencodeClient';
-import type { TExecutionSignal } from '../../Graph.entity';
+import type { TActivityMap, TExecutionSignal } from '../../Graph.entity';
 
 export type TSessionMessageCache = TSessionMessage[];
 
@@ -16,6 +16,20 @@ export const setStatus = (
     ? (prev as Record<string, SessionStatus>)
     : {}),
   [sessionID]: status,
+});
+
+/**
+ * Marca de actividad monótona (FR-009, contract session-activity §2): conserva
+ * el máximo entre la marca previa y el instante del evento, sin mutar la
+ * entrada. `{ ...prev, [sessionID]: Math.max(prev[sessionID] ?? 0, at) }`.
+ */
+export const setActivity = (
+  prev: TActivityMap,
+  sessionID: string,
+  at: number,
+): TActivityMap => ({
+  ...prev,
+  [sessionID]: Math.max(prev[sessionID] ?? 0, at),
 });
 
 export const removeSession = (prev: unknown, id: string): SessionInfo[] =>

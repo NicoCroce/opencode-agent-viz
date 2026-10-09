@@ -1,4 +1,5 @@
 import type { TGraphNode } from '../../Graph.entity';
+import { isActiveStatus } from '../nodeStatus';
 
 /**
  * Inicio del intervalo de ejecución de un nodo.
@@ -12,11 +13,16 @@ export const startOf = (node: TGraphNode): number =>
 /**
  * Fin del intervalo de ejecución de un nodo.
  *
- * Usa `updatedAt` (`time.idle ?? time.updated`) y cae a `metrics.endedAt` o a
- * `now`.
+ * Un nodo en estado activo (`isActiveStatus`) se considera **abierto hasta el
+ * presente observado**, por lo que devuelve `now`. Un nodo terminado usa su fin
+ * real: `updatedAt` (`time.idle ?? time.updated`) y cae a `metrics.endedAt` o a
+ * `now`. La apertura **nunca** se infiere de datos ausentes (FR-011): solo el
+ * estado activo explícito la habilita.
  */
 export const endOf = (node: TGraphNode, now: number): number =>
-  node.data.updatedAt ?? node.data.metrics.endedAt ?? now;
+  isActiveStatus(node.data.status)
+    ? now
+    : node.data.updatedAt ?? node.data.metrics.endedAt ?? now;
 
 /**
  * Intervalo `[inicio, fin]` de ejecución de un nodo, unificando
@@ -38,5 +44,26 @@ export const nodeInterval = (
 ): [number, number] => {
   const start = startOf(node);
   const end = endOf(node, now);
+  return [start, Math.max(start, end)];
+};
+
+/**
+ * Intervalo de **solape** de un nodo para el agrupamiento de hermanos.
+ *
+ * El fin abierto de un activo se modela como `+∞`: para decidir solape es
+ * equivalente a evaluar en cualquier `now ≥ max(inicio)`, y así el agrupamiento
+ * queda **independiente del reloj** (Principio V, FR-008). Un terminado se
+ * cierra con su fin real (`endOf(node, 0)`), nunca con `now`, de modo que un
+ * terminado sin datos de fin no se confunde con un activo (FR-011).
+ *
+ * Se conserva el clamp `Math.max(inicio, fin)` para garantizar un intervalo
+ * válido. Una sola lógica de intervalos compartida con `parallelism.ts`
+ * (FR-010).
+ */
+export const executionInterval = (node: TGraphNode): [number, number] => {
+  const start = startOf(node);
+  const end = isActiveStatus(node.data.status)
+    ? Number.POSITIVE_INFINITY
+    : endOf(node, 0);
   return [start, Math.max(start, end)];
 };
