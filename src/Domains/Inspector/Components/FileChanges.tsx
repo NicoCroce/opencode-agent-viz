@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Container } from '@app/Application/Components';
 import { SectionFrame } from '@app/Application/Components/Molecules';
+import { cn } from '@app/Application/lib/utils';
 import type { TFileChange } from '../Inspector.entity';
+import { FileDiff } from './FileDiff';
 
 interface FileChangesProps {
   /** Archivos afectados por el agente (FR-028). */
@@ -25,11 +27,19 @@ const STATUS_COLOR: Record<TFileChange['status'], string> = {
   deleted: 'text-status-error',
 };
 
+/** Punto LED por estado del archivo, reutilizando el lenguaje de LEDs (FR-019). */
+const STATUS_DOT_COLOR: Record<TFileChange['status'], string> = {
+  added: 'bg-status-done',
+  modified: 'bg-status-running',
+  deleted: 'bg-status-error',
+};
+
 /**
  * Impacto del agente en el repositorio (FR-028..FR-030): lista de archivos con
- * su estado y líneas añadidas/quitadas. Seleccionar un archivo muestra su
- * parche en monoespaciado; un parche vacío/ausente no bloquea la vista y se
- * indica como "parche no disponible". Sin cambios → estado vacío explícito.
+ * su estado (punto LED + etiqueta, FR-019) y líneas añadidas/quitadas.
+ * Seleccionar un archivo muestra su parche con el diff estilo editor
+ * (`FileDiff`, FR-016..FR-018); un parche vacío/ausente no bloquea la vista y
+ * se indica como "parche no disponible". Sin cambios → estado vacío explícito.
  *
  * Presentación pura: recibe `changes`/`isError`/`isLoading` desde el hook
  * (`useSessionDiff`) y solo gestiona la selección local del archivo.
@@ -65,8 +75,18 @@ export const FileChanges = ({
               }
               className="flex w-full min-w-0 items-center justify-between gap-2 border-b border-border py-1 text-left last:border-b-0"
             >
-              <span className="min-w-0 truncate font-mono text-xs text-foreground">
-                {change.file}
+              <span className="flex min-w-0 items-center gap-2">
+                <span
+                  data-dot={change.status}
+                  aria-hidden
+                  className={cn(
+                    'size-2 shrink-0 rounded-full',
+                    STATUS_DOT_COLOR[change.status],
+                  )}
+                />
+                <span className="min-w-0 truncate font-mono text-xs text-foreground">
+                  {change.file}
+                </span>
               </span>
               <span
                 className={`shrink-0 font-mono text-[11px] ${STATUS_COLOR[change.status] ?? 'text-muted-foreground'}`}
@@ -89,9 +109,7 @@ export const FileChanges = ({
               parche no disponible
             </p>
           ) : (
-            <pre className="max-h-64 overflow-auto rounded-flat border border-border bg-surface-1 p-2 font-mono text-[11px] text-foreground">
-              {selected.patch}
-            </pre>
+            <FileDiff patch={selected.patch} />
           )
         ) : null}
       </Container>

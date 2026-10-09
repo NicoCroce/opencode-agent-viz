@@ -5,6 +5,7 @@ export * from './LoopBadge';
 export * from './ResourceList';
 export * from './AnswersSection';
 export * from './FileChanges';
+export * from './FileDiff';
 export * from './QuestionsSection';
 export * from './ModelSection';
 export * from './ToolStats';

@@ -1,8 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ComponentProps } from 'react';
 import { render, screen } from '@testing-library/react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { NODE_STATUS_LABEL } from '@app/Application/Helpers';
+import { NODE_STATUS_COLOR, NODE_STATUS_LABEL } from '@app/Application/Helpers';
 import { AgentNode } from '../AgentNode';
 import {
   EMPTY_NODE_FOCUS,
@@ -11,6 +13,7 @@ import {
 } from '../NodeFocusContext';
 import type {
   TGraphNodeData,
+  TNodeEffort,
   TNodeMetrics,
   TNodeStatus,
 } from '../../Graph.entity';
@@ -315,6 +318,49 @@ describe('AgentNode — paralelismo', () => {
   });
 });
 
+describe('AgentNode — medidor de esfuerzo (T017, S9)', () => {
+  const effort = (overrides: Partial<TNodeEffort> = {}): TNodeEffort => ({
+    level: 3,
+    provisional: false,
+    reasons: ['lanzó paralelos', 'supera 2× la línea'],
+    ...overrides,
+  });
+
+  it('renders the effort meter with the accessible label when the node has effort', () => {
+    renderAgentNode({ data: withData({ effort: effort() }) });
+
+    expect(
+      screen.getByRole('img', {
+        name: 'Esfuerzo 3 de 5: lanzó paralelos, supera 2× la línea',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('places the meter in the header row, alongside the parallel badge', () => {
+    renderAgentNode({
+      data: withData({
+        effort: effort({ level: 4 }),
+        parallel: { groupId: 'g', size: 3 },
+      }),
+    });
+
+    const meter = screen.getByRole('img', { name: /^Esfuerzo 4 de 5/ });
+    const badge = screen.getByText('∥3');
+
+    // Misma fila: ambos comparten el contenedor del grupo derecho del encabezado
+    // (no se añade una fila nueva, effort-contract §5).
+    expect(meter.parentElement).toBe(badge.parentElement);
+  });
+
+  it('does not render the meter when the node has no effort', () => {
+    renderAgentNode({ data: withData({ effort: null }) });
+
+    expect(
+      screen.queryByRole('img', { name: /^Esfuerzo/ }),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe('AgentNode — estado enriquecido (US3, FR-017/FR-023)', () => {
   it.each<TNodeStatus>(Object.keys(NODE_STATUS_LABEL) as TNodeStatus[])(
     'renders the %s label',
@@ -323,26 +369,6 @@ describe('AgentNode — estado enriquecido (US3, FR-017/FR-023)', () => {
       expect(screen.getByText(NODE_STATUS_LABEL[status])).toBeInTheDocument();
     },
   );
-
-  it('shows a progress pulse while the execution is active (FR-022)', () => {
-    for (const status of ACTIVE_STATUSES) {
-      const { unmount } = renderAgentNode({ data: withData({ status }) });
-      const pulse = screen.getByTestId('agent-progress');
-      expect(pulse).toBeInTheDocument();
-      expect(pulse).toHaveClass('animate-pulse');
-      // La señal es puramente visual: no depende del texto en generación.
-      expect(pulse).toHaveAttribute('aria-hidden');
-      unmount();
-    }
-  });
-
-  it('does not show a progress pulse once the execution is not active', () => {
-    for (const status of INACTIVE_STATUSES) {
-      const { unmount } = renderAgentNode({ data: withData({ status }) });
-      expect(screen.queryByTestId('agent-progress')).not.toBeInTheDocument();
-      unmount();
-    }
-  });
 });
 
 describe('AgentNode — reintento (US3, FR-018)', () => {
@@ -478,5 +504,92 @@ describe('AgentNode — foco por contexto (T025, C4)', () => {
     );
 
     expect(nodeOpacity(container)).toBe(1);
+  });
+});
+
+describe('AgentNode — animación "pensando" del rail (T023, A1/A2/A3)', () => {
+  const getRail = (container: HTMLElement): HTMLElement => {
+    const rail = container.querySelector('[data-testid="node-status-rail"]');
+    if (!(rail instanceof HTMLElement)) {
+      throw new Error('No se encontró el rail de estado del AgentNode');
+    }
+    return rail;
+  };
+
+  /**
+   * Estados activos sin rayado: son los únicos que muestran el barrido
+   * (`.rail-scan`). `retrying` queda fuera porque siempre va rayado.
+   */
+  const SCANNING_STATUSES: TNodeStatus[] = [
+    'running',
+    'compacting',
+    'waiting-permission',
+    'waiting-input',
+  ];
+
+  it.each<TNodeStatus>(SCANNING_STATUSES)(
+    'renders the rail with .rail-scan while the node is active (%s)',
+    (status) => {
+      const { container } = renderWithNode(status, { hasLoop: false });
+      const rail = getRail(container);
+
+      expect(rail).toHaveClass('rail-scan');
+      // La clase base de color de estado se conserva junto al barrido.
+      expect(rail).toHaveClass(NODE_STATUS_COLOR[status]);
+    },
+  );
+
+  it.each<TNodeStatus>(INACTIVE_STATUSES)(
+    'does not render .rail-scan once the node is terminal (%s)',
+    (status) => {
+      const { container } = renderWithNode(status, { hasLoop: false });
+
+      expect(getRail(container)).not.toHaveClass('rail-scan');
+    },
+  );
+
+  it('keeps the loop stripe instead of the scan for a retrying node', () => {
+    // `retrying` es activo pero rayado: el rayado (LOOP_STRIPE) gana.
+    const { container } = renderWithNode('retrying', { hasLoop: false });
+    const rail = getRail(container);
+
+    expect(rail).not.toHaveClass('rail-scan');
+    expect(rail.style.backgroundImage).toContain('repeating-linear-gradient');
+  });
+
+  it('does not scan a running node that is striped by a detected loop', () => {
+    const { container } = renderWithNode('running', { hasLoop: true });
+    const rail = getRail(container);
+
+    expect(rail).not.toHaveClass('rail-scan');
+    expect(rail.style.backgroundImage).toContain('repeating-linear-gradient');
+  });
+
+  it('keeps the base static class as the reduced-motion fallback (FR-003)', () => {
+    // Con `prefers-reduced-motion` el bloque global anula la animación y el
+    // rail queda en color de actividad sólido y estático: la clase base de
+    // color permanece junto a `.rail-scan`.
+    const { container } = renderWithNode('running', { hasLoop: false });
+    const rail = getRail(container);
+
+    expect(rail).toHaveClass('rail-scan');
+    expect(rail).toHaveClass('bg-status-running');
+  });
+});
+
+describe('index.css — barrido del rail (T024, A3)', () => {
+  const css = readFileSync(join(process.cwd(), 'src/index.css'), 'utf8');
+
+  it('defines the rail-scan keyframes and the .rail-scan class', () => {
+    expect(css).toMatch(/@keyframes\s+rail-scan/);
+    expect(css).toMatch(/\.rail-scan\b/);
+  });
+
+  it('declares the static state inside the global reduced-motion block (FR-003)', () => {
+    const reducedMotion = css.slice(
+      css.indexOf('prefers-reduced-motion: reduce'),
+    );
+
+    expect(reducedMotion).toMatch(/\.rail-scan/);
   });
 });

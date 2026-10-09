@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { TGraphEdge, TGraphNode, TGraphNodeData } from '../../Graph.entity';
+import type {
+  TGraphEdge,
+  TGraphNode,
+  TGraphNodeData,
+  TNodeEffort,
+} from '../../Graph.entity';
 import { EMPTY_METRICS } from '../../Graph.entity';
 import { reconcileGraphModel } from '../reconcileGraph';
+import { sameEffort, sameNodeData } from '../reconcile/comparators';
 
 /**
  * Spec del contrato de render (feature 006), criterios C1..C2 de
@@ -286,5 +292,159 @@ describe('reconcileGraphModel · pureza (no muta entradas)', () => {
     expect(snapshot(next)).toBe(nextBefore);
     expect(result.nodes[0]).toBe(prev.nodes[0]);
     expect(result.nodes[1]).toBe(next.nodes[1]);
+  });
+});
+
+/**
+ * S8 de `contracts/effort-contract.md` §4 (data-model §2.1): `effort` debe
+ * entrar en `sameNodeData` vía `sameEffort`; sin el comparador el nodo no se
+ * reemplazaría y el medidor quedaría congelado. `effort` es opcional, así que
+ * `undefined` y `null` son equivalentes (sin esfuerzo) y el paso de ausente a
+ * presente debe detectarse.
+ */
+describe('reconcileGraphModel · S8 (effort en la identidad de nodo)', () => {
+  const effort = (
+    level: TNodeEffort['level'],
+    provisional = false,
+    reasons: string[] = [],
+  ): TNodeEffort => ({ level, provisional, reasons });
+
+  describe('sameEffort', () => {
+    it('trata `undefined` y `null` como equivalentes (sin esfuerzo)', () => {
+      expect(sameEffort(undefined, undefined)).toBe(true);
+      expect(sameEffort(null, null)).toBe(true);
+      expect(sameEffort(undefined, null)).toBe(true);
+      expect(sameEffort(null, undefined)).toBe(true);
+    });
+
+    it('detecta el paso de ausente a presente y de presente a ausente', () => {
+      expect(sameEffort(undefined, effort(1))).toBe(false);
+      expect(sameEffort(null, effort(1))).toBe(false);
+      expect(sameEffort(effort(1), undefined)).toBe(false);
+      expect(sameEffort(effort(1), null)).toBe(false);
+    });
+
+    it('detecta cambios de level', () => {
+      expect(sameEffort(effort(2), effort(3))).toBe(false);
+      expect(sameEffort(effort(5), effort(1))).toBe(false);
+    });
+
+    it('detecta cambios de provisional', () => {
+      expect(sameEffort(effort(2, false), effort(2, true))).toBe(false);
+      expect(sameEffort(effort(2, true), effort(2, false))).toBe(false);
+    });
+
+    it('detecta cambios de reasons (longitud y contenido)', () => {
+      expect(sameEffort(effort(2, false, ['a']), effort(2, false, []))).toBe(false);
+      expect(
+        sameEffort(effort(2, false, ['a']), effort(2, false, ['a', 'b'])),
+      ).toBe(false);
+      expect(
+        sameEffort(effort(2, false, ['a', 'b']), effort(2, false, ['b', 'a'])),
+      ).toBe(false);
+    });
+
+    it('es verdadero con el mismo contenido aunque cambie la identidad', () => {
+      expect(sameEffort(effort(3), effort(3))).toBe(true);
+      expect(
+        sameEffort(effort(4, true, ['paralelos']), effort(4, true, ['paralelos'])),
+      ).toBe(true);
+    });
+  });
+
+  describe('sameNodeData', () => {
+    it('no distingue dos nodos sin `effort` (undefined vs ausente)', () => {
+      const withUndefined = makeNode('root', { data: { effort: undefined } });
+      const withoutField = makeNode('root');
+
+      expect(sameNodeData(withUndefined.data, withoutField.data)).toBe(true);
+    });
+
+    it('propaga el cambio de level al reconciliar (el medidor deja de congelarse)', () => {
+      const prev = {
+        nodes: [makeNode('root', { data: { effort: effort(1) } })],
+        edges: [],
+      };
+      const next = {
+        nodes: [makeNode('root', { data: { effort: effort(2) } })],
+        edges: [],
+      };
+
+      const result = reconcileGraphModel(prev, next);
+
+      expect(result.nodes[0]).not.toBe(prev.nodes[0]);
+      expect(result.nodes[0]).toBe(next.nodes[0]);
+    });
+
+    it('propaga el cambio de provisional', () => {
+      const prev = {
+        nodes: [makeNode('root', { data: { effort: effort(2, false) } })],
+        edges: [],
+      };
+      const next = {
+        nodes: [makeNode('root', { data: { effort: effort(2, true) } })],
+        edges: [],
+      };
+
+      const result = reconcileGraphModel(prev, next);
+
+      expect(result.nodes[0]).not.toBe(prev.nodes[0]);
+      expect(result.nodes[0]).toBe(next.nodes[0]);
+    });
+
+    it('propaga el cambio de reasons', () => {
+      const prev = {
+        nodes: [makeNode('root', { data: { effort: effort(3, false, ['a']) } })],
+        edges: [],
+      };
+      const next = {
+        nodes: [makeNode('root', { data: { effort: effort(3, false, ['a', 'b']) } })],
+        edges: [],
+      };
+
+      const result = reconcileGraphModel(prev, next);
+
+      expect(result.nodes[0]).not.toBe(prev.nodes[0]);
+      expect(result.nodes[0]).toBe(next.nodes[0]);
+    });
+
+    it('propaga el paso de ausente a presente', () => {
+      const prev = { nodes: [makeNode('root')], edges: [] };
+      const next = {
+        nodes: [makeNode('root', { data: { effort: effort(4) } })],
+        edges: [],
+      };
+
+      const result = reconcileGraphModel(prev, next);
+
+      expect(result.nodes[0]).not.toBe(prev.nodes[0]);
+      expect(result.nodes[0]).toBe(next.nodes[0]);
+    });
+
+    it('reutiliza el mismo objeto de nodo cuando el `effort` no cambia', () => {
+      const prev = {
+        nodes: [makeNode('root', { data: { effort: effort(2, true, ['x']) } })],
+        edges: [],
+      };
+      const next = {
+        nodes: [makeNode('root', { data: { effort: effort(2, true, ['x']) } })],
+        edges: [],
+      };
+
+      const result = reconcileGraphModel(prev, next);
+
+      expect(result.nodes[0]).toBe(prev.nodes[0]);
+      expect(result.nodes).toBe(prev.nodes);
+    });
+
+    it('reutiliza el mismo objeto cuando ambos carecen de `effort`', () => {
+      const prev = { nodes: [makeNode('root')], edges: [] };
+      const next = { nodes: [makeNode('root')], edges: [] };
+
+      const result = reconcileGraphModel(prev, next);
+
+      expect(result.nodes[0]).toBe(prev.nodes[0]);
+      expect(result.nodes).toBe(prev.nodes);
+    });
   });
 });

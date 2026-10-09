@@ -1,10 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { SessionInfo } from '@opencode/client';
+import { STORE_KEY } from '@app/Application/Hooks';
+import {
+  INSPECTOR_DEFAULT_WIDTH,
+  INSPECTOR_MAX_WIDTH,
+  INSPECTOR_MIN_WIDTH,
+  INSPECTOR_STEP,
+} from '@app/Application/Helpers/panelWidth';
 import { queryKeys } from '@app/Domains/queryKeys';
 import { useRootSessions } from '@app/Domains/Sessions';
+import { INSPECTOR_PANEL_WIDTH_KEY } from '../Hooks/useInspectorPanel';
 import { WorkspacePage } from '../WorkspacePage';
 
 /**
@@ -79,15 +87,49 @@ vi.mock('@app/Domains/Sessions', () => ({
   useRootSessions: vi.fn(),
 }));
 
-vi.mock('@app/Domains/Inspector', () => ({
-  InspectorPanel: () => null,
-  useSessionContext: () => ({
-    messages: [],
-    isError: false,
-    isLoading: false,
-  }),
-  useSessionForms: () => ({ questions: [] }),
-}));
+vi.mock('@app/Domains/Inspector', async () => {
+  const React = await import('react');
+  const { useDevice } = await import('@app/Application/Hooks');
+  return {
+    // Marcador identificable: permite afirmar que el contenido del panel no se
+    // remonta al cambiar el ancho (P5/FR-012). Reproduce el control de
+    // fullscreen del panel real (solo escritorio) para poder ejercer el toggle
+    // y su cierre (US6/T051).
+    InspectorPanel: (props: {
+      isFullscreen?: boolean;
+      onToggleFullscreen?: () => void;
+    }) => {
+      const { isDesktop } = useDevice();
+      const control =
+        isDesktop && props.onToggleFullscreen
+          ? React.createElement(
+              'button',
+              {
+                type: 'button',
+                'aria-pressed': Boolean(props.isFullscreen),
+                'aria-label': props.isFullscreen
+                  ? 'Salir de pantalla completa'
+                  : 'Pantalla completa',
+                onClick: props.onToggleFullscreen,
+              },
+              'fullscreen',
+            )
+          : null;
+
+      return React.createElement(
+        'div',
+        { 'data-testid': 'inspector-panel' },
+        control,
+      );
+    },
+    useSessionContext: () => ({
+      messages: [],
+      isError: false,
+      isLoading: false,
+    }),
+    useSessionForms: () => ({ questions: [] }),
+  };
+});
 
 vi.mock('@app/Domains/History', () => ({
   HistoryModal: () => null,
@@ -153,6 +195,14 @@ const seedStructureCache = (client: QueryClient): void => {
   client.setQueryData(queryKeys.sessions.list(DIRECTORY), [sessionInfo]);
   client.setQueryData(queryKeys.agents.list(DIRECTORY), []);
   client.setQueryData(queryKeys.sessions.status(), {});
+};
+
+/**
+ * Fija la presentación (desktop/móvil) sembrando el store global que consume
+ * `useDevice` (`STORE_KEY.isMobile`). Sin sembrar, `useDevice` arranca en móvil.
+ */
+const setDevice = (client: QueryClient, isMobile: boolean): void => {
+  client.setQueryData([STORE_KEY.isMobile], isMobile);
 };
 
 const renderWorkspace = (client: QueryClient) =>
@@ -296,5 +346,167 @@ describe('WorkspacePage — orden de estados error→carga→vacío→datos (T03
     expect(screen.getByTestId('agent-graph')).toBeInTheDocument();
     expect(screen.queryByTestId('graph-skeleton')).not.toBeInTheDocument();
     expect(screen.queryByText('Sin agentes')).not.toBeInTheDocument();
+  });
+});
+
+describe('WorkspacePage — resize del panel de detalle (T042, P5, FR-012, SC-007)', () => {
+  beforeEach(() => {
+    service.listSessions.mockResolvedValue([sessionInfo]);
+  });
+
+  it('escritorio: monta el separador accesible y ajusta el ancho sin alterar grafo ni contenido', async () => {
+    const client = createClient();
+    seedStructureCache(client);
+    setDevice(client, false);
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+
+    const separator = screen.getByRole('separator');
+    expect(separator).toHaveAttribute('aria-orientation', 'vertical');
+    expect(separator).toHaveAttribute(
+      'aria-valuenow',
+      String(INSPECTOR_DEFAULT_WIDTH),
+    );
+    expect(separator).toHaveAttribute(
+      'aria-valuemin',
+      String(INSPECTOR_MIN_WIDTH),
+    );
+    expect(separator).toHaveAttribute(
+      'aria-valuemax',
+      String(INSPECTOR_MAX_WIDTH),
+    );
+    expect(separator).toHaveAttribute('tabindex', '0');
+
+    const column = screen.getByTestId('inspector-column');
+    expect(column).toHaveStyle({ width: `${INSPECTOR_DEFAULT_WIDTH}px` });
+
+    // Referencias de nodo del contenido: no deben cambiar al redimensionar.
+    const inspectorBefore = screen.getByTestId('inspector-panel');
+    const graphBefore = screen.getByTestId('agent-graph');
+
+    fireEvent.keyDown(separator, { key: 'ArrowLeft' });
+
+    const widened = INSPECTOR_DEFAULT_WIDTH + INSPECTOR_STEP;
+    expect(column).toHaveStyle({ width: `${widened}px` });
+    expect(separator).toHaveAttribute('aria-valuenow', String(widened));
+    // El contenido del inspector y el grafo se conservan intactos (FR-012).
+    expect(screen.getByTestId('inspector-panel')).toBe(inspectorBefore);
+    expect(screen.getByTestId('agent-graph')).toBe(graphBefore);
+  });
+
+  it('móvil: no monta el separador ni el control de fullscreen, aun con el panel activo', async () => {
+    const client = createClient();
+    seedStructureCache(client);
+    setDevice(client, true);
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+
+    // Se abre la pestaña del inspector: el panel se monta, pero los controles de
+    // escritorio (separador y fullscreen) no deben existir (AGENTS §9).
+    fireEvent.click(screen.getByRole('tab', { name: 'inspector' }));
+
+    expect(screen.getByTestId('inspector-panel')).toBeInTheDocument();
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /pantalla completa|fullscreen/i }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('WorkspacePage — fullscreen del panel de detalle (T051, P6, FR-013..FR-015)', () => {
+  beforeEach(() => {
+    service.listSessions.mockResolvedValue([sessionInfo]);
+  });
+
+  const renderDesktopWorkspace = async () => {
+    const client = createClient();
+    seedStructureCache(client);
+    setDevice(client, false);
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+  };
+
+  it('toggleFullscreen expande el panel y el mismo control vuelve al layout normal', async () => {
+    await renderDesktopWorkspace();
+
+    expect(screen.getByTestId('inspector-column')).not.toHaveAttribute(
+      'data-fullscreen',
+    );
+    expect(screen.getByRole('separator')).toBeInTheDocument();
+
+    const expand = screen.getByRole('button', { name: 'Pantalla completa' });
+    expect(expand).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(expand);
+
+    const overlay = screen.getByTestId('inspector-column');
+    expect(overlay).toHaveAttribute('data-fullscreen', 'true');
+    expect(overlay).toHaveClass('bg-surface-0');
+    // El separador de escritorio no se monta en fullscreen.
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+
+    const collapse = screen.getByRole('button', {
+      name: 'Salir de pantalla completa',
+    });
+    expect(collapse).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(collapse);
+
+    expect(screen.getByTestId('inspector-column')).not.toHaveAttribute(
+      'data-fullscreen',
+    );
+    expect(screen.getByRole('separator')).toBeInTheDocument();
+  });
+
+  it('Escape cierra el fullscreen antes de limpiar la selección', async () => {
+    await renderDesktopWorkspace();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pantalla completa' }));
+    expect(screen.getByTestId('inspector-column')).toHaveAttribute(
+      'data-fullscreen',
+      'true',
+    );
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('inspector-column')).not.toHaveAttribute(
+        'data-fullscreen',
+      ),
+    );
+    expect(screen.getByRole('separator')).toBeInTheDocument();
+  });
+
+  it('arranca en layout normal y no persiste el fullscreen', async () => {
+    await renderDesktopWorkspace();
+
+    expect(screen.getByTestId('inspector-column')).not.toHaveAttribute(
+      'data-fullscreen',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pantalla completa' }));
+    expect(screen.getByTestId('inspector-column')).toHaveAttribute(
+      'data-fullscreen',
+      'true',
+    );
+
+    // Solo se persiste el ancho del panel, nunca el estado de fullscreen.
+    const keys = Array.from(
+      { length: window.localStorage.length },
+      (_, index) => window.localStorage.key(index),
+    );
+    expect(keys).toEqual([INSPECTOR_PANEL_WIDTH_KEY]);
   });
 });

@@ -95,6 +95,21 @@ export interface TNodeParallelism {
 }
 
 /**
+ * Nivel de esfuerzo de vista de un nodo (FR-021..FR-028; data-model §2.1).
+ * Escala acumulativa 1..5 derivada de forma pura por `deriveEffortByNode`
+ * (`lib/effort/deriveEffort.ts`): paralelismo, duración relativa a su línea y
+ * forma (hijos/invocaciones). `provisional` mientras la línea tenga algún nodo
+ * activo (los tiempos no están cerrados). **Solo lectura** (FR-027): no es
+ * editable ni interactivo. Se adjunta en el memo final de `useGraphModel`.
+ */
+export interface TNodeEffort {
+  level: 1 | 2 | 3 | 4 | 5;
+  provisional: boolean;
+  /** Motivos legibles; alimentan la descripción accesible (FR-026). */
+  reasons: string[];
+}
+
+/**
  * Marca de última actividad observada por sesión (FR-009), cacheada en
  * `queryKeys.sessions.activity()`. Estado de vista en caché (TanStack Query),
  * hermana de `sessions.status()`: `[sessionID]` = último instante de actividad
@@ -141,6 +156,13 @@ export interface TGraphNodeData extends Record<string, unknown> {
   currentTool: TCurrentTool | null;
   /** `null` cuando el nodo no corrió en paralelo con ningún hermano. */
   parallel: TNodeParallelism | null;
+  /**
+   * Nivel de esfuerzo de vista (data-model §2.1; FR-021). `undefined` hasta que
+   * el memo final de `useGraphModel` lo deriva; entra en `sameNodeData` vía
+   * `sameEffort` (contract effort §4). Opcional (como `enrichment?`) para no
+   * forzar su inicialización en el modelo estructural.
+   */
+  effort?: TNodeEffort | null;
   /**
    * Estado de carga del detalle (data-model §2.2). En la fase estructural vale
    * `'pending'`; pasa a `'ready'` cuando el enriquecimiento del nodo fusiona sus

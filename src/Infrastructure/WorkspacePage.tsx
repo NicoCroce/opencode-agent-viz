@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useDevice, useEscapeKey, useReasoningVisibility } from '@app/Application/Hooks';
 import {
@@ -19,6 +19,7 @@ import { InspectorPane } from './Components/InspectorPane';
 import { SessionsRail } from './Components/SessionsRail';
 import { WorkspaceLayout } from './Components/WorkspaceLayout';
 import { useHistoryOverlay } from './Hooks/useHistoryOverlay';
+import { useInspectorPanel } from './Hooks/useInspectorPanel';
 import { useSessionOpenPerf } from './Hooks/useSessionOpenPerf';
 import { useWorkspaceSummary } from './Hooks/useWorkspaceSummary';
 import type { TWorkspaceTab } from './WorkspacePage.constants';
@@ -28,6 +29,9 @@ export const WorkspacePage = () => {
   const navigate = useNavigate();
   const { isMobile } = useDevice();
   const [tab, setTab] = useState<TWorkspaceTab>('graph');
+  // Estado de vista del panel de detalle (US5/US6): ancho persistido y
+  // fullscreen efímero. Una sola fuente de lógica para ambas presentaciones.
+  const panel = useInspectorPanel();
 
   const { groups, items, isLoading: sessionsLoading } = useRootSessions();
   const statusQuery = useGetSessionStatus();
@@ -38,7 +42,9 @@ export const WorkspacePage = () => {
     [items, id],
   );
   const graph = useGraphModel(id ?? null, directory);
-  const follow = useFollowMode(graph.activeNodeId);
+  // El modo "seguir" se ancla al nodo activo más reciente (FR-005), no al
+  // primero en orden de nodo; `activeNodeId` se conserva para otros usos.
+  const follow = useFollowMode(graph.latestActiveNodeId);
 
   useSessionOpenPerf({
     id: id ?? null,
@@ -76,7 +82,20 @@ export const WorkspacePage = () => {
     onClose: close,
   });
 
-  useEscapeKey(clearSelection, selectedNodeId !== null);
+  // `Escape` cierra primero la pantalla completa del panel (US6/FR-015) y solo
+  // después limpia la selección del nodo. Una sola fuente de lógica para ambas
+  // presentaciones; el listener se activa si hay fullscreen o selección.
+  const { isFullscreen, closeFullscreen } = panel;
+
+  const handleEscape = useCallback(() => {
+    if (isFullscreen) {
+      closeFullscreen();
+      return;
+    }
+    clearSelection();
+  }, [isFullscreen, closeFullscreen, clearSelection]);
+
+  useEscapeKey(handleEscape, isFullscreen || selectedNodeId !== null);
 
   // Preguntas (FR-033) y contexto de compactación (FR-035) del histórico:
   // Infrastructure pide los datos al dominio Inspector y los inyecta por props.
@@ -117,6 +136,9 @@ export const WorkspacePage = () => {
       showReasoning={reasoning.visible}
       onToggleReasoning={reasoning.toggle}
       onOpenHistory={open}
+      isResizing={panel.isResizing}
+      isFullscreen={panel.isFullscreen}
+      onToggleFullscreen={panel.toggleFullscreen}
     />
   );
 
@@ -144,6 +166,11 @@ export const WorkspacePage = () => {
       graph={graphPane}
       inspector={inspectorPane}
       history={historyOverlay}
+      inspectorWidth={panel.width}
+      isResizing={panel.isResizing}
+      onResizeStart={panel.startResize}
+      onResizeKey={panel.onResizeKey}
+      isFullscreen={panel.isFullscreen}
     />
   );
 };

@@ -40,7 +40,11 @@ const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) =>
       )}
     >
       <NodeResizeHandles nodeId={id} selected={selected} />
-      <NodeStatusRail status={data.status} hasLoop={data.metrics.hasLoop} />
+      <NodeStatusRail
+        status={data.status}
+        active={isRunning}
+        hasLoop={data.metrics.hasLoop}
+      />
       <Handle type="target" position={Position.Top} className="!bg-border" />
 
       <Container
@@ -51,6 +55,7 @@ const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) =>
           title={data.title}
           agentName={data.agentName}
           parallel={parallel}
+          effort={data.effort}
           isRunning={isRunning}
           status={data.status}
         />

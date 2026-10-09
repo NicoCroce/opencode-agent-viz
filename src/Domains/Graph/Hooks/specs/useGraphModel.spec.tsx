@@ -71,6 +71,7 @@ const PUBLIC_RESULT_KEYS: ReadonlyArray<keyof UseGraphModelResult> = [
   'parallelGroups',
   'executionPlan',
   'activeNodeId',
+  'latestActiveNodeId',
   'isLoading',
   'isError',
   'error',
@@ -149,6 +150,10 @@ describe('useGraphModel — contrato de carga (L7..L8)', () => {
     expect(shape.executionPlan).toBeDefined();
     expect(
       shape.activeNodeId === null || typeof shape.activeNodeId === 'string',
+    ).toBe(true);
+    expect(
+      shape.latestActiveNodeId === null ||
+        typeof shape.latestActiveNodeId === 'string',
     ).toBe(true);
     expect(typeof shape.isLoading).toBe('boolean');
     expect(typeof shape.isError).toBe('boolean');
@@ -402,5 +407,234 @@ describe('useGraphModel — filas paralelas en vivo y paridad (E5/A5)', () => {
     );
 
     expect(laneSnapshot(reopened.result.current)).toEqual(liveSnapshot);
+  });
+});
+
+/* -------------------------------------------------------------------- */
+/* S11 — esfuerzo por nodo e identidad estable ante tick (T021).        */
+/* -------------------------------------------------------------------- */
+
+const EFFORT_ROOT = 'ses-effort-root';
+const EFFORT_CHILD = 'ses-effort-child';
+const EFFORT_START = new Date('2026-01-01T00:00:00.000Z').getTime();
+const EFFORT_TICK = 1_000;
+
+/**
+ * Reloj falso + shim de idle (jsdom no implementa `requestIdleCallback`), como
+ * en `useGraphModel.tick.spec.tsx`: permite disparar el tick de 1 s y resolver
+ * los lotes de enriquecimiento por separado.
+ */
+const installEffortClock = (): void => {
+  vi.useFakeTimers();
+  vi.setSystemTime(EFFORT_START);
+  vi.stubGlobal('requestIdleCallback', (callback: IdleRequestCallback) =>
+    setTimeout(
+      () => callback({ didTimeout: false, timeRemaining: () => 50 }),
+      0,
+    ),
+  );
+  vi.stubGlobal('cancelIdleCallback', (handle: number) => clearTimeout(handle));
+};
+
+/** Avanza turnos de idle (1 ms, por debajo del tick) hasta enriquecer todo. */
+const drainEffort = async (
+  hook: ReturnType<typeof renderGraph>,
+  maxTurns = 16,
+): Promise<void> => {
+  for (let turn = 0; turn < maxTurns; turn += 1) {
+    const nodes = hook.result.current.graph.nodes;
+    if (
+      nodes.length > 0 &&
+      nodes.every((node) => node.data.enrichment === 'ready')
+    ) {
+      return;
+    }
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+  }
+};
+
+const effortNode = (result: UseGraphModelResult, id: string) => {
+  const node = result.graph.nodes.find((candidate) => candidate.id === id);
+  if (!node) throw new Error(`nodo ${id} no encontrado`);
+  return node;
+};
+
+describe('useGraphModel — esfuerzo por nodo e identidad estable (S11, T021)', () => {
+  beforeEach(() => {
+    installEffortClock();
+    listSessions.mockReset().mockResolvedValue([
+      session(EFFORT_ROOT),
+      session(EFFORT_CHILD, { parentID: EFFORT_ROOT }),
+    ]);
+    listAgents.mockReset().mockResolvedValue([]);
+    getSessionPermissions.mockReset().mockResolvedValue([]);
+    getSessionLog.mockReset().mockResolvedValue([]);
+    listSessionForms.mockReset().mockResolvedValue([]);
+    getSessionForm.mockReset().mockResolvedValue(undefined);
+    listSessionInbox.mockReset().mockResolvedValue([]);
+    // La raíz queda activa (sin `time.completed`, duración viva); el hijo queda
+    // terminado (`time.completed`, duración fija).
+    getSessionMessages.mockReset().mockImplementation((id: string) =>
+      Promise.resolve(
+        id === EFFORT_ROOT
+          ? [assistantMessage({ id: 'msg_root', time: { created: 2 } })]
+          : [
+              assistantMessage({
+                id: 'msg_child',
+                time: { created: 2, completed: 5 },
+              }),
+            ],
+      ),
+    );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  it('expone data.effort por nodo y conserva la identidad del nodo sin cambios ante un tick', async () => {
+    const queryClient = createRevisitClient();
+    queryClient.setQueryData(queryKeys.sessions.status(), {
+      [EFFORT_ROOT]: busyStatus,
+      [EFFORT_CHILD]: idleStatus,
+    });
+
+    const hook = renderGraph(queryClient, EFFORT_ROOT);
+    await drainEffort(hook);
+
+    // Todo nodo expone un nivel de esfuerzo válido (nivel base 1 garantizado).
+    for (const node of hook.result.current.graph.nodes) {
+      expect(node.data.effort).toBeDefined();
+      expect(node.data.effort?.level).toBeGreaterThanOrEqual(1);
+      expect(node.data.effort?.level).toBeLessThanOrEqual(5);
+      expect(node.data.effort?.reasons.length).toBeGreaterThan(0);
+    }
+
+    const activeBefore = effortNode(hook.result.current, EFFORT_ROOT);
+    const inactiveBefore = effortNode(hook.result.current, EFFORT_CHILD);
+    expect(activeBefore.data.status).toBe('running');
+    expect(inactiveBefore.data.status).toBe('succeeded');
+    const activeDurationBefore = activeBefore.data.metrics.durationMs;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(EFFORT_TICK);
+    });
+
+    const activeAfter = effortNode(hook.result.current, EFFORT_ROOT);
+    const inactiveAfter = effortNode(hook.result.current, EFFORT_CHILD);
+
+    // El activo avanza de duración: se reconstruye (su `effort` puede cambiar).
+    expect(activeAfter).not.toBe(activeBefore);
+    expect(activeAfter.data.metrics.durationMs).toBe(
+      (activeDurationBefore as number) + EFFORT_TICK,
+    );
+
+    // El inactivo no cambia de duración ni de nivel: conserva el **mismo objeto**
+    // de nodo (y por tanto el mismo objeto de `effort`).
+    expect(inactiveAfter).toBe(inactiveBefore);
+    expect(inactiveAfter.data.effort).toBe(inactiveBefore.data.effort);
+  });
+});
+
+/* -------------------------------------------------------------------- */
+/* US3 (T031) — `latestActiveNodeId` aditivo en UseGraphModelResult.     */
+/* -------------------------------------------------------------------- */
+
+const LATEST_ROOT = 'ses-latest-root';
+const LATEST_EARLY = 'ses-latest-early';
+const LATEST_LATE = 'ses-latest-late';
+const LATEST_IDS = [LATEST_ROOT, LATEST_EARLY, LATEST_LATE] as const;
+
+/** Raíz → dos hermanos concurrentes con inicio de ejecución escalonado. */
+const buildLatestSubtree = () => [
+  session(LATEST_ROOT, { time: { created: 0, updated: 0 } }),
+  session(LATEST_EARLY, { parentID: LATEST_ROOT }),
+  session(LATEST_LATE, { parentID: LATEST_ROOT }),
+];
+
+const latestStatuses = (
+  status: SessionStatus,
+): Record<string, SessionStatus> =>
+  Object.fromEntries(LATEST_IDS.map((id) => [id, status]));
+
+const allLatestReady = (result: UseGraphModelResult): boolean =>
+  result.graph.nodes.length === LATEST_IDS.length &&
+  result.graph.nodes.every((node) => node.data.enrichment === 'ready');
+
+/**
+ * `UseGraphModelResult` expone `latestActiveNodeId` (FR-005) **sin alterar**
+ * `activeNodeId` (additivo; active-node-feedback-contract §2). El `activeNodeId`
+ * sigue siendo el primer nodo activo en orden de nodo; `latestActiveNodeId` es
+ * el de mayor hora de inicio entre los activos.
+ */
+describe('useGraphModel — latestActiveNodeId (T031, US3)', () => {
+  beforeEach(() => {
+    listSessions.mockReset().mockResolvedValue(buildLatestSubtree());
+    listAgents.mockReset().mockResolvedValue([]);
+    getSessionPermissions.mockReset().mockResolvedValue([]);
+    getSessionLog.mockReset().mockResolvedValue([]);
+    listSessionForms.mockReset().mockResolvedValue([]);
+    getSessionForm.mockReset().mockResolvedValue(undefined);
+    listSessionInbox.mockReset().mockResolvedValue([]);
+    // `metrics.startedAt` = mínimo `time.created` de los assistant: el hijo
+    // "early" empieza en 100 y el "late" en 300 (FR-005).
+    getSessionMessages.mockReset().mockImplementation((id: string) =>
+      Promise.resolve([
+        assistantMessage({
+          id: `msg-${id}`,
+          time: {
+            created:
+              id === LATEST_LATE ? 300 : id === LATEST_EARLY ? 100 : 0,
+          },
+        }),
+      ]),
+    );
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('expone latestActiveNodeId (mayor hora de inicio) conservando activeNodeId', async () => {
+    const queryClient = createRevisitClient();
+    queryClient.setQueryData(queryKeys.sessions.status(), {
+      ...latestStatuses(idleStatus),
+      [LATEST_EARLY]: busyStatus,
+      [LATEST_LATE]: busyStatus,
+    });
+
+    const { result } = renderGraph(queryClient, LATEST_ROOT);
+    await waitFor(() => expect(allLatestReady(result.current)).toBe(true));
+
+    // `activeNodeId` se conserva: el primer activo en orden de nodo.
+    const firstActive = result.current.graph.nodes.find(
+      (node) => node.data.status === 'running',
+    )?.id;
+    expect(firstActive).toBe(LATEST_EARLY);
+    expect(result.current.activeNodeId).toBe(firstActive);
+
+    // `latestActiveNodeId` elige el activo que empezó más tarde (FR-005).
+    expect(result.current.latestActiveNodeId).toBe(LATEST_LATE);
+    expect(result.current.latestActiveNodeId).not.toBe(
+      result.current.activeNodeId,
+    );
+  });
+
+  it('latestActiveNodeId es null cuando no hay nodos activos (FR-007)', async () => {
+    const queryClient = createRevisitClient();
+    queryClient.setQueryData(
+      queryKeys.sessions.status(),
+      latestStatuses(idleStatus),
+    );
+
+    const { result } = renderGraph(queryClient, LATEST_ROOT);
+    await waitFor(() => expect(allLatestReady(result.current)).toBe(true));
+
+    expect(result.current.latestActiveNodeId).toBeNull();
+    expect(result.current.activeNodeId).toBeNull();
   });
 });
