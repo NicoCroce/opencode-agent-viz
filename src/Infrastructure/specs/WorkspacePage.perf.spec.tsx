@@ -1,15 +1,21 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import type { SessionInfo } from '@opencode/client';
+import type { SessionInfo, SessionStatus } from '@opencode/client';
 import { queryKeys } from '@app/Domains/queryKeys';
 import {
   PERF_METRIC,
   perfMark,
   perfMeasure,
 } from '@app/Application/Helpers/perf';
-import { busyStatus } from '@app/Domains/Graph/lib/specs/fixtures';
+import type { TGraphModel } from '@app/Domains/Graph/Graph.entity';
+import {
+  assistantMessage,
+  busyStatus,
+  idleStatus,
+  session,
+} from '@app/Domains/Graph/lib/specs/fixtures';
 import { useRootSessions } from '@app/Domains/Sessions';
 import { WorkspacePage } from '../WorkspacePage';
 
@@ -20,6 +26,11 @@ import { WorkspacePage } from '../WorkspacePage';
  */
 const graphHooks = vi.hoisted(() => ({
   useNow: vi.fn<(options?: { enabled?: boolean; intervalMs?: number }) => number>(),
+  /**
+   * Captura las props con las que `GraphPane` monta `AgentGraph` para observar
+   * la identidad de los nodos del modelo (SC-006, T053) sin renderizar React Flow.
+   */
+  agentGraph: vi.fn(),
 }));
 
 /**
@@ -78,7 +89,7 @@ vi.mock('@app/Domains/Graph', async () => {
   graphHooks.useNow.mockImplementation(useNow);
 
   return {
-    AgentGraph: () => null,
+    AgentGraph: graphHooks.agentGraph,
     GraphSkeleton: () => null,
     SessionSummaryBar: () => null,
     isActiveStatus,
@@ -168,10 +179,10 @@ const seedStructureCache = (client: QueryClient): void => {
   client.setQueryData(queryKeys.sessions.status(), {});
 };
 
-const renderWorkspace = (client: QueryClient) =>
+const renderWorkspace = (client: QueryClient, sessionId: string = SESSION_ID) =>
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[`/sessions/${SESSION_ID}`]}>
+      <MemoryRouter initialEntries={[`/sessions/${sessionId}`]}>
         <Routes>
           <Route path="/sessions/:id" element={<WorkspacePage />} />
         </Routes>
@@ -283,5 +294,152 @@ describe('WorkspacePage — tick del resumen condicionado a nodos activos (T041,
     await waitFor(() =>
       expect(graphHooks.useNow).toHaveBeenCalledWith({ enabled: true }),
     );
+  });
+});
+
+/* -------------------------------------------------------------------- */
+/* SC-006 (T053) — identidad de nodo estable con ~150 nodos ante el tick.*/
+/* -------------------------------------------------------------------- */
+
+const PERF_NODE_COUNT = 150;
+const PERF_ROOT_ID = 'ses-perf-root';
+const PERF_CHILD_IDS = Array.from(
+  { length: PERF_NODE_COUNT - 1 },
+  (_, index) => `ses-perf-child-${index}`,
+);
+const PERF_START = new Date('2026-01-01T00:00:00.000Z').getTime();
+const PERF_CHILD_DURATION_MS = 50;
+const PERF_TICK_MS = 1_000;
+
+/** Subárbol de ~150 nodos: raíz + N-1 hermanos en una sola tanda. */
+const buildPerfSessions = (): SessionInfo[] => [
+  session(PERF_ROOT_ID, { time: { created: 0, updated: 0 } }),
+  ...PERF_CHILD_IDS.map((id, index) =>
+    session(id, {
+      parentID: PERF_ROOT_ID,
+      time: { created: index + 1, updated: index + 1 },
+    }),
+  ),
+];
+
+/** Solo la raíz está activa; los 149 hijos quedan terminados. */
+const buildPerfStatuses = (): Record<string, SessionStatus> => ({
+  [PERF_ROOT_ID]: busyStatus,
+  ...Object.fromEntries(PERF_CHILD_IDS.map((id) => [id, idleStatus])),
+});
+
+/**
+ * La raíz no tiene `time.completed` (duración viva que avanza con el tick); los
+ * hijos sí (duración fija), de modo que el tick solo debe reconstruir la raíz.
+ */
+const buildPerfMessages = (id: string) =>
+  id === PERF_ROOT_ID
+    ? [assistantMessage({ id: 'msg_perf_root', time: { created: PERF_START } })]
+    : [
+        assistantMessage({
+          id: `msg_${id}`,
+          time: {
+            created: PERF_START,
+            completed: PERF_START + PERF_CHILD_DURATION_MS,
+          },
+        }),
+      ];
+
+/** Nodos con los que `GraphPane` montó `AgentGraph` en el último render. */
+const latestGraphNodes = (): TGraphModel['nodes'] => {
+  const calls = graphHooks.agentGraph.mock.calls as unknown as Array<
+    [{ graph: TGraphModel }]
+  >;
+  const call = calls[calls.length - 1];
+  if (!call) throw new Error('AgentGraph no se montó');
+  return call[0].graph.nodes;
+};
+
+const nodeById = (nodes: TGraphModel['nodes'], id: string) => {
+  const node = nodes.find((candidate) => candidate.id === id);
+  if (!node) throw new Error(`nodo ${id} no encontrado`);
+  return node;
+};
+
+describe('WorkspacePage — identidad de nodo estable con ~150 nodos (T053, SC-006, Principio VII)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(PERF_START);
+    graphHooks.agentGraph.mockImplementation(() => null);
+
+    vi.mocked(useRootSessions).mockReturnValue({
+      items: [
+        {
+          session: session(PERF_ROOT_ID, { time: { created: 0, updated: 0 } }),
+          agentName: 'develop',
+        },
+      ],
+      groups: [],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('el tick de 1 s solo reconstruye el nodo activo; los ~149 inactivos conservan identidad', async () => {
+    const client = createClient();
+    client.setQueryData(
+      queryKeys.sessions.list(DIRECTORY),
+      buildPerfSessions(),
+    );
+    client.setQueryData(queryKeys.agents.list(DIRECTORY), []);
+    client.setQueryData(queryKeys.sessions.status(), buildPerfStatuses());
+    for (const id of [PERF_ROOT_ID, ...PERF_CHILD_IDS]) {
+      client.setQueryData(
+        queryKeys.sessions.messages(id),
+        buildPerfMessages(id),
+      );
+    }
+
+    renderWorkspace(client, PERF_ROOT_ID);
+
+    // El modelo real expone los ~150 nodos en el primer render (todo en caché).
+    const nodesBefore = latestGraphNodes();
+    expect(nodesBefore).toHaveLength(PERF_NODE_COUNT);
+    expect(screen.getByText(`${PERF_NODE_COUNT} agentes`)).toBeInTheDocument();
+
+    const rootBefore = nodeById(nodesBefore, PERF_ROOT_ID);
+    const rootDurationBefore = rootBefore.data.metrics.durationMs;
+    expect(rootBefore.data.status).toBe('running');
+    expect(rootDurationBefore).not.toBeNull();
+
+    const childrenBefore = new Map(
+      PERF_CHILD_IDS.map((id) => [id, nodeById(nodesBefore, id)]),
+    );
+    // Cada hijo inactivo trae su esfuerzo ya derivado y una duración fija.
+    for (const id of PERF_CHILD_IDS) {
+      const child = childrenBefore.get(id);
+      expect(child?.data.effort).toBeDefined();
+      expect(child?.data.metrics.durationMs).toBe(PERF_CHILD_DURATION_MS);
+    }
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PERF_TICK_MS);
+    });
+
+    const nodesAfter = latestGraphNodes();
+    expect(nodesAfter).toHaveLength(PERF_NODE_COUNT);
+
+    // El nodo activo avanza su duración y se reconstruye…
+    const rootAfter = nodeById(nodesAfter, PERF_ROOT_ID);
+    expect(rootAfter).not.toBe(rootBefore);
+    expect(rootAfter.data.metrics.durationMs).toBe(
+      (rootDurationBefore as number) + PERF_TICK_MS,
+    );
+
+    // …mientras los ~149 inactivos conservan el **mismo objeto** de nodo (y con
+    // él su `effort`): el tick no dispara un re-render en cascada (SC-006).
+    for (const id of PERF_CHILD_IDS) {
+      expect(nodeById(nodesAfter, id)).toBe(childrenBefore.get(id));
+    }
   });
 });
