@@ -1,44 +1,50 @@
 ---
 name: code-reviewer
-description: Checklist de @blendverse-reviewer (arquitectura, tipado, seguridad multi-tenant, convenciones y estados de UI) y formato de 04_review_log.md.
+description: Checklist de revisión de código del visor, alineada con la constitución (principios I-VIII), AGENTS.md y app.instructions.md. Usar al revisar cambios de una feature.
 ---
 
-# Skill: code-reviewer
+# Code Reviewer
 
-Tsc, lint y ubicación de carpetas los valida `qa-report.sh`; no los revises. Revisá solo los `affected_files`.
+Revisa solo los archivos modificados (`git diff --name-only <base>...HEAD`). `pnpm tsc`, `pnpm lint` y `pnpm test` los ejecuta la verificación; no los repitas.
 
 ## Checklist
 
-🔴 = crítico (un fallo → `REJECTED`). 🟡 = recomendado (va a Deuda técnica, no bloquea).
+🔴 = crítico (un fallo → `REJECTED`). 🟡 = recomendado (va a deuda técnica, no bloquea).
 
-Chequeos mecánicos primero (un solo `grep` sobre `affected_files`): `: any\b|as any|<any>` (ítem 4) y `console\.` (ítem 9).
+Chequeos mecánicos primero, con un solo `grep` sobre los archivos modificados: `: any\b|as any|<any>` (ítem 4) y `console\.` (ítem 9).
 
-**Backend / arquitectura**
-1. 🔴 `Domain/` no importa de `Application/` ni `Infrastructure/`.
-2. 🔴 Los use cases dependen de la interfaz del repositorio, no de la implementación.
-3. 🔴 Dominio nuevo registrado en `register.ts` y `Router.ts`.
+**Constitución y arquitectura**
+1. 🔴 Observador de solo lectura: sin llamadas de escritura al servidor de OpenCode (I).
+2. 🔴 Estructura por dominios; un componente no importa `@app/Domains/<OtroDominio>`; el cruce se hace en el hook (II).
+3. 🔴 Los datos del servidor pasan solo por TanStack Query; ninguna llamada al SDK fuera de `*.service.ts` / `opencodeService` (III).
 4. 🔴 Sin `any` explícito.
-5. 🟡 Métodos públicos con tipo de retorno explícito.
-6. 🔴 Entre capas solo se comparten interfaces/tipos, no clases concretas.
-7. 🔴 Input validado con Zod (controller) o RHF + Zod (formulario).
-8. 🔴 Toda query del repositorio filtra por `ownerId`/`id_propietario` (o usa `TenantAwareRepository`).
+5. 🔴 Tipos derivados de `@opencode/client` con prefijo `T`; sin interfaces manuales que dupliquen el SDK (IV).
+6. 🔴 La lógica vive en hooks o funciones puras, no en componentes ni páginas (V).
+7. 🟡 Query keys en `src/Domains/queryKeys.ts`; sin claves inline.
+8. 🔴 Sin magic strings; constantes extraídas.
 9. 🟡 Sin `console.*` en código productivo.
-10. 🔴 Naming de clases, archivos y carpetas según `server.instructions.md` / `app.instructions.md`.
-11. 🟡 La entidad expone `static create()`, `toJSON()` y `get values()`.
+10. 🔴 Naming según `app.instructions.md` (`T[Entity]`, `useGet[Entities]`, `[Entity][Action].page.tsx`, `[ENTITY]_[ACTION]_ROUTE`, `[Domain]Router`).
+11. 🟡 El barrel `index.ts` no reexporta implementaciones privadas.
 
-**Frontend** (solo si hay archivos en `packages/app/`; ver `app.instructions.md` → "Estados de Pantalla")
-12. 🔴 Pantallas con datos: `isError` → `EmptyScreenError`, `isLoading` → skeleton, vacío → `EmptyScreenFilter`/`EmptyState`.
-13. 🔴 Sin texto suelto para estados (`Cargando`, `<Text.Muted>`, `<p>`) ni fallbacks inalcanzables en ternarios.
-14. 🔴 Botones que disparan mutations usan `isLoading={isPending}`, no solo `disabled`.
-15. 🟡 Empty states de dominio construidos sobre `EmptyState`.
-16. 🟡 Skeletons en `Components/` del dominio (o `Application/Components/` si son cross-domain).
-17. 🟡 El barrel `index.ts` no reexporta implementaciones privadas.
+**Pantallas y UI** (VI)
+12. 🔴 Pantallas con datos: `isError` → `EmptyScreenError`, `isLoading` → skeleton, vacío → `EmptyScreenFilter` / `EmptyState`, datos.
+13. 🔴 Sin texto suelto para estados (`Cargando`, `<p>`) ni fallbacks inalcanzables.
+14. 🔴 Botones que disparan mutations usan `isLoading={isPending}`.
+15. 🔴 Páginas envueltas en `Page`; layout con `Container`, sin `div` + `flex`.
+16. 🔴 Sin `md:hidden` / `hidden md:block`; se usa `useDevice()`.
+17. 🟡 Skeletons y empty states en `Components/` del dominio.
 
-Rechazar solo por incumplimientos de estándares documentados, nunca por estilo personal.
+**Rendimiento** (VII)
+18. 🔴 Los eventos SSE se procesan por lotes y sin re-renders innecesarios; sin suscripciones SSE adicionales fuera de `EventStreamProvider`.
 
-## `04_review_log.md`
+**Repositorio y tests** (VIII)
+19. 🔴 Los tests están en `specs/` junto al código, no mezclados.
+20. 🔴 La lógica pura nueva tiene tests con datos concretos.
+21. 🔴 Commits siguen la skill `commit-conventions`.
 
-Frontmatter: `.opencode/scripts/bash/memory-log-scaffold.sh frontmatter review_log {task_id} Reviewer_Agent APPROVED|REJECTED`.
+Rechaza solo por incumplimientos de estándares documentados, nunca por estilo personal.
+
+## Formato de salida
 
 ```markdown
 # Revisión — <título>
@@ -46,8 +52,10 @@ Frontmatter: `.opencode/scripts/bash/memory-log-scaffold.sh frontmatter review_l
 Resultado: APPROVED | REJECTED · ítems revisados: <n> · 🔴 fallidos: <lista o "ninguno">
 
 ## Feedback (solo si REJECTED; uno por ítem 🔴 fallido)
-- Ítem <n> — `<archivo>:<línea>`: <problema>. Esperado: <cambio concreto, con snippet si ayuda>.
+- Ítem <n> — `<archivo>:<línea>`: <problema>. Esperado: <cambio concreto>.
 
 ## Deuda técnica (solo si hay 🟡 fallidos)
 - <ítem>: <detalle>
 ```
+
+Devuelve este resultado como respuesta; no lo escribas en un archivo.

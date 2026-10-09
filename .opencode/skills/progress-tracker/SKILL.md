@@ -1,44 +1,34 @@
 ---
 name: progress-tracker
-description: Muestra el progreso compacto de pipelines y cadenas de agentes. Usar al iniciar, cambiar de fase, pausar o delegar. `@develop` y `@blendverse-implement` ya traen estas reglas inline; cargarla solo en flujos ad-hoc.
+description: Muestra el progreso compacto de flujos por fases y cadenas de subagentes con `todowrite`. Usar al iniciar, cambiar de fase, pausar o delegar en flujos ad-hoc; SddOrch ya incluye estas reglas.
 ---
 
 # Progress Tracker
 
-Usá `todowrite` como estado visual primario. Actualizalo inmediatamente antes de
-una fase/agente y al finalizarlo; un ítem solo se completa con resultado positivo.
-Las fases no aplicables se completan con `SKIPPED — <motivo>`.
+Usa `todowrite` como estado visual primario. Actualízalo justo antes de iniciar una fase o delegar y al terminar; un ítem solo se completa con resultado positivo. Las fases no aplicables se completan con `SKIPPED — <motivo>`.
 
-## Diseño de feature
+## Fases
 
-Crear una lista con Fases 0–6. Fase 0 es `SKIPPED — solo se evalúa en modo auto`
-cuando el modo es `plan`. Fase 3 incluye el diseño frontend condicional; no es una
-fase adicional para el porcentaje.
+Crea una lista con las fases del flujo elegido. El progreso es `round(fases terminadas / total * 100)`.
 
-El progreso cuenta únicamente Fases 1–6:
-`round(fases terminadas / 6 * 100)`. Un handoff aceptado es `HANDOFF STARTED`, no
-la finalización de la implementación.
-
-Informar cada transición en una línea:
+Informa cada transición en una línea:
 
 ```text
-Fase <n>/6 · <estado> · <agente o acción> · <progreso>%
+Fase <n>/<total> · <estado> · <agente o acción> · <progreso>%
 ```
 
-Agregar una segunda línea solo ante una decisión, bloqueo, cambio de modo o salto:
+Añade una segunda línea solo ante una decisión, un bloqueo, un cambio de modo o un salto:
 
 ```text
 Motivo: <hecho concreto>. Siguiente: <acción>.
 ```
 
-## Cadena de implementación
+## Subagentes en paralelo
 
-Crear la lista según scope: back, front, tester ∥ reviewer, QA (script) y cierre. Mostrar
-antes de cada `task`:
+Antes de lanzar una tanda, muestra:
 
 ```text
-@<agent> · <acción> · <actual>% → <siguiente>%
+Tanda <i>/<n> · <k> subagentes en paralelo · <progreso>%
 ```
 
-No repetir outputs esperados, estimaciones, “currently doing”, “up next” ni banners
-ASCII: la lista ya contiene esa información.
+No repitas salidas esperadas, estimaciones ni banners ASCII: la lista ya contiene esa información.

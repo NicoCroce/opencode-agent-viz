@@ -8,7 +8,7 @@ Proyecto: Visor web de ejecuciones multi-agente de OpenCode.
 - **Estado:** TanStack Query 5, React Router 7, Zustand (estado global opcional)
 - **UI:** Tailwind 4, shadcn/ui (Radix), lucide-react, sonner
 - **Graph:** React Flow (@xyflow/react) con dagre para layout
-- **SDK:** @opencode-ai/sdk para consumir eventos de OpenCode
+- **SDK:** @opencode/client para consumir eventos de OpenCode
 - **Testing:** Vitest + Testing Library + jsdom
 
 ## Arquitectura
@@ -73,7 +73,7 @@ Domains/[Domain]/
 
 ### 3. Datos y TanStack Query
 
-- **Tipos:** derivados SOLO de `@opencode-ai/sdk`, con prefijo `T`.
+- **Tipos:** derivados SOLO de `@opencode/client`, con prefijo `T`.
 - **Queries:** en `[Domain].service.ts`, con query keys centralizados en `queryKeys.ts` por dominio.
 - **SSE:** una sola suscripción en `EventStreamProvider`, que dispatch eventos a queryClient vía `setQueryData`.
 - **Hooks:** todo acceso a datos pasa por hooks (`useGet*`, `useSubscribe*`). **Prohibido**: llamar al cliente del SDK desde componentes.
@@ -164,7 +164,7 @@ export const queryKeys = {
 4. **Plan:** Architecture, stack, data flow, components.
 5. **Tasks:** Tareas T### por user story, con paths concretos.
 6. **Analyze:** Hallazgos, consistencia.
-7. **Implement:** blendverse-back no aplica (no hay backend); solo frontend + tests.
+7. **Implement:** solo frontend + tests; lo orquesta el agente `sddorch` (`.opencode/agents/sddorch.md`).
 
 ## Convención de Commits
 
@@ -186,6 +186,6 @@ test(graph): add fixtures for multi-agent execution
 1. Ejecutar `specify init --ai opencode --here` (ya está lista la carpeta).
 2. Cargar constitution.
 3. Ejecutar specify → clarify → plan → tasks → analyze.
-4. Implementar con el mismo flow que gestDoc.
+4. Implementar con `sddorch`.
 
 ¡Listo para empezar con Spec-kit!

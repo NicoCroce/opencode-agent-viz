@@ -78,7 +78,7 @@ Los tipos vienen del SDK:
 
 ```typescript
 // ✅ Correcto — del SDK
-import type { Session, SessionStatus } from '@opencode-ai/sdk';
+import type { Session, SessionStatus } from '@opencode/client';
 
 export type TSession = Session;
 export type TSessionStatus = SessionStatus;
@@ -86,6 +86,8 @@ export type TSessionStatus = SessionStatus;
 // Para búsquedas locales (no vienen del SDK):
 export type TSessionSearch = { search?: string; status?: TSessionStatus };
 ```
+
+**Campos de vista derivados del modelo.** Un campo que no viene del SDK sino que se **deriva** para la UI (p. ej. `enrichment`, `effort`) se declara **opcional** en el tipo del modelo (`campo?: T… | null`) y lo puebla su derivación. Así no rompe constructores ni fixtures existentes. Los comparadores de reconciliación (`sameNodeData`) deben cubrir el campo nuevo, o el valor derivado no se re-renderizará.
 
 ### Servicio (TanStack Query)
 

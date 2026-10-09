@@ -1,183 +1,55 @@
 ---
-description: Reglas del sistema de memoria multi-agente. Todo agente que escriba en memory/ debe leer este archivo primero.
-applyTo: 'memory/**'
+description: Reglas de memoria de SddOrch en Engram. Todo agente que lea o escriba memoria persistente debe seguirlas.
 ---
 
-# Sistema de Memoria Multi-Agente (`memory/`)
+# Memoria en Engram
 
-## Estructura de Carpetas
+La memoria persistente de los flujos SDD vive en **Engram**. No existe una carpeta `memory/` en el repo (no la crees). La única carpeta con ese nombre es `.specify/memory/` (constitución de Spec-kit) y no se toca.
 
-Cada tarea recibe su propia subcarpeta con el formato `TASK-{rama}-YYYYMMDD-N`:
+## Quién escribe
+
+- **Solo SddOrch (el orquestador) escribe** en Engram. Los subagentes no llaman a `mem_save`: devuelven su resultado al orquestador (ver `sddorch-contract.md`) y él decide qué guardar.
+- Cualquier agente puede leer (`mem_search`, `mem_get_observation`, `mem_context`) si el orquestador se lo indica.
+
+## Convención de `topic_key`
+
+`<feature>` es el nombre de `feature_directory` en `.specify/feature.json` (por ejemplo `007-fix-parallel-lanes-live`). Un `topic_key` estable hace que guardar de nuevo actualice la misma observación en vez de crear otra.
+
+| Qué | `topic_key` | Tipo | Contenido |
+|---|---|---|---|
+| Estado de la ejecución | `sddorch/<feature>/state` | `decision` | modo, fase actual, fases terminadas, tanda actual, tareas hechas / fallidas / bloqueadas, rama |
+| Brief del recon | `sddorch/<feature>/recon` | `discovery` | síntesis priorizada: alcance, archivos, riesgos, complejidad, modo sugerido |
+| Registro de la ejecución | `sddorch/<feature>/run` | `discovery` | duración por fase, reintentos, tareas fallidas |
+| Señal de harness | `sddorch/harness-signal/<slug>` | `discovery` | tipo, disparador, workaround, evidencia, nº de repeticiones |
+
+Usa `project: opencode-agent-viz` en todas las observaciones.
+
+## Contenido de `state`
+
+Mantenlo corto y estructurado:
 
 ```
-memory/
-  TASK-feat-segments-20260517-1/
-    01_requirements.md    ← @blendverse-analyst (SOLO si el origen es input crudo; ver nota abajo)
-    02_dev_log.md         ← @blendverse-back / @blendverse-front (skill dev-logger)
-    03_qa_report.md       ← qa-report.sh (script, sin agente)
-    04_review_log.md      ← @blendverse-reviewer
-    05_test_log.md        ← @blendverse-tester
-    .checkpoint.json      ← checkpoint.sh (fuente de reanudación)
-  history_log.json        ← índice global cronológico (actualizado por @blendverse-implement al cerrar)
-  BLOCKED.md              ← se crea SOLO si se alcanza el break-loop (attempts >= 3)
+mode: plan | auto
+phase: <fase actual>
+done: [<fases terminadas>]
+wave: <i>/<n>
+tasks: done [T001..] · failed [T0xx] · blocked [T0yy]
+branch: <rama>
+updated: <fecha ISO>
 ```
 
-> **`01_requirements.md` es opcional.** Solo se genera cuando el origen es input crudo (vía `@blendverse-analyst`). Cuando el origen es Speckit, los agentes leen `{feature_dir}/spec.md` y `tasks.md` **directamente** — no se transcribe ni se copia su contenido a `memory/`. `feature_dir` se resuelve desde `.specify/feature.json`, no desde el nombre lógico de la feature. En ambos casos, `02_dev_log.md` en adelante siempre vive en `memory/{task_id}/`, porque esos archivos no tienen equivalente en Speckit.
+Guárdalo al **terminar cada fase** y al cerrar cada tanda. No guardes informes completos de subagentes ni diffs.
 
-## Convención de IDs de Tarea
+## Reanudación
 
-- Formato: `TASK-{rama-sanitizada}-YYYYMMDD-N` donde:
-  - `{rama-sanitizada}` es el nombre de la rama git activa (`git branch --show-current`) con cada `/` reemplazado por `-` (ej. `feat/segments` → `feat-segments`).
-  - `N` es un número secuencial (1, 2, 3…) para esa rama.
-- Ejemplo: rama `feat/segments` → `TASK-feat-segments-20260517-1`
-- Para obtener el próximo ID: leer `memory/history_log.json`; si no existe ninguna entrada `IN_PROGRESS` para la rama sanitizada actual, el primero del día es `TASK-{rama-sanitizada}-YYYYMMDD-1`.
+Al iniciar, el orquestador consulta `mem_search` con `sddorch/<feature>/state` (o `mem_context`). Si hay un estado con fase no terminada, ofrece con `question` reanudar desde esa fase o empezar de cero. Contrasta siempre con el repo real (`tasks.md`, `git status`) antes de reanudar: Engram indica dónde estabas, pero los archivos son la verdad.
 
-## Frontmatter Obligatorio
+## Qué no guardar
 
-Todos los archivos de memoria **deben** comenzar con un bloque YAML frontmatter. Un archivo sin frontmatter es inválido y no puede ser procesado por el orquestador (`@blendverse-implement`).
+- Contenido de `spec.md`, `plan.md` o `tasks.md` (ya viven en `feature_directory`).
+- Código, diffs o salidas de terminal.
+- Datos personales o secretos.
 
-### Schema — `01_requirements.md` (solo flujo de input crudo)
+## Señales de harness
 
-```yaml
----
-task_id: 'TASK-{rama}-YYYYMMDD-N'
-agent: 'Analyst_Agent'
-status: 'DONE' # DONE | IN_PROGRESS
-version: '1.0.0'
-date: 'YYYY-MM-DD'
----
-```
-
-### Schema — `02_dev_log.md`
-
-```yaml
----
-task_id: 'TASK-{rama}-YYYYMMDD-N'
-agent: 'Back_Agent' # Back_Agent | Front_Agent
-status: 'IMPLEMENTED' # IMPLEMENTED | IN_PROGRESS
-attempts: 1 # número de iteraciones del Coder (máx. 3)
-date: 'YYYY-MM-DD'
-affected_files:
-  - 'packages/server/src/domains/X/Domain/X.entity.ts'
----
-```
-
-> **Regla `affected_files`:** Listar **todos** los archivos creados o modificados (incluidos barrels, DI y registros globales). `qa-report.sh` valida exactamente esta lista (eslint, `vitest related`, estructura): un archivo omitido no se valida. El tester decide por su cuenta cuáles tienen lógica que testear.
-
-### Schema — `03_qa_report.md`
-
-```yaml
----
-task_id: 'TASK-{rama}-YYYYMMDD-N'
-agent: 'QA_Agent'
-status: 'PASS' # PASS | FAIL
-attempts: 1 # número de ejecuciones de QA (máx. 3)
-date: 'YYYY-MM-DD'
----
-```
-
-### Schema — `04_review_log.md`
-
-```yaml
----
-task_id: 'TASK-{rama}-YYYYMMDD-N'
-agent: 'Reviewer_Agent'
-status: 'APPROVED' # APPROVED | REJECTED
-attempts: 1
-date: 'YYYY-MM-DD'
----
-```
-
-### Schema — `05_test_log.md`
-
-```yaml
----
-task_id: 'TASK-{rama}-YYYYMMDD-N'
-agent: 'Tester_Agent'
-status: 'PASS' # PASS | FAIL
-attempts: 1 # número de iteraciones del Tester (máx. 3)
-date: 'YYYY-MM-DD'
----
-```
-
-### Schema — `BLOCKED.md`
-
-```yaml
----
-task_id: 'TASK-{rama}-YYYYMMDD-N'
-agent: 'QA_Agent' # o "Reviewer_Agent" o "Tester_Agent"
-blocked_at: 'YYYY-MM-DD HH:MM'
-attempts: 3
-reason: 'Descripción exacta del error repetido sin solución'
----
-```
-
-## Mecanismo Break-Loop (Anti-Bucles)
-
-El campo `attempts` en el frontmatter lleva el conteo de iteraciones por agente.
-
-**Regla estricta:** Si `attempts` llega a **3** sin resolución:
-
-1. El agente activo **NO** hace handoff al Coder de nuevo.
-2. Crea `memory/BLOCKED.md` con el schema anterior.
-3. Escribe en el chat: `⛔ Se alcanzó el límite de 3 iteraciones en [agente]. Intervención humana requerida. Ver memory/BLOCKED.md.`
-4. Detiene toda ejecución automática hasta intervención manual.
-
-## Registro Global `history_log.json`
-
-`@blendverse-implement` actualiza este archivo: crea la entrada con `status: IN_PROGRESS` al resolver un `task_id` nuevo (Paso 1 de su protocolo), y la cierra con `status: COMPLETED` cuando `@blendverse-reviewer` aprueba (o `BLOCKED` si se activa el break-loop).
-
-> **Regla de rotación:** Mantener un máximo de **10 entradas** en el array. Cuando se agregue la entrada número 11, eliminar la entrada más antigua con `status: COMPLETED`. Las entradas con `status: IN_PROGRESS` o `BLOCKED` nunca se eliminan.
-
-```json
-[
-  {
-    "task_id": "TASK-20260517-1",
-    "title": "Breve descripción de la tarea",
-    "status": "COMPLETED",
-    "created_at": "2026-05-17T10:00:00Z",
-    "closed_at": "2026-05-17T11:30:00Z",
-    "agents_chain": [
-      {
-        "agent": "Analyst_Agent",
-        "status": "DONE",
-        "timestamp": "2026-05-17T10:00:00Z"
-      },
-      {
-        "agent": "Back_Agent",
-        "status": "IMPLEMENTED",
-        "timestamp": "2026-05-17T10:30:00Z"
-      },
-      {
-        "agent": "Tester_Agent",
-        "status": "PASS",
-        "timestamp": "2026-05-17T10:50:00Z"
-      },
-      {
-        "agent": "QA_Agent",
-        "status": "PASS",
-        "timestamp": "2026-05-17T11:00:00Z"
-      },
-      {
-        "agent": "Reviewer_Agent",
-        "status": "APPROVED",
-        "timestamp": "2026-05-17T11:25:00Z"
-      }
-    ]
-  }
-]
-```
-
-## Reglas para los Agentes
-
-1. **`task_id`**: usar el que pasa el orquestador; si no hay, `resolve-task-id.sh resolve <rama> <título>`.
-2. **No sobreescribir** archivos de una tarea anterior sin generar un nuevo `task_id`.
-3. **El frontmatter es inmutable** una vez que el archivo alcanza estado final (`DONE`, `IMPLEMENTED`, `PASS`, `APPROVED`). Para re-iterar, incrementar `attempts`.
-4. **Cada agente escribe únicamente su archivo designado**; no modifica archivos de otros agentes.
-5. **Rutas relativas** — siempre usar la ruta desde la raíz del monorepo (ej. `packages/server/src/...`).
-6. **Brevedad obligatoria en reportes** — los cuerpos de `03_qa_report.md` y `04_review_log.md` deben contener solo lo necesario para que el siguiente agente actúe: si el resultado es `PASS`/`APPROVED`, omitir el output de terminal (solo registrar el estado); si es `FAIL`/`REJECTED`, incluir únicamente el error concreto y el archivo afectado.
-
-## Espejo en Engram (`engram-sync`)
-
-- Solo `@blendverse-implement` escribe en Engram, un único espejo `task/{task_id}/status` al cerrar (`COMPLETED`) o bloquear (`BLOCKED`), con `capture_prompt: false`. Los workers no espejan sus artefactos.
-- La reanudación usa `.checkpoint.json` y los archivos de `memory/`, que son la fuente de verdad.
+Cuando un subagente reporta una `harness_signal`, el orquestador la guarda con `sddorch/harness-signal/<slug>` (slug corto en kebab-case del problema). Si ya existe, actualiza el contador de repeticiones. Al cierre solo se proponen al usuario las señales repetidas 2 o más veces o las que provocaron un fallo o un reintento.

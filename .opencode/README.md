@@ -1,29 +1,25 @@
 # OpenCode Configuration — opencode-agent-viz
 
+Configuración para OpenCode V2 (`https://opencode.ai/v2/docs/`).
+
 ## Estructura
 
-- **instructions/** — Normas de arquitectura y convenciones aplicadas automáticamente en tareas
+- **agents/** — Agentes en Markdown (frontmatter V2: `mode`, `permissions`, `steps`)
+  - `sddorch.md` — Orquestador Spec-Kit (primary)
+  - `sddorch-recon`, `-implementer`, `-reviewer`, `-tester`, `-release` — Subagentes
+- **commands/** — Comandos `speckit.*` (instalados por Spec-Kit, no editar)
+- **instructions/**
   - `app.instructions.md` — Convenciones del frontend (dominios, componentes, hooks, tipos)
-  - `memory.instructions.md` — Reglas de persistencia en Engram
-- **skills/** — Skills locales del proyecto (heredadas de gestDoc)
-  - front-ddd-generator, code-reviewer, dev-logger, etc.
-- **templates/speckit/** — Plantillas para Spec-kit (specify, plan, tasks)
-- **plugins/** — Plugins locales (se cargan automáticamente)
-  - `selectable-questions.ts` — Fuerza el uso del tool `question` en vez de menús de texto plano
-- **scripts/bash/** — Scripts de utilidad (timeout, etc.)
+  - `memory.instructions.md` — Reglas de memoria en Engram
+  - `sddorch-contract.md` — Contrato de retorno de los subagentes
+- **skills/** — `front-ddd-generator`, `code-reviewer`, `test-generator`, `commit-conventions`, `pr-detail`, `progress-tracker`
+- **scripts/bash/** — `open-pr.sh` (push + PR) y `run-timeout.sh`
 
 ## Configuración
 
-Ver `opencode.json`:
-- Instructions cargadas automáticamente
-- Temperaturas por agente (specify/tasks = 0.1, plan = 0.3)
-- Plugins: `plugins/` se cargan automáticamente; sus tipos vienen de `@opencode/plugin` (ver `.opencode/package.json`)
+`opencode.json` (raíz) carga `app.instructions.md` y `memory.instructions.md`. Los agentes llevan sus permisos en el propio frontmatter.
 
-## Uso
+## Reglas
 
-Los archivos en `instructions/` se cargan automáticamente cuando ejecutas cualquier tarea. Las convenciones se aplican a:
-
-- `app.instructions.md` → sobre `src/Domains/**` (tareas de frontend)
-- `memory.instructions.md` → sobre persistencia en todas las tareas
-
-Modify instruction files directly; no need to restart OpenCode.
+- No editar `commands/speckit.*`, `.specify/scripts/`, `.specify/templates/` ni `.specify/memory/constitution.md`.
+- No existe carpeta `memory/`: el estado de los flujos vive en Engram.

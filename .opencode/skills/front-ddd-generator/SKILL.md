@@ -1,184 +1,78 @@
 ---
 name: front-ddd-generator
-description: Genera un dominio completo en el frontend React/tRPC: entity types, service tRPC, rutas, router, hooks (query + mutation + cache), páginas vacías y actualización de los archivos globales de registro.
+description: Genera el esqueleto de un dominio nuevo en `src/Domains/` (entity, service, query keys, rutas, router, hooks, página, barrel) siguiendo la arquitectura del visor. Usar al crear un dominio nuevo, no para editar uno existente.
 ---
 
 # Front DDD Generator
 
-## ⚠️ CONTROL DE CONTEXTO (ESTRICTO)
+Crea el esqueleto de `src/Domains/<Domain>/`. Las reglas de fondo están en `AGENTS.md` y `.opencode/instructions/app.instructions.md`; esta skill solo indica qué archivos crear y dónde registrarlos.
 
-- **MODO AISLADO:** No uses `@workspace`. Solo el contexto que el usuario te provee.
-- **TRABAJA UN DOMINIO A LA VEZ** y verifica errores tras crear cada archivo.
-- **NO modifiques archivos fuera de `packages/app/`** excepto los dos archivos de registro global indicados al final.
-- **VERIFICAR COMPONENTES:** Antes de cualquier componente, revisar que no exista ya en `packages/app/src/Application/Components/`.
+## Antes de crear
 
-## Herramientas Requeridas
+1. Comprueba que el dominio no existe: `ls src/Domains`.
+2. Define: nombre del dominio (PascalCase plural), entidad (singular), si necesita página y ruta, y qué datos del SDK consume.
+3. Mira un dominio vivo como referencia de estilo: `src/Domains/Sessions/`.
+4. Muestra el árbol a crear y espera confirmación si el usuario no lo especificó.
 
-- `read/readFile` — Para leer archivos de referencia del servidor (interfaces de dominio)
-- `edit/createFile` — Para crear cada archivo del dominio frontend
-- `edit/editFiles` — Para actualizar los archivos globales (Routes.tsx, MenuAccess.tsx)
-- `diagnostics/getErrors` — Para verificar errores al finalizar
-
----
-
-## Prerequisito: El Dominio Backend ya debe existir
-
-Esta skill asume que el dominio ya fue creado con `back-ddd-generator`. Necesitas leer de:
-
-- `packages/server/src/domains/[Domain]/Infrastructure/Routes/[Domain].routes.ts` → para el tipo `T[Domain]Router` (el contrato tRPC del dominio)
-
----
-
-## Protocolo de Preguntas (OBLIGATORIO si faltan datos)
-
-Antes de generar, pregunta al usuario:
-
-1. **Nombre del dominio en el server** (carpeta, PascalCase): ej. `Products`
-2. **Nombre de la entidad** (PascalCase singular): ej. `Product`
-3. **¿Qué páginas necesita?** (Lista, Nueva, Editar, Detalle)
-4. **¿Qué campos de búsqueda/filtro tiene la lista?**
-5. **¿Necesita entrada en el menú de navegación?**
-
----
-
-## Validación de Estructura (OBLIGATORIO)
-
-Antes de crear el primer archivo, lista para el usuario el árbol exacto a crear. **No procedas sin aprobación.**
+## Árbol
 
 ```
-packages/app/src/Domains/[Domain]/
-├── [Entity].entity.ts
-├── [Domain].service.ts
-├── [Domain].routes.tsx
-├── [Domain].router.tsx
-├── Components/
-│   └── index.ts
+src/Domains/<Domain>/
+├── <Entity>.entity.ts
+├── <Domain>.service.ts
+├── <Domain>.routes.ts          # solo si hay página
+├── <Domain>.router.tsx         # solo si hay página
+├── Components/index.ts
 ├── Hooks/
-│   ├── useGet[Entities].ts
-│   ├── useGet[Entity].ts
-│   ├── useAdd[Entity].ts
-│   ├── useUpdate[Entity].ts
-│   ├── useDelete[Entity].ts
-│   ├── useCache[Entities].ts
+│   ├── use<Action><Entity>.ts
+│   ├── specs/use<Action><Entity>.spec.tsx
 │   └── index.ts
-├── Pages/
-│   ├── [Entity]List.page.tsx
-│   ├── [Entity]New.page.tsx
-│   ├── [Entity]Update.page.tsx
+├── Pages/                      # solo si hay página
+│   ├── <Entity><Action>.page.tsx
 │   └── index.ts
+├── specs/                      # tests del service y fixtures
 └── index.ts
-
-Archivos globales a actualizar:
-  packages/app/src/Infrastructure/Routes.tsx
-  packages/app/src/Domains/MenuAccess.tsx  (si necesita menú)
 ```
 
----
+## Reglas por archivo
 
-## Estructura de Archivos y Templates
+- **entity**: tipos con prefijo `T`, derivados de `@opencode/client`. Sin interfaces manuales salvo tipos locales de filtros (`T<Entity>Search`).
+  ```ts
+  import type { SessionInfo } from '@opencode/client';
+  export type TSession = SessionInfo;
+  ```
+- **service**: solo hooks de TanStack Query. El acceso al SDK pasa siempre por `opencodeService` de `@app/Infrastructure/Services/opencodeClient`; nunca se llama al cliente directamente. Claves de `queryKeys` de `src/Domains/queryKeys.ts`.
+  ```ts
+  export const useGet<Entities> = (directory: string | null) =>
+    useQuery({
+      queryKey: queryKeys.<entities>.list(directory ?? ''),
+      queryFn: () => opencodeService.list<Entities>(directory as string),
+      enabled: Boolean(directory),
+    });
+  ```
+- **queryKeys**: añade la rama del dominio a `src/Domains/queryKeys.ts` con `all` y las claves necesarias.
+- **routes**: constantes `<ENTITY>_<ACTION>_ROUTE` sin JSX (`.ts`).
+- **router**: array exportado `<Domain>Router` con `<Route key=... />`.
+- **hooks**: concentran la lógica y combinan el service. Los componentes y las páginas no llaman al service directamente.
+- **page**: envuelta en `<Page title="...">` de `@app/Application/Components`. Estados en este orden: `isError` → `<EmptyScreenError />`, `isLoading` → skeleton del dominio, sin datos → `<EmptyScreenFilter />` o `<EmptyState />`, datos.
+- **Components**: presentación pura. Layout con `<Container>`, no con `div` + `flex`. Skeleton del dominio en `Components/`.
+- **barrel `index.ts`**: reexporta entity, service, routes, Components, Hooks, Pages y el router.
 
-### Variables de sustitución
+## Registro global
 
-- `[Entity]` = singular PascalCase → ej. `Product`
-- `[Entities]` = plural PascalCase → ej. `Products`
-- `[Domain]` = nombre del dominio carpeta → ej. `Products`
-- `[domain]` = camelCase → ej. `products`
-- `[DOMAIN]` = SCREAMING_SNAKE_CASE → ej. `PRODUCTS`
+1. `src/Infrastructure/Routes.tsx`: importar `<Domain>Router` desde `@app/Domains/<Domain>` y añadirlo dentro de `<Route element={<AppShell />}>` (`{<Domain>Router}`).
+2. `src/Domains/queryKeys.ts`: la rama nueva.
 
----
+## Restricciones
 
-## Templates
+- No importes `@app/Domains/<OtroDominio>` desde un componente; si hace falta cruzar dominios, hazlo en el hook.
+- Sin magic strings: extrae constantes.
+- Sin `md:hidden` / `hidden md:block`; usa `useDevice()`.
+- Los tests van en `specs/` junto al código, nunca mezclados con los fuentes.
 
-Los templates de cada archivo están en `.opencode/skills/front-ddd-generator/templates.md`. Leerlo **solo al crear un dominio nuevo**; para cambios en un dominio existente, imitar los archivos hermanos del dominio.
+## Verificación
 
-## Convenciones de UI
-
-### Button
-
-- Por defecto NO pasar el atributo `size`. El tamaño default del tema es el correcto.
-- NO agregar un componente `<Icon>` dentro del `<Button>`. Usar los atributos `icon` y `showIcon`:
-
-```tsx
-<Button onClick={() => null} icon={faEdit} showIcon />
 ```
-
-### Estados de pantalla — Loading / Error / Empty (OBLIGATORIO)
-
-Toda página o componente que obtiene datos (useQuery) implementa los tres estados en este orden:
-
-```tsx
-const { data, isLoading, isError, error } = service;
-
-if (isError) return <EmptyScreenError message={error?.message} />;
-if (isLoading) return <Skeleton />; // skeleton del dominio en Components/
-if (!data?.length) return <EmptyScreenFilter onClick={openFilters} />;
+pnpm tsc && pnpm lint && pnpm test
 ```
-
-**Componentes genéricos (siempre desde el barrel `@app/Application`):**
-
-| Estado  | Componente          | Cuándo usarlo                                   |
-| ------- | ------------------- | ----------------------------------------------- |
-| Error   | `EmptyScreenError`  | La query falla (`isError`)                      |
-| Vacío   | `EmptyScreenFilter` | No hay resultados de filtros/búsqueda           |
-| Vacío   | `EmptyState`        | Empty state con título/descripción/ícono/CTA    |
-| Loading | `Skeleton`          | Base para skeletons del dominio (`ui/skeleton`) |
-
-**Reglas:**
-
-1. NUNCA texto suelto inline para estos estados (`<Text.Muted>Cargando</Text.Muted>`, `<p>`). SIEMPRE los componentes genéricos.
-2. NO dejar fallbacks inalcanzables `: <Text.Muted>Cargando</Text.Muted>` al final de un ternario. Si `isLoading` es false, no hay error y no hay data → empty state.
-3. Los skeletons del dominio van en `Components/` como archivo propio (`[Entity]TableSkeleton.tsx`, `[Entity]CardsSkeleton.tsx`), construidos sobre `Skeleton`. Si usás `DataTable`/`DataList`, usá sus `.Skeleton` estáticos.
-4. Los empty states domain-specific usan `EmptyState` internamente (base visual única, contexto dinámico en el dominio).
-
-### Botones que ejecutan servicios — SIEMPRE con `isLoading`
-
-Todo botón que dispara una mutation recibe `isLoading={isPending}` (spinner + disable automático del `Button` del proyecto):
-
-```tsx
-// ✅ Correcto
-<Button type="submit" isLoading={isPending}>Guardar</Button>
-
-// ❌ Incorrecto — sin feedback visual
-<Button type="submit" disabled={isPending}>Guardar</Button>
-```
-
-- NUNCA solo `disabled={isPending}` en un botón que ejecuta un servicio.
-- Los botones "Cancelar" acompañantes se deshabilitan con `disabled={isPending}` (sin spinner).
-- Botones fuera del proyecto (`ui/button` raw, `AlertDialogAction`, `<button>` nativo) que ejecutan servicio: usar el `Button` wrapper con `isLoading`, o `disabled` + indicador manual.
-
----
-
-## Archivos Globales a Actualizar
-
-### 1. `packages/app/src/Infrastructure/Routes.tsx`
-
-Agregar el import del router y sumarlo al array `AllRoutes`:
-
-```typescript
-import { [Domain]Router } from '@app/Domains/[Domain]';
-
-export const AllRoutes = [
-  // ... existentes ...
-  ...[Domain]Router,
-];
-```
-
-### 2. `packages/app/src/Domains/MenuAccess.tsx` (si el dominio necesita menú)
-
-Agregar la entrada de menú siguiendo el patrón de las entradas existentes.
-
----
-
-## Checklist Final
-
-Tras crear todos los archivos, ejecuta `diagnostics/getErrors` y verifica:
-
-- [ ] No hay errores de TypeScript
-- [ ] `[Entity].entity.ts` deriva los tipos con `inferRouterOutputs` (nunca `I[Entity]` del server — desvío D1)
-- [ ] `[Domain].service.ts` importa el tipo correcto del dominio server
-- [ ] Todos los hooks usan `[Domain]Service` (no instancias directas de tRPC)
-- [ ] `Routes.tsx` incluye el nuevo `[Domain]Router`
-- [ ] Las páginas exportan componentes con nombre correcto
-- [ ] La `[Entity]ListPage` implementa los tres estados: `isError` → `EmptyScreenError`, `isLoading` → skeleton del dominio, empty → `EmptyScreenFilter`/`EmptyState` (sin texto inline ni fallbacks `Cargando`)
-- [ ] Los botones que ejecutan mutations reciben `isLoading={isPending}` (nunca solo `disabled`)
-- [ ] `index.ts` raíz hace barrel export de todo
+Corrige los errores antes de dar el dominio por creado.
