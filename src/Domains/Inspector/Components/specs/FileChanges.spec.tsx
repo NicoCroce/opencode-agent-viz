@@ -153,6 +153,53 @@ describe('FileChanges', () => {
     expect(b).toHaveAttribute('aria-pressed', 'false');
   });
 
+  it('aligns status and deltas in fixed right-aligned columns', () => {
+    render(
+      <FileChanges
+        changes={[change({ file: 'src/a.ts', additions: 12, deletions: 3 })]}
+        isError={false}
+        isLoading={false}
+      />,
+    );
+
+    expect(screen.getByText('modificado')).toHaveClass(
+      'w-[70px]',
+      'text-right',
+    );
+    expect(screen.getByText('+12')).toHaveClass('w-9', 'text-right', 'tabular-nums');
+    expect(screen.getByText('-3')).toHaveClass('w-9', 'text-right', 'tabular-nums');
+  });
+
+  it('dims zero deltas so a single-sided change does not shout', () => {
+    render(
+      <FileChanges
+        changes={[change({ file: 'src/a.ts', additions: 5, deletions: 0 })]}
+        isError={false}
+        isLoading={false}
+      />,
+    );
+
+    expect(screen.getByText('+5')).toHaveClass('text-status-done');
+    expect(screen.getByText('-0')).toHaveClass('text-muted-foreground/60');
+  });
+
+  it('highlights the selected row with a surface background (D9)', async () => {
+    const user = userEvent.setup();
+    render(
+      <FileChanges
+        changes={[change({ file: 'src/a.ts' }), change({ file: 'src/b.ts' })]}
+        isError={false}
+        isLoading={false}
+      />,
+    );
+
+    const a = screen.getByRole('button', { name: /src\/a\.ts/ });
+    expect(a).not.toHaveClass('bg-surface-2');
+
+    await user.click(a);
+    expect(a).toHaveClass('bg-surface-2');
+  });
+
   it('shows an explicit empty state when the agent changed no files', () => {
     render(<FileChanges changes={[]} isError={false} isLoading={false} />);
 
