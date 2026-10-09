@@ -8,6 +8,7 @@ import { reduceSessionLifecycle } from './eventReduce/slices/sessionLifecycle';
 import type { TReducibleEvent } from './eventReduce/eventTypes';
 import type { TEventUpdate } from './eventReduce/queryUpdates';
 
+export { reduceActivity } from './eventReduce/activity';
 export type { TSessionMessageCache } from './eventReduce/cache';
 export type { TReducibleEvent } from './eventReduce/eventTypes';
 export type {

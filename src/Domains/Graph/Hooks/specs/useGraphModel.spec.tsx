@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { SessionStatus } from '@opencode/client';
 import type { ReactNode } from 'react';
 import { queryKeys } from '../../../queryKeys';
 import {
   DEFAULT_DIRECTORY,
   assistantMessage,
+  busyStatus,
+  idleStatus,
   session,
 } from '../../lib/specs/fixtures';
 import { useGraphModel, type UseGraphModelResult } from '../useGraphModel';
@@ -226,5 +229,178 @@ describe('useGraphModel — contrato de carga (L7..L8)', () => {
     expect(getSessionLog).not.toHaveBeenCalledWith(readyId);
     expect(listSessionForms).not.toHaveBeenCalledWith(readyId);
     expect(listSessionInbox).not.toHaveBeenCalledWith(readyId);
+  });
+});
+
+/* -------------------------------------------------------------------- */
+/* E5/A5 — filas paralelas en vivo y paridad en vivo/refresco (T024).    */
+/* -------------------------------------------------------------------- */
+
+const LANE_ROOT = 'ses-lane-root';
+const LANE_IDS = ['ses-lane-1', 'ses-lane-2', 'ses-lane-3'] as const;
+const LANE_FINISH = 1_000;
+
+/**
+ * Subárbol raíz → N hermanos concurrentes (subagentes en paralelo). Los hijos
+ * se crean en instantes **escalonados** (`10/20/30`) para probar que el
+ * agrupamiento sale del solape real de actividad y no de "casi al mismo
+ * tiempo"; `finish` fija el fin real (`SessionInfo.time.updated`) del estado
+ * completo que llega al terminar la ejecución.
+ */
+const buildLaneSubtree = (finish: number | null = null) => [
+  session(LANE_ROOT, { time: { created: 0, updated: 0 } }),
+  ...LANE_IDS.map((id, index) => {
+    const created = 10 * (index + 1);
+    return session(id, {
+      parentID: LANE_ROOT,
+      time: { created, updated: finish ?? created },
+    });
+  }),
+];
+
+const laneStatuses = (
+  status: SessionStatus,
+): Record<string, SessionStatus> =>
+  Object.fromEntries(LANE_IDS.map((id) => [id, status]));
+
+const laneNode = (result: UseGraphModelResult, id: string) => {
+  const node = result.graph.nodes.find((candidate) => candidate.id === id);
+  if (!node) throw new Error(`nodo ${id} no encontrado`);
+  return node;
+};
+
+const allLanesReady = (result: UseGraphModelResult): boolean =>
+  result.graph.nodes.length === LANE_IDS.length + 1 &&
+  result.graph.nodes.every((node) => node.data.enrichment === 'ready');
+
+/**
+ * Disposición observable de la vista: niveles (filas), columnas, posiciones y
+ * grupos paralelos. Es lo que debe permanecer idéntico entre el estado en vivo
+ * y el estado completo reconstruido (paridad en vivo/refresco).
+ */
+const laneSnapshot = (result: UseGraphModelResult) => ({
+  levelByNode: { ...result.executionPlan.levelByNode },
+  columnByNode: { ...result.executionPlan.columnByNode },
+  positions: Object.fromEntries(
+    result.graph.nodes.map((node) => [node.id, node.position]),
+  ),
+  parallelGroups: [...result.parallelGroups]
+    .map((group) => [...group.nodeIds].sort().join(','))
+    .sort(),
+});
+
+const seedLaneContent = () => {
+  getSessionMessages.mockImplementation((id: string) =>
+    Promise.resolve([assistantMessage({ id: `msg-${id}` })]),
+  );
+};
+
+describe('useGraphModel — filas paralelas en vivo y paridad (E5/A5)', () => {
+  beforeEach(() => {
+    listSessions.mockResolvedValue(buildLaneSubtree());
+    listAgents.mockResolvedValue([]);
+    getSessionMessages.mockReset();
+    getSessionPermissions.mockResolvedValue([]);
+    getSessionLog.mockResolvedValue([]);
+    listSessionForms.mockResolvedValue([]);
+    getSessionForm.mockResolvedValue(undefined);
+    listSessionInbox.mockResolvedValue([]);
+    seedLaneContent();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('los N subagentes concurrentes comparten fila/levelByNode desde el modelo enriquecido (E5)', async () => {
+    const queryClient = createRevisitClient();
+    queryClient.setQueryData(
+      queryKeys.sessions.status(),
+      laneStatuses(busyStatus),
+    );
+
+    const { result } = renderGraph(queryClient, LANE_ROOT);
+
+    await waitFor(() => expect(allLanesReady(result.current)).toBe(true));
+
+    const { executionPlan, graph, parallelGroups } = result.current;
+
+    // Una sola fila para los N hermanos activos, por debajo de la raíz.
+    const levels = LANE_IDS.map((id) => executionPlan.levelByNode[id]);
+    expect(new Set(levels).size).toBe(1);
+    expect(levels[0]).toBeGreaterThan(executionPlan.levelByNode[LANE_ROOT]);
+
+    // Misma fila = mismo `y`; cada subagente en su propia columna (`x`).
+    const ys = LANE_IDS.map((id) => laneNode(result.current, id).position.y);
+    const xs = LANE_IDS.map((id) => laneNode(result.current, id).position.x);
+    expect(new Set(ys).size).toBe(1);
+    expect(new Set(xs).size).toBe(LANE_IDS.length);
+
+    // Activos (`running`) en la fase enriquecida, no apilados.
+    for (const id of LANE_IDS) {
+      expect(laneNode(result.current, id).data.status).toBe('running');
+    }
+
+    // El badge (`data.parallel`) sale de los mismos grupos que la fila (FR-010).
+    const group = parallelGroups.find(
+      (candidate) => candidate.nodeIds.length === LANE_IDS.length,
+    );
+    expect(group?.nodeIds.slice().sort()).toEqual([...LANE_IDS].sort());
+    for (const id of LANE_IDS) {
+      expect(laneNode(result.current, id).data.parallel?.size).toBe(
+        LANE_IDS.length,
+      );
+    }
+
+    expect(graph.nodes).toHaveLength(LANE_IDS.length + 1);
+  });
+
+  it('la disposición en vivo se mantiene idéntica al llegar el estado completo y al reabrir (A5)', async () => {
+    const queryClient = createRevisitClient();
+    queryClient.setQueryData(
+      queryKeys.sessions.status(),
+      laneStatuses(busyStatus),
+    );
+
+    const live = renderGraph(queryClient, LANE_ROOT);
+    await waitFor(() => expect(allLanesReady(live.result.current)).toBe(true));
+
+    const liveSnapshot = laneSnapshot(live.result.current);
+    // En vivo, los N concurrentes ya comparten una fila.
+    expect(
+      new Set(LANE_IDS.map((id) => liveSnapshot.levelByNode[id])).size,
+    ).toBe(1);
+
+    // Llega el estado completo: las sesiones reportan su fin real y terminan.
+    act(() => {
+      queryClient.setQueryData(
+        queryKeys.sessions.status(),
+        laneStatuses(idleStatus),
+      );
+      queryClient.setQueryData(
+        queryKeys.sessions.list(DEFAULT_DIRECTORY),
+        buildLaneSubtree(LANE_FINISH),
+      );
+    });
+
+    await waitFor(() =>
+      expect(
+        LANE_IDS.every(
+          (id) => laneNode(live.result.current, id).data.status === 'succeeded',
+        ),
+      ).toBe(true),
+    );
+
+    // El agrupamiento final coincide con el observado en vivo (US1 esc. 3).
+    expect(laneSnapshot(live.result.current)).toEqual(liveSnapshot);
+
+    // Reabrir la vista con el estado completo no cambia la disposición.
+    live.unmount();
+    const reopened = renderGraph(queryClient, LANE_ROOT);
+    await waitFor(() =>
+      expect(allLanesReady(reopened.result.current)).toBe(true),
+    );
+
+    expect(laneSnapshot(reopened.result.current)).toEqual(liveSnapshot);
   });
 });

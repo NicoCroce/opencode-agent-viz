@@ -6,6 +6,7 @@ import type {
   SessionStatus,
 } from '@opencode/client';
 import type {
+  TActivityMap,
   TEnrichmentState,
   TExecutionSignal,
   TGraphNode,
@@ -27,6 +28,13 @@ export interface TGraphNodeContext {
   signals: Record<string, TExecutionSignal>;
   forms: FormDetail[];
   enrichment: TEnrichmentState;
+  /**
+   * Marca de última actividad observada por sesión (`queryKeys.sessions.activity()`,
+   * FR-009). Amplía la fuente de `updatedAt` con el `max` acumulado en vivo
+   * (contract session-activity §4). **Opcional** para preservar la paridad de los
+   * consumidores previos: sin marca, `updatedAt` cae a la lista de sesiones.
+   */
+  activity?: TActivityMap;
   now: number;
 }
 
@@ -41,6 +49,7 @@ export const toGraphNode = (
     signals,
     forms,
     enrichment,
+    activity,
     now,
   }: TGraphNodeContext,
 ): TGraphNode => {
@@ -71,6 +80,13 @@ export const toGraphNode = (
     lastAssistantErrored: base.lastAssistantErrored,
   });
 
+  // Fin del intervalo: la lista de sesiones (`time.idle ?? time.updated`) o la
+  // marca de actividad en vivo (`activity[session.id]`), la más nueva. `null`
+  // cuando ambas fuentes quedan en `0` (contract session-activity §4).
+  const listedUpdatedAt = session.time.idle ?? session.time.updated ?? 0;
+  const activityUpdatedAt = activity?.[session.id] ?? 0;
+  const updatedAt = Math.max(listedUpdatedAt, activityUpdatedAt);
+
   return {
     id: session.id,
     type: 'agent' as const,
@@ -79,7 +95,7 @@ export const toGraphNode = (
       sessionId: session.id,
       title: session.title ?? null,
       createdAt: session.time.created,
-      updatedAt: session.time.idle ?? session.time.updated,
+      updatedAt: updatedAt === 0 ? null : updatedAt,
       agentName,
       directory: session.location.directory,
       model: base.model ?? agent?.model ?? null,

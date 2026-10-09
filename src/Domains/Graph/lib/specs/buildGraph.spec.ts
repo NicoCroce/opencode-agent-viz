@@ -987,4 +987,120 @@ describe("buildGraph", () => {
       );
     });
   });
+
+  /* ------------------------------------------------------------------ */
+  /* A4 — updatedAt fresco por marca de actividad (FR-009)               */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * `updatedAt` del nodo = `max(session.time.idle ?? session.time.updated ?? 0,
+   * activity[session.id] ?? 0)`; `null` cuando ese máximo queda en `0`
+   * (contract session-activity §4, data-model §1.1). La entrada `activity`
+   * (`TActivityMap`) se propaga por `buildGraph` hasta `toGraphNode` (T018/T019).
+   */
+  const sessionWithTime = (id: string, time: SessionInfo["time"]): SessionInfo => ({
+    ...session(id),
+    time,
+  });
+
+  describe("FR-009 — updatedAt = max(lista, marca de actividad) (A4)", () => {
+    it("toma la marca de actividad cuando es más nueva que la lista", () => {
+      const graph = buildGraph(
+        baseInput({
+          sessions: [
+            sessionWithTime("root", { created: 1, updated: 100, idle: 100 }),
+          ],
+          activity: { root: 250 },
+        }),
+      );
+      expect(graph.nodes[0].data.updatedAt).toBe(250);
+    });
+
+    it("cae a time.updated sin idle y la actividad gana", () => {
+      const graph = buildGraph(
+        baseInput({
+          sessions: [sessionWithTime("root", { created: 1, updated: 100 })],
+          activity: { root: 175 },
+        }),
+      );
+      expect(graph.nodes[0].data.updatedAt).toBe(175);
+    });
+
+    it("nunca retrocede la marca de la lista cuando la actividad es anterior", () => {
+      const graph = buildGraph(
+        baseInput({
+          sessions: [
+            sessionWithTime("root", { created: 1, updated: 100, idle: 100 }),
+          ],
+          activity: { root: 40 },
+        }),
+      );
+      expect(graph.nodes[0].data.updatedAt).toBe(100);
+    });
+
+    it("prefiere time.idle sobre time.updated cuando ambos existen", () => {
+      const graph = buildGraph(
+        baseInput({
+          sessions: [
+            sessionWithTime("root", { created: 1, updated: 50, idle: 100 }),
+          ],
+          activity: { root: 40 },
+        }),
+      );
+      expect(graph.nodes[0].data.updatedAt).toBe(100);
+    });
+
+    it("ignora la marca de actividad de otras sesiones", () => {
+      const graph = buildGraph(
+        baseInput({
+          sessions: [
+            sessionWithTime("root", { created: 1, updated: 100, idle: 100 }),
+          ],
+          activity: { other: 999 },
+        }),
+      );
+      expect(graph.nodes[0].data.updatedAt).toBe(100);
+    });
+
+    it("devuelve null cuando la lista y la actividad son ambas 0", () => {
+      const graph = buildGraph(
+        baseInput({
+          sessions: [sessionWithTime("root", { created: 1, updated: 0 })],
+          activity: { root: 0 },
+        }),
+      );
+      expect(graph.nodes[0].data.updatedAt).toBeNull();
+    });
+
+    it("devuelve null sin activity cuando la marca de la lista es 0", () => {
+      const graph = buildGraph(
+        baseInput({
+          sessions: [sessionWithTime("root", { created: 1, updated: 0 })],
+        }),
+      );
+      expect(graph.nodes[0].data.updatedAt).toBeNull();
+    });
+
+    describe("compatibilidad sin activity", () => {
+      it("conserva updatedAt = time.idle ?? time.updated al omitir activity", () => {
+        const graph = buildGraph(
+          baseInput({
+            sessions: [
+              sessionWithTime("root", { created: 1, updated: 50, idle: 100 }),
+            ],
+          }),
+        );
+        expect(graph.nodes[0].data.updatedAt).toBe(100);
+      });
+
+      it("cae a time.updated sin idle al omitir activity", () => {
+        const graph = buildGraph(
+          baseInput({
+            sessions: [sessionWithTime("root", { created: 1, updated: 100 })],
+          }),
+        );
+        expect(graph.nodes[0].data.updatedAt).toBe(100);
+      });
+    });
+  });
 });

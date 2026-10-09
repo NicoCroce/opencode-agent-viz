@@ -1,22 +1,17 @@
 import type { TGraphModel, TGraphNode, TParallelGroup } from '../Graph.entity';
+import { executionInterval, nodeInterval } from './execution/nodeInterval';
 
 /**
- * Intervalo de ejecución de un nodo.
+ * `true` si los intervalos de **solape** de dos nodos hermanos se superponen.
  *
- * Usa `createdAt` (creación de la sesión, estable y disponible apenas cargan
- * las sesiones) y cae a `metrics.startedAt` si falta. El fin es `updatedAt`
- * (`time.idle ?? time.updated`) y cae a `metrics.endedAt` o `now`.
+ * Usa `executionInterval`, la única lógica de intervalos compartida con
+ * `executionLevels`: un nodo activo se modela con fin `+∞`, de modo que el
+ * solape no depende del reloj (FR-008, FR-010, Principio V). Un terminado se
+ * cierra con su fin real y nunca se confunde con un activo (FR-011).
  */
-const intervalOf = (node: TGraphNode, now: number): [number, number] => {
-  const start = node.data.createdAt ?? node.data.metrics.startedAt ?? now;
-  const end =
-    node.data.updatedAt ?? node.data.metrics.endedAt ?? now;
-  return [start, Math.max(start, end)];
-};
-
-const overlaps = (a: TGraphNode, b: TGraphNode, now: number): boolean => {
-  const [aStart, aEnd] = intervalOf(a, now);
-  const [bStart, bEnd] = intervalOf(b, now);
+const overlaps = (a: TGraphNode, b: TGraphNode): boolean => {
+  const [aStart, aEnd] = executionInterval(a);
+  const [bStart, bEnd] = executionInterval(b);
   return aStart < bEnd && bStart < aEnd;
 };
 
@@ -29,6 +24,11 @@ const overlaps = (a: TGraphNode, b: TGraphNode, now: number): boolean => {
  *
  * Función pura, sin React (Principio V); O(n²) dentro de cada grupo de hermanos.
  * Devuelve los lotes ordenados por instante de inicio.
+ *
+ * El **agrupamiento** ya no depende del reloj (`executionInterval`, fin `+∞`
+ * para activos); `now` se conserva en la firma pública y solo alimenta las
+ * ventanas informativas `startedAt`/`endedAt` (`nodeInterval`, que cierra a un
+ * activo en el presente observado), tal como las ventanas de nivel.
  */
 export const deriveSiblingBatches = (
   model: TGraphModel,
@@ -61,7 +61,7 @@ export const deriveSiblingBatches = (
 
     for (let i = 0; i < nodes.length; i += 1) {
       for (let j = i + 1; j < nodes.length; j += 1) {
-        if (!overlaps(nodes[i], nodes[j], now)) continue;
+        if (!overlaps(nodes[i], nodes[j])) continue;
         const rootA = find(nodes[i].id);
         const rootB = find(nodes[j].id);
         if (rootA !== rootB) parent.set(rootA, rootB);
@@ -78,14 +78,14 @@ export const deriveSiblingBatches = (
 
     for (const members of byRoot.values()) {
       const sorted = [...members].sort(
-        (a, b) => intervalOf(a, now)[0] - intervalOf(b, now)[0],
+        (a, b) => nodeInterval(a, now)[0] - nodeInterval(b, now)[0],
       );
       batches.push({
         id: `${key || 'root'}#${sorted[0].id}`,
         parentId: key || null,
         nodeIds: sorted.map((node) => node.id),
-        startedAt: Math.min(...sorted.map((node) => intervalOf(node, now)[0])),
-        endedAt: Math.max(...sorted.map((node) => intervalOf(node, now)[1])),
+        startedAt: Math.min(...sorted.map((node) => nodeInterval(node, now)[0])),
+        endedAt: Math.max(...sorted.map((node) => nodeInterval(node, now)[1])),
       });
     }
   }

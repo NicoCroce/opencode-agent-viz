@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import type { SessionInfo } from '@opencode/client';
 import { queryKeys } from '../../../queryKeys';
 import {
   DEFAULT_DIRECTORY,
@@ -43,6 +44,8 @@ vi.mock('@app/Infrastructure/Services/opencodeClient', () => ({
 
 const ROOT_ID = 'ses-root';
 const CHILD_ID = 'ses-child';
+const SIBLING_A_ID = 'ses-child-a';
+const SIBLING_B_ID = 'ses-child-b';
 
 const START = new Date('2026-01-01T00:00:00.000Z').getTime();
 const SECOND = 1_000;
@@ -54,6 +57,34 @@ const createClient = () =>
       mutations: { retry: false },
     },
   });
+
+/**
+ * Reloj falso + shim de idle (jsdom no implementa `requestIdleCallback`: se
+ * shimea sobre `setTimeout`, como en `useGraphEnrichment.spec.tsx`). Compartido
+ * por todas las suites de este archivo.
+ */
+const installGraphClock = (): void => {
+  vi.useFakeTimers();
+  vi.setSystemTime(START);
+  vi.stubGlobal('requestIdleCallback', (callback: IdleRequestCallback) =>
+    setTimeout(
+      () => callback({ didTimeout: false, timeRemaining: () => 50 }),
+      0,
+    ),
+  );
+  vi.stubGlobal('cancelIdleCallback', (handle: number) => clearTimeout(handle));
+};
+
+/** Resetea los loaders del servicio mock para el subárbol dado. */
+const resetServiceMocks = (sessions: SessionInfo[]): void => {
+  service.listSessions.mockReset().mockResolvedValue(sessions);
+  service.listAgents.mockReset().mockResolvedValue([]);
+  service.getSessionPermissions.mockReset().mockResolvedValue([]);
+  service.getSessionLog.mockReset().mockResolvedValue([]);
+  service.listSessionForms.mockReset().mockResolvedValue([]);
+  service.getSessionForm.mockReset().mockResolvedValue(undefined);
+  service.listSessionInbox.mockReset().mockResolvedValue([]);
+};
 
 const renderGraph = (client: QueryClient) => {
   const Wrapper = ({ children }: { children: ReactNode }) => (
@@ -105,6 +136,13 @@ const buildSubtree = () => [
   session(CHILD_ID, { parentID: ROOT_ID }),
 ];
 
+/** Subárbol raíz → dos hermanos (mismo padre), candidatos a fila paralela. */
+const buildParallelSubtree = () => [
+  session(ROOT_ID),
+  session(SIBLING_A_ID, { parentID: ROOT_ID }),
+  session(SIBLING_B_ID, { parentID: ROOT_ID }),
+];
+
 /**
  * Contenido por sesión: la raíz activa no tiene `time.completed` (duración viva);
  * el hijo inactivo sí (duración fija).
@@ -124,28 +162,29 @@ const seedContent = () => {
   );
 };
 
+/**
+ * Contenido del subárbol paralelo: la raíz queda **terminada** (duración fija);
+ * los dos hermanos quedan **activos**, sin `time.completed` (duración viva).
+ */
+const seedParallelContent = () => {
+  service.getSessionMessages.mockImplementation((id: string) =>
+    Promise.resolve(
+      id === ROOT_ID
+        ? [
+            assistantMessage({
+              id: 'msg_root',
+              time: { created: 2, completed: 5 },
+            }),
+          ]
+        : [assistantMessage({ id: `msg_${id}`, time: { created: 2 } })],
+    ),
+  );
+};
+
 describe('useGraphModel — tick solo con nodos activos (FR-006, SC-005)', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(START);
-    vi.stubGlobal('requestIdleCallback', (callback: IdleRequestCallback) =>
-      setTimeout(
-        () =>
-          callback({ didTimeout: false, timeRemaining: () => 50 }),
-        0,
-      ),
-    );
-    vi.stubGlobal('cancelIdleCallback', (handle: number) =>
-      clearTimeout(handle),
-    );
-
-    service.listSessions.mockReset().mockResolvedValue(buildSubtree());
-    service.listAgents.mockReset().mockResolvedValue([]);
-    service.getSessionPermissions.mockReset().mockResolvedValue([]);
-    service.getSessionLog.mockReset().mockResolvedValue([]);
-    service.listSessionForms.mockReset().mockResolvedValue([]);
-    service.getSessionForm.mockReset().mockResolvedValue(undefined);
-    service.listSessionInbox.mockReset().mockResolvedValue([]);
+    installGraphClock();
+    resetServiceMocks(buildSubtree());
     seedContent();
   });
 
@@ -229,5 +268,106 @@ describe('useGraphModel — tick solo con nodos activos (FR-006, SC-005)', () =>
       expect(node).toBe(before[index]);
       expect(node.data.metrics.durationMs).toBe(durations[index]);
     });
+  });
+});
+
+/**
+ * Spec E7 (FR-007, SC-004; contract execution-lanes §6.2, Principio VII).
+ *
+ * Con hermanos paralelos ya alineados en la misma fila, el paso del reloj (tick
+ * de 1 s) **y** un evento no estructural (la marca de actividad que parchea el
+ * SSE, que no altera la topología ni la clase de intervalo de un activo) no
+ * deben reacomodar el grafo: el plan y las posiciones conservan su identidad
+ * (la clave de ejecución no cambia) y el orden de las filas y columnas queda
+ * intacto. Lo único que avanza es `durationMs` de los nodos **activos**.
+ */
+describe('useGraphModel — estabilidad ante tick y eventos no estructurales (FR-007, SC-004, E7)', () => {
+  beforeEach(() => {
+    installGraphClock();
+    resetServiceMocks(buildParallelSubtree());
+    seedParallelContent();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  it('con hermanos paralelos alineados, el tick de 1 s y un evento no estructural no cambian plan/posiciones/orden', async () => {
+    const client = createClient();
+    client.setQueryData(queryKeys.sessions.status(), {
+      [ROOT_ID]: idleStatus,
+      [SIBLING_A_ID]: busyStatus,
+      [SIBLING_B_ID]: busyStatus,
+    });
+
+    const hook = renderGraph(client);
+    await drain(hook);
+
+    const planBefore = hook.result.current.executionPlan;
+    const nodesBefore = hook.result.current.graph.nodes;
+    const orderBefore = planBefore.levels.map((level) => level.nodeIds);
+    const positionById = new Map(
+      nodesBefore.map((node) => [node.id, node.position]),
+    );
+    const durationById = new Map(
+      nodesBefore.map((node) => [node.id, node.data.metrics.durationMs]),
+    );
+
+    // Punto de partida: los dos hermanos activos comparten fila (nivel) y
+    // ocupan columnas distintas; la raíz terminada queda en otra fila.
+    const siblingLevel = planBefore.levels.find((level) =>
+      level.nodeIds.includes(SIBLING_A_ID),
+    );
+    expect(siblingLevel?.nodeIds).toEqual(
+      expect.arrayContaining([SIBLING_A_ID, SIBLING_B_ID]),
+    );
+    expect(siblingLevel?.parallel).toBe(true);
+    expect(positionById.get(SIBLING_A_ID)?.y).toBe(
+      positionById.get(SIBLING_B_ID)?.y,
+    );
+    expect(positionById.get(SIBLING_A_ID)?.x).not.toBe(
+      positionById.get(SIBLING_B_ID)?.x,
+    );
+
+    await act(async () => {
+      // Evento no estructural: marca de actividad SSE para los activos (no
+      // cambia topología ni clase de intervalo) + tick de 1 s.
+      client.setQueryData(queryKeys.sessions.activity(), {
+        [SIBLING_A_ID]: START + SECOND,
+        [SIBLING_B_ID]: START + SECOND,
+      });
+      await vi.advanceTimersByTimeAsync(SECOND);
+    });
+
+    const planAfter = hook.result.current.executionPlan;
+    const nodeByIdAfter = new Map(
+      hook.result.current.graph.nodes.map((node) => [node.id, node]),
+    );
+
+    // La clave de ejecución no cambió: el plan conserva la identidad y el orden.
+    expect(planAfter).toBe(planBefore);
+    expect(planAfter.levels.map((level) => level.nodeIds)).toEqual(orderBefore);
+
+    // Las posiciones también conservan la identidad (mismo objeto del layout
+    // memoizado): ningún nodo saltó de fila ni de columna.
+    nodesBefore.forEach((node) => {
+      expect(nodeByIdAfter.get(node.id)?.position).toBe(
+        positionById.get(node.id),
+      );
+    });
+
+    // Solo los activos avanzan su `durationMs` con el tick…
+    expect(nodeByIdAfter.get(SIBLING_A_ID)?.data.metrics.durationMs).toBe(
+      (durationById.get(SIBLING_A_ID) as number) + SECOND,
+    );
+    expect(nodeByIdAfter.get(SIBLING_B_ID)?.data.metrics.durationMs).toBe(
+      (durationById.get(SIBLING_B_ID) as number) + SECOND,
+    );
+    // …y el nodo terminado conserva su duración fija.
+    expect(nodeByIdAfter.get(ROOT_ID)?.data.metrics.durationMs).toBe(
+      durationById.get(ROOT_ID),
+    );
   });
 });

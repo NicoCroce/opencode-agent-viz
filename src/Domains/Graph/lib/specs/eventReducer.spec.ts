@@ -1,10 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import type { SessionStatus, V2Event } from '@opencode/client';
-import { reduceEvent } from '../eventReducer';
+import { reduceActivity, reduceEvent } from '../eventReducer';
 import type { TReducibleEvent } from '../eventReducer';
+import { setActivity } from '../eventReduce/cache';
 import { queryKeys } from '../../../queryKeys';
 import type { TSessionMessage } from '@app/Infrastructure/Services/opencodeClient';
 import type { TExecutionSignal } from '../../Graph.entity';
+
+/**
+ * `V2Event` incluye `V2EventServerConnected`, que no expone `created`. Cuando
+ * un array mezcla eventos de `V2Event` con `SessionMessageContentUpdated`, el
+ * tipo resultante (`V2Event | SessionMessageContentUpdated`) tampoco expone
+ * `created`. Los helpers que devuelven deltas consolidados se tipan con este
+ * subconjunto para conservar el acceso a `created` en los loops de actividad.
+ */
+type TCreatedV2Event = Extract<V2Event, { created: number }>;
 
 const applySet = (prev: unknown, event: TReducibleEvent): unknown => {
   const updates = reduceEvent(event);
@@ -44,6 +54,16 @@ const applyExecution = (
     event,
     queryKeys.sessions.execution('ses_1'),
   ) as Record<string, TExecutionSignal>;
+
+/** La marca de actividad es un `Record<sessionID, number>` (TActivityMap). */
+const applyActivity = (
+  prev: Record<string, number> | undefined,
+  event: TReducibleEvent,
+): Record<string, number> | undefined => {
+  const update = reduceActivity(event);
+  if (!update || update.kind !== 'set') return prev;
+  return update.updater(prev) as Record<string, number>;
+};
 
 const serverConnected: V2Event = {
   id: 'evt_connected',
@@ -115,7 +135,7 @@ const stepStarted: V2Event = {
   },
 };
 
-const textEnded = (ordinal: number, text: string): V2Event => ({
+const textEnded = (ordinal: number, text: string): TCreatedV2Event => ({
   id: `evt_text_${ordinal}`,
   created: 101 + ordinal,
   type: 'session.text.ended',
@@ -123,7 +143,7 @@ const textEnded = (ordinal: number, text: string): V2Event => ({
   data: { sessionID: 'ses_1', assistantMessageID: 'msg_1', ordinal, text },
 });
 
-const reasoningEnded = (ordinal: number, text: string): V2Event => ({
+const reasoningEnded = (ordinal: number, text: string): TCreatedV2Event => ({
   id: `evt_reasoning_${ordinal}`,
   created: 110 + ordinal,
   type: 'session.reasoning.ended',
@@ -515,5 +535,103 @@ describe('reduceEvent', () => {
     ]) {
       expect(reduceEvent(event)).toBeNull();
     }
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* Marca de actividad (contract session-activity §2, A1/A2)            */
+/* ------------------------------------------------------------------ */
+
+describe('reduceActivity', () => {
+  it('returns null for events without a session (server.connected)', () => {
+    expect(reduceActivity(serverConnected)).toBeNull();
+  });
+
+  it('targets sessions.activity() with a set update for events with a session', () => {
+    expect(reduceActivity(stepStarted)).toMatchObject({
+      kind: 'set',
+      queryKey: queryKeys.sessions.activity(),
+    });
+  });
+
+  it('records event.created for lifecycle/status/idle events', () => {
+    for (const event of [sessionCreated, statusRetry, sessionIdle]) {
+      expect(applyActivity({}, event)).toEqual({ ses_1: event.created });
+    }
+  });
+
+  it('records event.created for message/content events', () => {
+    for (const event of [
+      stepStarted,
+      textEnded(0, 'hola'),
+      reasoningEnded(1, 'pienso'),
+      contentUpdated,
+      toolInputStarted,
+    ]) {
+      expect(applyActivity({}, event)).toEqual({ ses_1: event.created });
+    }
+  });
+
+  it('records event.created for execution/retry/compaction events', () => {
+    for (const event of [
+      execStarted,
+      execSucceeded,
+      execFailed,
+      execInterrupted,
+      retryScheduled,
+      compactionStarted,
+      compactionEnded,
+      compactionFailed,
+    ]) {
+      expect(applyActivity({}, event)).toEqual({ ses_1: event.created });
+    }
+  });
+
+  it('records event.created for permission events', () => {
+    for (const event of [permission, permissionReplied]) {
+      expect(applyActivity({}, event)).toEqual({ ses_1: event.created });
+    }
+  });
+
+  it('records event.created for inbox/forms events', () => {
+    for (const event of [
+      inboxDelivered,
+      formCreated,
+      formReplied,
+      formCancelled,
+    ]) {
+      expect(applyActivity({}, event)).toEqual({ ses_1: event.created });
+    }
+  });
+
+  it('records event.created for deltas, whose content is otherwise ignored', () => {
+    for (const event of [
+      textDelta,
+      reasoningDelta,
+      toolInputDelta,
+      toolProgress,
+      compactionDelta,
+    ]) {
+      expect(applyActivity({}, event)).toEqual({ ses_1: event.created });
+    }
+  });
+});
+
+describe('setActivity', () => {
+  it('adds the activity mark for a session absent from the map', () => {
+    expect(setActivity({}, 'ses_1', 42)).toEqual({ ses_1: 42 });
+  });
+
+  it('keeps the maximum so the mark never moves backwards', () => {
+    expect(setActivity({ ses_1: 100 }, 'ses_1', 50)).toEqual({ ses_1: 100 });
+    expect(setActivity({ ses_1: 100 }, 'ses_1', 150)).toEqual({ ses_1: 150 });
+  });
+
+  it('does not mutate the input map', () => {
+    const prev = { ses_1: 100 };
+    const next = setActivity(prev, 'ses_1', 200);
+
+    expect(prev).toEqual({ ses_1: 100 });
+    expect(next).not.toBe(prev);
   });
 });

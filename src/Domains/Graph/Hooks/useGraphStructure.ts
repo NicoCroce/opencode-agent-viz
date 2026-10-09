@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   useGetAgents,
+  useGetSessionActivity,
   useGetSessions,
   useGetSessionStatus,
 } from '../../Sessions/Sessions.service';
@@ -8,13 +9,13 @@ import { type TGraphModel, type TParallelGroup } from '../Graph.entity';
 import { assembleStructuralGraph } from '../lib/assembleStructuralGraph';
 import { buildStructuralModel } from '../lib/buildStructuralModel';
 import {
+  deriveExecutionKey,
   deriveExecutionLevels,
   layoutExecution,
   type TExecutionPlan,
 } from '../lib/executionLevels';
 import { filterSubtree } from '../lib/filterSubtree';
 import { indexPositions } from '../lib/indexPositions';
-import { topologySignature } from '../lib/layoutGraph';
 import { isActiveStatus } from '../lib/nodeStatus';
 import { toParallelByNode } from '../lib/parallelByNode';
 import { deriveParallelGroups } from '../lib/parallelism';
@@ -30,10 +31,12 @@ export { filterSubtree };
  * Modelo **estructural** del grafo (contrato de carga §1.1, data-model §3): la
  * primera fase del modelo por fases. Se deriva **solo** de consultas ya
  * cacheadas —sesiones (`queryKeys.sessions.list(directory)`), estados
- * (`queryKeys.sessions.status()`) y agentes (`queryKeys.agents.list(directory)`)
- * — y **no** abre ninguna consulta de contenido (mensajes, log, permisos,
- * formularios o inbox), de modo que el grafo se pinta sin esperar al volumen de
- * contenido (FR-010, SC-007, criterio L4).
+ * (`queryKeys.sessions.status()`), actividad (`queryKeys.sessions.activity()`) y
+ * agentes (`queryKeys.agents.list(directory)`) — y **no** abre ninguna consulta
+ * de contenido (mensajes, log, permisos, formularios o inbox), de modo que el
+ * grafo se pinta sin esperar al volumen de contenido (FR-010, SC-007, criterio
+ * L4). La marca de actividad es un mapa plano parcheado por SSE, no una consulta
+ * de contenido.
  *
  * Los nodos salen con `enrichment: 'pending'` y `metrics: EMPTY_METRICS`; el
  * enriquecimiento los completa y los marca `'ready'`. En esta fase solo
@@ -58,6 +61,7 @@ export const useGraphStructure = (
 ): UseGraphStructureResult => {
   const sessionsQuery = useGetSessions(directory);
   const statusQuery = useGetSessionStatus();
+  const activityQuery = useGetSessionActivity();
   const agentsQuery = useGetAgents(directory);
 
   const sessions = useMemo(() => sessionsQuery.data ?? [], [sessionsQuery.data]);
@@ -78,34 +82,49 @@ export const useGraphStructure = (
         sessions: related,
         statuses: statusQuery.data ?? {},
         agents: agentsQuery.data ?? [],
+        activity: activityQuery.data ?? {},
         now,
       }),
-    [related, statusQuery.data, agentsQuery.data, now],
+    [
+      related,
+      statusQuery.data,
+      agentsQuery.data,
+      activityQuery.data,
+      now,
+    ],
   );
 
-  const signature = topologySignature(model);
+  // Clave de ejecución (topología + clase/borde de intervalo): el plan,
+  // las posiciones y los grupos se memoizan por ella, no por la firma de
+  // topología, para reaccionar a la transición activo↔terminado y al cambio
+  // del fin real de un terminado sin relayout por eventos no estructurales ni
+  // por tick (FR-003, FR-007/SC-004, research R3).
+  const executionKey = deriveExecutionKey(model);
 
-  // El plan de ejecución se memoiza por firma de topología: el orden temporal de
-  // las sesiones ya creadas es estable, así que no se recalcula por datos.
+  // El plan de ejecución se memoiza por la clave de ejecución: el orden temporal
+  // de las sesiones ya creadas es estable, así que no se recalcula por datos.
   const executionPlan = useMemo(
     () => deriveExecutionLevels(model, now),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [signature],
+    [executionKey],
   );
 
   const positions = useMemo(
     () => indexPositions(layoutExecution(model, executionPlan).nodes),
-    // Intentionally keyed by topology signature, not by `model` identity:
+    // Intentionally keyed by the execution key, not by `model` identity:
     // status/metrics updates must not trigger a relayout (Principio VII).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [signature],
+    [executionKey],
   );
 
   // El paralelismo se apoya en los tiempos de sesión (`createdAt`/`updatedAt`),
   // que ya son estructurales; se completa en el enriquecimiento si hace falta.
+  // Se memoiza por la misma clave de ejecución para que filas y badge salgan
+  // de un único instante de derivación (FR-010, research R3).
   const parallelGroups = useMemo(
     () => deriveParallelGroups(model, now),
-    [model, now],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [executionKey],
   );
 
   const parallelByNode = useMemo(

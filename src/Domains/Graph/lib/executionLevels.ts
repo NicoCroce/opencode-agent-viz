@@ -26,3 +26,8 @@ export {
   layoutExecution,
   type TRowLayout,
 } from './execution/layoutRows';
+export { deriveExecutionKey } from './execution/executionKey';
+export {
+  deriveExecutionLayout,
+  type TExecutionLayout,
+} from './execution/deriveExecutionLayout';
