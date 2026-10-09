@@ -84,7 +84,7 @@ export const WorkspaceLayout = ({
         >
           {sessions}
         </Container>
-        <Container block className="min-h-0 flex-1">
+        <Container block className="min-h-0 min-w-0 flex-1">
           {graph}
         </Container>
         {!isFullscreen ? (
