@@ -5,9 +5,9 @@ import { cn } from '@app/Application/lib/utils';
 import type { TGraphNodeData } from '../Graph.entity';
 import { isActiveStatus } from '../lib/nodeStatus';
 import { AgentNodeFooter } from './AgentNodeFooter';
+import { AgentNodeEffortBand } from './AgentNodeEffortBand';
 import { AgentNodeHeader } from './AgentNodeHeader';
 import { AgentNodeModelLine } from './AgentNodeModelLine';
-import { EffortMeter } from './EffortMeter';
 import { NodeResizeHandles } from './NodeResizeHandles';
 import { NodeStatusRail } from './NodeStatusRail';
 import { useNodeFocusOpacity } from './useNodeFocusOpacity';
@@ -15,11 +15,10 @@ import { useNodeFocusOpacity } from './useNodeFocusOpacity';
 type AgentFlowNode = Node<TGraphNodeData, 'agent'>;
 
 /**
- * Card del agente: encabezado (título + estado), línea de modelo y pie con
- * consumo, rango horario y herramienta. El medidor de esfuerzo se ancla a la
- * esquina inferior derecha del card (fuera del flujo del encabezado). El alto
- * lo calcula `cardHeight` (`lib/cardHeight.ts`) y lo comparten los carriles de
- * ejecución.
+ * Card del agente: encabezado (título + cluster de estado), línea de modelo,
+ * pie con consumo/contexto y banda de esfuerzo al pie (la firma del nodo). El
+ * alto lo calcula `cardHeight` (`lib/cardHeight.ts`) y lo comparten los carriles
+ * de ejecución.
  */
 const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) => {
   // Resaltado de foco por contexto (contrato de render §1.2/§2).
@@ -70,16 +69,8 @@ const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) =>
           retry={data.retry}
           interruptReason={data.interruptReason}
         />
+        <AgentNodeEffortBand effort={data.effort} />
       </Container>
-
-      {data.effort ? (
-        <Container
-          block
-          className="pointer-events-none absolute bottom-2 right-2.5 z-10"
-        >
-          <EffortMeter effort={data.effort} />
-        </Container>
-      ) : null}
 
       <Handle type="source" position={Position.Bottom} className="!bg-border" />
     </div>

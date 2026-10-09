@@ -1,8 +1,8 @@
 import { Container } from '@app/Application/Components';
 import {
   formatCost,
-  formatDateTimeRange,
   formatDuration,
+  formatTimeRange,
   formatTokens,
 } from '@app/Application/Helpers';
 import { formatClock } from '@app/Application/Helpers/format/clock';
@@ -25,14 +25,13 @@ interface AgentNodeFooterProps {
 }
 
 /**
- * Pie del card: consumo (tokens · costo · duración), rango horario y, cuando
- * aplica, herramienta en curso (FR-018), reintento (FR-018) e interrupción
- * (FR-019). Los valores ausentes caen a "no disponible" (edge case).
+ * Pie del card, en dos registros:
+ * - **Vitals**: consumo (tokens · costo · duración), la carga analítica.
+ * - **Contexto**: rango horario compacto (`HH:mm → HH:mm`) y, cuando aplica, la
+ *   herramienta en curso (FR-018) en la misma línea.
  *
- * Las líneas que pueden quedar por debajo del medidor de esfuerzo —anclado a la
- * esquina inferior derecha del card— reservan el canal derecho (`pr-7`, ~28 px,
- * `EFFORT_METER_WIDTH`) para que el texto no quede tapado. La fila de consumo no
- * lo reserva: es `flex-wrap` y reservarlo cambiaría el alto estimado del pie.
+ * El reintento (FR-018) y la interrupción (FR-019) conservan su propia línea en
+ * color de estado. Los valores ausentes caen a "no disponible" (edge case).
  */
 export const AgentNodeFooter = ({
   metrics,
@@ -42,7 +41,7 @@ export const AgentNodeFooter = ({
   retry,
   interruptReason,
 }: AgentNodeFooterProps) => {
-  const timeRange = formatDateTimeRange({
+  const timeRange = formatTimeRange({
     startedAt: metrics.startedAt,
     endedAt: metrics.endedAt,
     isRunning,
@@ -73,7 +72,7 @@ export const AgentNodeFooter = ({
         row
         align="center"
         space="none"
-        className="min-w-0 flex-wrap gap-x-1.5 font-mono text-[11px] tabular-nums text-muted-foreground"
+        className="min-w-0 flex-wrap gap-x-1.5 font-mono text-[11px] tabular-nums text-foreground/70"
       >
         <span>
           {tokens === null ? formatTokens(null) : `${formatTokens(tokens)} tok`}
@@ -83,20 +82,30 @@ export const AgentNodeFooter = ({
         <span aria-hidden>·</span>
         <span>{formatDuration(metrics.durationMs)}</span>
       </Container>
-      <span className="min-w-0 truncate pr-7 font-mono text-[11px] tabular-nums text-muted-foreground">
-        {timeRange}
-      </span>
-      {currentTool ? (
-        <span
-          className="min-w-0 truncate pr-7 font-mono text-[11px] text-foreground/80"
-          title={currentTool.name}
-        >
-          {currentTool.name}
-        </span>
-      ) : null}
+
+      <Container
+        row
+        align="center"
+        space="none"
+        className="min-w-0 gap-1.5 font-mono text-[11px] tabular-nums text-muted-foreground"
+      >
+        <span className="min-w-0 truncate">{timeRange}</span>
+        {currentTool ? (
+          <>
+            <span aria-hidden>·</span>
+            <span
+              className="min-w-0 truncate text-foreground/80"
+              title={currentTool.name}
+            >
+              {currentTool.name}
+            </span>
+          </>
+        ) : null}
+      </Container>
+
       {retryLabel ? (
         <span
-          className="min-w-0 truncate pr-7 font-mono text-[11px] tabular-nums text-status-running"
+          className="min-w-0 truncate font-mono text-[11px] tabular-nums text-status-running"
           title={retryLabel}
         >
           {retryLabel}
@@ -104,7 +113,7 @@ export const AgentNodeFooter = ({
       ) : null}
       {interruptLabel ? (
         <span
-          className="min-w-0 truncate pr-7 font-mono text-[11px] text-status-error"
+          className="min-w-0 truncate font-mono text-[11px] text-status-error"
           title={interruptLabel}
         >
           {interruptLabel}

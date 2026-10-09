@@ -27,7 +27,9 @@ export const NodeStatusRail = ({ status, active, hasLoop }: NodeStatusRailProps)
       aria-hidden
       data-testid="node-status-rail"
       className={cn(
-        'absolute left-0 top-0 h-full w-[3px]',
+        // Hairline discreto: 2 px y algo rebajado, para que el estado no pese
+        // más que el título (el punto del encabezado da la lectura precisa).
+        'absolute left-0 top-0 h-full w-[2px] opacity-[0.72]',
         !striped && NODE_STATUS_COLOR[status],
         scanning && 'rail-scan',
       )}

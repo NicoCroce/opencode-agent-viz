@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { TGraphNodeData } from '../../Graph.entity';
 import { EMPTY_METRICS } from '../../Graph.entity';
-import { cardHeight, EFFORT_METER_WIDTH, STATUS_WIDTH } from '../cardHeight';
+import { cardHeight, STATUS_WIDTH } from '../cardHeight';
 import { NODE_WIDTH } from '../layoutGraph';
 import { MIN_NODE_HEIGHT } from '../nodeResize';
 
@@ -36,14 +36,14 @@ describe('cardHeight', () => {
     expect(withModel).toBeGreaterThan(withoutModel);
   });
 
-  it('grows with the current-tool line', () => {
+  it('does not grow for the current tool: it shares the context line', () => {
     const withoutTool = cardHeight(data(), NODE_WIDTH);
     const withTool = cardHeight(
       data({ currentTool: { name: 'bash', state: 'running' } }),
       NODE_WIDTH,
     );
 
-    expect(withTool).toBeGreaterThan(withoutTool);
+    expect(withTool).toBe(withoutTool);
   });
 
   it('gives a long title two lines and a short title one', () => {
@@ -76,25 +76,21 @@ describe('cardHeight', () => {
     );
   });
 
-  it('el medidor de esfuerzo no añade filas al card (S10)', () => {
+  it('la banda de esfuerzo suma una fila al card (S10)', () => {
     const withEffort = data({
       effort: { level: 5, provisional: true, reasons: ['lanzó paralelos'] },
     });
 
-    // El esfuerzo se ancla a la esquina inferior derecha del card: no debe
-    // cambiar la altura estimada del card.
-    expect(cardHeight(withEffort, NODE_WIDTH)).toBe(
+    // El esfuerzo vive en su banda al pie: el card crece para alojarla.
+    expect(cardHeight(withEffort, NODE_WIDTH)).toBeGreaterThan(
       cardHeight(data(), NODE_WIDTH),
     );
   });
 
-  it('el encabezado vuelve a reservar solo el estado y el badge (72 px)', () => {
-    // El medidor de esfuerzo se ancla al pie, así que el encabezado ya no
-    // reserva su ancho: la reserva vuelve a la base (estado + badge de
-    // paralelos). `EFFORT_METER_WIDTH` sigue siendo el ancho real del medidor
-    // (referencia del canal derecho `pr-7` del pie).
-    expect(EFFORT_METER_WIDTH).toBeGreaterThan(0);
-    expect(STATUS_WIDTH).toBe(72);
+  it('el encabezado reserva el cluster meta: punto + estado + badge (84 px)', () => {
+    // Punto de estado (6 px) + separación (6 px) sobre la base del estado y el
+    // badge de paralelos. El medidor de esfuerzo ya no va aquí.
+    expect(STATUS_WIDTH).toBe(84);
   });
 
   it('estima las líneas del título contra la reserva base del encabezado (72 px)', () => {

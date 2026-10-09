@@ -15,10 +15,11 @@ const BASE_REASON = 'esfuerzo base';
 
 /**
  * Medidor de esfuerzo del nodo (S9; effort-contract §5; design-direction §3.6):
- * regleta de `EFFORT_MAX` muescas de **solo lectura**. Las encendidas usan
- * `--primary` (exclusivo del esfuerzo); las apagadas, un borde neutro. Mientras
- * el nivel es provisional, el medidor se atenúa. Expone `role="img"` con la
- * leyenda "Esfuerzo N de 5: <reasons>" (nunca es un control, FR-027).
+ * barra de `EFFORT_MAX` segmentos que **ocupa el ancho disponible** (`flex-1`),
+ * de **solo lectura**. Los encendidos usan `--primary` (exclusivo del esfuerzo);
+ * los apagados, un borde neutro. Mientras el nivel es provisional, el medidor se
+ * atenúa. Expone `role="img"` con la leyenda "Esfuerzo N de 5: <reasons>" (nunca
+ * es un control, FR-027). La etiqueta y el nivel los aporta `AgentNodeEffortBand`.
  */
 export const EffortMeter = ({ effort }: EffortMeterProps) => {
   if (!effort) return null;
@@ -34,8 +35,8 @@ export const EffortMeter = ({ effort }: EffortMeterProps) => {
       role="img"
       aria-label={`Esfuerzo ${level} de 5: ${detail}`}
       data-provisional={provisional}
-      className={cn('shrink-0', provisional && 'opacity-60')}
-      style={{ gap: '3px' }}
+      className={cn('min-w-0 flex-1', provisional && 'opacity-60')}
+      style={{ gap: '2px' }}
     >
       {NOTCHES.map((index) => {
         const lit = index < level;
@@ -46,7 +47,7 @@ export const EffortMeter = ({ effort }: EffortMeterProps) => {
             data-lit={lit}
             aria-hidden
             className={cn(
-              'h-2.5 w-[3px] rounded-[1px]',
+              'h-0.5 flex-1 rounded-[1px]',
               lit ? 'bg-primary' : 'bg-border',
             )}
           />

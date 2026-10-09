@@ -106,11 +106,6 @@ const nodeOpacity = (container: HTMLElement): number => {
 
 const pad = (value: number): string => String(value).padStart(2, '0');
 
-const stamp = (ms: number): string => {
-  const date = new Date(ms);
-  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-};
-
 const clock = (ms: number): string => {
   const date = new Date(ms);
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -233,23 +228,23 @@ describe('AgentNode — consumo resumido', () => {
 });
 
 describe('AgentNode — rango horario (US5)', () => {
-  it('renders the start – end range from metrics.startedAt/endedAt alongside the duration', () => {
+  it('renders the compact start → end clock range alongside the duration', () => {
     renderWithNode('succeeded', { startedAt: START, endedAt: END });
 
     expect(
-      screen.getByText(`${stamp(START)} – ${stamp(END)}`),
+      screen.getByText(`${clock(START)} → ${clock(END)}`),
     ).toBeInTheDocument();
     // El rango convive con la duración existente; no la reemplaza.
     expect(screen.getByText('1m 23s')).toBeInTheDocument();
   });
 
   it.each<TNodeStatus>(ACTIVE_STATUSES)(
-    'shows "inicio – en curso" while the node status is %s',
+    'shows "inicio → en curso" while the node status is %s',
     (status) => {
       renderWithNode(status, { startedAt: START, endedAt: null });
 
       expect(
-        screen.getByText(`${stamp(START)} – en curso`),
+        screen.getByText(`${clock(START)} → en curso`),
       ).toBeInTheDocument();
     },
   );
@@ -258,10 +253,10 @@ describe('AgentNode — rango horario (US5)', () => {
     renderWithNode('running', { startedAt: START, endedAt: END });
 
     expect(
-      screen.getByText(`${stamp(START)} – en curso`),
+      screen.getByText(`${clock(START)} → en curso`),
     ).toBeInTheDocument();
     expect(
-      screen.queryByText(`${stamp(START)} – ${stamp(END)}`),
+      screen.queryByText(`${clock(START)} → ${clock(END)}`),
     ).not.toBeInTheDocument();
   });
 
@@ -269,7 +264,7 @@ describe('AgentNode — rango horario (US5)', () => {
     renderWithNode('succeeded', { startedAt: START, endedAt: null });
 
     expect(
-      screen.getByText(`${stamp(START)} – no disponible`),
+      screen.getByText(`${clock(START)} → no disponible`),
     ).toBeInTheDocument();
   });
 
@@ -277,7 +272,7 @@ describe('AgentNode — rango horario (US5)', () => {
     renderWithNode('succeeded', { startedAt: null, endedAt: END });
 
     expect(
-      screen.getByText(`no disponible – ${stamp(END)}`),
+      screen.getByText(`no disponible → ${clock(END)}`),
     ).toBeInTheDocument();
   });
 
@@ -285,7 +280,7 @@ describe('AgentNode — rango horario (US5)', () => {
     renderWithNode('succeeded', { startedAt: null, endedAt: null });
 
     expect(
-      screen.getByText('no disponible – no disponible'),
+      screen.getByText('no disponible → no disponible'),
     ).toBeInTheDocument();
   });
 });
@@ -336,7 +331,7 @@ describe('AgentNode — medidor de esfuerzo (T017, S9)', () => {
     ).toBeInTheDocument();
   });
 
-  it('anchors the meter to the bottom-right of the card, outside the header row', () => {
+  it('renders the meter inside the labeled footer band, not floating in a corner', () => {
     renderAgentNode({
       data: withData({
         effort: effort({ level: 4 }),
@@ -346,17 +341,22 @@ describe('AgentNode — medidor de esfuerzo (T017, S9)', () => {
 
     const meter = screen.getByRole('img', { name: /^Esfuerzo 4 de 5/ });
     const badge = screen.getByText('∥3');
-    const anchor = meter.parentElement;
 
-    // El medidor ya no comparte fila con el badge del encabezado.
-    expect(anchor).not.toBe(badge.parentElement);
-    // Se ancla a la esquina inferior derecha del card, por encima del contenido
-    // y sin capturar el puntero (no es un control, FR-027).
-    expect(anchor).toHaveClass('absolute');
-    expect(anchor).toHaveClass('bottom-2');
-    expect(anchor).toHaveClass('right-2.5');
-    expect(anchor).toHaveClass('z-10');
-    expect(anchor).toHaveClass('pointer-events-none');
+    // La banda acompaña al medidor con etiqueta y nivel, y no comparte fila con
+    // el badge del encabezado. El medidor ya no se posiciona en una esquina.
+    expect(screen.getByText('esfuerzo')).toBeInTheDocument();
+    expect(screen.getByText('4/5')).toBeInTheDocument();
+    expect(meter).not.toHaveClass('absolute');
+    expect(meter.parentElement).not.toBe(badge.parentElement);
+  });
+
+  it('marks a provisional effort in the band label', () => {
+    renderAgentNode({
+      data: withData({ effort: effort({ level: 2, provisional: true }) }),
+    });
+
+    expect(screen.getByText('esfuerzo · provisional')).toBeInTheDocument();
+    expect(screen.getByText('2/5')).toBeInTheDocument();
   });
 
   it('does not render the meter when the node has no effort', () => {
@@ -365,6 +365,7 @@ describe('AgentNode — medidor de esfuerzo (T017, S9)', () => {
     expect(
       screen.queryByRole('img', { name: /^Esfuerzo/ }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByText('esfuerzo')).not.toBeInTheDocument();
   });
 });
 
