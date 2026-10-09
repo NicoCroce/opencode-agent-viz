@@ -1,47 +1,28 @@
 import { useQuery } from '@tanstack/react-query';
-import type {
-  FormAnswer,
-  FormDetail,
-  FormField,
-  FormValue,
-  PermissionRequest,
-} from '@opencode/client';
 import { opencodeService } from '@app/Infrastructure/Services/opencodeClient';
 import { queryKeys } from '../queryKeys';
 import type {
-  TPermissionEntry,
-  TQuestionEntry,
   TSessionContextResult,
   TSessionDiffResult,
   TSessionFormsResult,
   TSessionInboxResult,
   TSessionPermissionsResult,
 } from './Inspector.entity';
+import { toPermissionEntry, toQuestionEntry } from './lib/questionMappers';
 
-/**
- * V2 no expone todos de sesión: las tareas del subagente se derivan de los
- * tool calls del contexto (`deriveTasks`), sin request extra.
- */
-export const useGetMcpServers = (directory: string | null) =>
-  useQuery({
-    queryKey: queryKeys.mcp.servers(directory ?? ''),
-    queryFn: () => opencodeService.getMcpServers(directory ?? undefined),
-    enabled: Boolean(directory),
-    staleTime: Infinity,
-  });
+// Recursos (MCP/instrucciones) en su propio service; re-exportados para
+// preservar la API pública que consumen `useInspectorData` y el barrel.
+export {
+  useGetInstructions,
+  useGetMcpServers,
+} from './InspectorResources.service';
 
-/**
- * Las instrucciones en V2 son entries por sesión
- * (`session.instructions.entry.list`), no una lista global en el config.
- */
-export const useGetInstructions = (sessionId: string | null) =>
-  useQuery({
-    queryKey: queryKeys.sessions.instructions(sessionId ?? 'none'),
-    queryFn: () =>
-      opencodeService.getSessionInstructions(sessionId as string),
-    enabled: Boolean(sessionId),
-    staleTime: Infinity,
-  });
+// Mensajes de la sesión en su propio service; re-exportados para preservar la
+// API pública que consumen `useInspectorData` y el barrel.
+export {
+  useSessionMessages,
+  type TSessionMessagesResult,
+} from './InspectorMessages.service';
 
 /**
  * Impacto del agente en el repositorio (FR-028..FR-030): archivos afectados y
@@ -64,47 +45,6 @@ export const useSessionDiff = (
     isLoading: query.isLoading,
   };
 };
-
-/** Opciones ofrecidas por un campo (solo `string`/`multiselect`, FR-032). */
-const fieldOptions = (field: FormField) => {
-  if (field.type !== 'string' && field.type !== 'multiselect') return [];
-  return (field.options ?? []).map((option) => ({
-    value: option.value,
-    label: option.label,
-  }));
-};
-
-const formatFormValue = (value: FormValue): string =>
-  Array.isArray(value) ? value.join(', ') : String(value);
-
-/** Respuesta de un formulario como texto legible (`campo: valor`). */
-const formatAnswer = (answer: FormAnswer): string =>
-  Object.entries(answer)
-    .map(([key, value]) => `${key}: ${formatFormValue(value)}`)
-    .join(', ');
-
-/** `FormDetail` -> view-model, resolviendo `state`/`answer` (FR-032/FR-033). */
-const toQuestionEntry = (form: FormDetail): TQuestionEntry => ({
-  id: form.id,
-  title: form.title,
-  fields: form.fields.map((field) => ({
-    key: field.key,
-    title: field.title ?? null,
-    type: field.type,
-    options: fieldOptions(field),
-  })),
-  state: form.state.status,
-  answer:
-    form.state.status === 'answered' ? formatAnswer(form.state.answer) : null,
-});
-
-/** `PermissionRequest` -> view-model (FR-031). */
-const toPermissionEntry = (request: PermissionRequest): TPermissionEntry => ({
-  id: request.id,
-  action: request.action,
-  resources: request.resources,
-  message: request.message ?? null,
-});
 
 /**
  * Preguntas dirigidas al usuario (FR-032/FR-033): lista los formularios de la

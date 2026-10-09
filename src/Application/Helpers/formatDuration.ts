@@ -1,4 +1,6 @@
-export const UNAVAILABLE = '—';
+import { UNAVAILABLE } from './format/constants';
+
+export { UNAVAILABLE } from './format/constants';
 
 export const formatDuration = (ms: number | null | undefined): string => {
   if (ms === null || ms === undefined || Number.isNaN(ms)) return UNAVAILABLE;

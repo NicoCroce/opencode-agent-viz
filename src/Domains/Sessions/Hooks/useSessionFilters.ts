@@ -88,7 +88,7 @@ export const useSessionFilters = (
   const hasActiveFilters =
     validSelected.length > 0 || range !== DEFAULT_TIME_RANGE;
 
-  const now = useNow(range !== DEFAULT_TIME_RANGE);
+  const now = useNow({ enabled: range !== DEFAULT_TIME_RANGE });
 
   const filteredGroups = useMemo(
     () => filterGroups(groups, { directories: validSelected, range, now }),

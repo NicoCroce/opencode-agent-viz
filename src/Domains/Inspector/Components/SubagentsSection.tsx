@@ -1,4 +1,5 @@
 import { Container, StatusDot } from '@app/Application/Components';
+import { SectionFrame } from '@app/Application/Components/Molecules';
 import type { TGraphNode } from '@app/Domains/Graph/Graph.entity';
 import type { TTaskEntry } from '../Inspector.entity';
 
@@ -17,35 +18,36 @@ export const SubagentsSection = ({
   tasks,
   parallelPeers,
 }: SubagentsSectionProps) => (
-  <Container space="small">
-    <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-      Subagentes
-    </span>
-    {tasks.length === 0 && parallelPeers.length === 0 ? (
-      <p className="text-xs text-muted-foreground">
-        Sin subagentes ni agentes en paralelo.
-      </p>
-    ) : (
-      <Container space="small">
-        {tasks.map((task) => (
-          <div key={task.id} className="flex items-center gap-2">
-            <span className="font-mono text-[11px] text-muted-foreground">
-              {task.status}
-            </span>
-            <span className="truncate text-xs text-foreground">
-              {task.description}
-            </span>
-          </div>
-        ))}
-        {parallelPeers.map((peer) => (
-          <div key={peer.id} className="flex min-w-0 items-center gap-2">
-            <StatusDot status={peer.data.status} />
-            <span className="min-w-0 truncate font-mono text-xs text-foreground">
-              {peer.data.title ?? peer.data.agentName}
-            </span>
-          </div>
-        ))}
-      </Container>
-    )}
-  </Container>
+  <SectionFrame
+    title="Subagentes"
+    isEmpty={tasks.length === 0 && parallelPeers.length === 0}
+    emptyLabel="Sin subagentes ni agentes en paralelo."
+  >
+    <Container space="small">
+      {tasks.map((task) => (
+        <Container key={task.id} row space="small" align="center">
+          <span className="font-mono text-[11px] text-muted-foreground">
+            {task.status}
+          </span>
+          <span className="truncate text-xs text-foreground">
+            {task.description}
+          </span>
+        </Container>
+      ))}
+      {parallelPeers.map((peer) => (
+        <Container
+          key={peer.id}
+          row
+          space="small"
+          align="center"
+          className="min-w-0"
+        >
+          <StatusDot status={peer.data.status} />
+          <span className="min-w-0 truncate font-mono text-xs text-foreground">
+            {peer.data.title ?? peer.data.agentName}
+          </span>
+        </Container>
+      ))}
+    </Container>
+  </SectionFrame>
 );

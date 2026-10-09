@@ -1,5 +1,7 @@
 import { cn } from '@app/Application/lib/utils';
-import { UNAVAILABLE } from '@app/Application/Helpers/formatDuration';
+import { Container } from '../Layout';
+import { SectionHeading } from './SectionHeading';
+import { UnavailableValue } from './UnavailableValue';
 
 interface MetricProps {
   label: string;
@@ -12,18 +14,10 @@ export const Metric = ({ label, value, hint, className }: MetricProps) => {
   const unavailable = value === null || value === undefined;
 
   return (
-    <div className={cn('flex flex-col gap-0.5', className)}>
-      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </span>
+    <Container space="none" className={cn('gap-0.5!', className)}>
+      <SectionHeading>{label}</SectionHeading>
       {unavailable ? (
-        <span
-          className="font-mono text-sm tabular-nums text-muted-foreground"
-          aria-label="no disponible"
-        >
-          {UNAVAILABLE}
-          <span className="sr-only"> no disponible</span>
-        </span>
+        <UnavailableValue className="font-mono text-sm tabular-nums" />
       ) : (
         <span className="font-mono text-sm font-medium tabular-nums text-foreground">
           {value}
@@ -32,6 +26,6 @@ export const Metric = ({ label, value, hint, className }: MetricProps) => {
       {hint ? (
         <span className="text-[11px] text-muted-foreground">{hint}</span>
       ) : null}
-    </div>
+    </Container>
   );
 };

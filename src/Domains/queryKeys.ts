@@ -16,6 +16,10 @@ export const queryKeys = {
     // El estado y los mensajes se indexan por sessionID (único global),
     // porque los eventos no siempre exponen el `directory`.
     status: () => [...queryKeys.sessions.all, 'status'],
+    // Última actividad observada por sesión (`TActivityMap`), hermana de
+    // `status`: parcheada por el reducer de eventos (`reduceActivity`) con
+    // `event.created`, sin red adicional.
+    activity: () => [...queryKeys.sessions.all, 'activity'],
     messages: (id: string) => [...queryKeys.sessions.all, 'messages', id],
     // V2 no expone todos de sesión: las tareas del subagente se derivan de los
     // tool calls `subagent`/`task` del propio contexto del mensaje.

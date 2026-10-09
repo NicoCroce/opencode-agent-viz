@@ -19,7 +19,7 @@ import { WorkspacePage } from '../WorkspacePage';
  * pasa por el barrel y este espía observa **solo** la decisión de la página.
  */
 const graphHooks = vi.hoisted(() => ({
-  useNow: vi.fn<(intervalMs?: number, enabled?: boolean) => number>(),
+  useNow: vi.fn<(options?: { enabled?: boolean; intervalMs?: number }) => number>(),
 }));
 
 /**
@@ -250,9 +250,9 @@ describe('WorkspacePage — tick del resumen condicionado a nodos activos (T041,
     vi.mocked(opencodeService.listSessions).mockResolvedValue([sessionInfo]);
   });
 
-  /** Argumentos `enabled` con los que la página evaluó el tick del resumen. */
+  /** Opciones con las que la página evaluó el tick del resumen. */
   const summaryTicks = () =>
-    graphHooks.useNow.mock.calls.map(([, enabled]) => enabled);
+    graphHooks.useNow.mock.calls.map(([options]) => options?.enabled);
 
   it('sin nodos activos no activa el tick del resumen', async () => {
     const client = createClient();
@@ -264,7 +264,7 @@ describe('WorkspacePage — tick del resumen condicionado a nodos activos (T041,
     await waitFor(() =>
       expect(screen.getByText('1 agentes')).toBeInTheDocument(),
     );
-    expect(graphHooks.useNow).toHaveBeenCalledWith(1000, false);
+    expect(graphHooks.useNow).toHaveBeenCalledWith({ enabled: false });
     expect(summaryTicks().every((enabled) => enabled === false)).toBe(true);
   });
 
@@ -281,7 +281,7 @@ describe('WorkspacePage — tick del resumen condicionado a nodos activos (T041,
       expect(screen.getByText('1 agentes')).toBeInTheDocument(),
     );
     await waitFor(() =>
-      expect(graphHooks.useNow).toHaveBeenCalledWith(1000, true),
+      expect(graphHooks.useNow).toHaveBeenCalledWith({ enabled: true }),
     );
   });
 });

@@ -4,6 +4,8 @@ import {
   Skeleton,
 } from '@app/Application/Components';
 import type { TPermissionEntry, TQuestionEntry } from '../Inspector.entity';
+import { PermissionRow } from './PermissionRow';
+import { QuestionRow } from './QuestionRow';
 
 interface QuestionsSectionProps {
   /** Permisos que la sesión está esperando (FR-031). */
@@ -18,19 +20,6 @@ interface QuestionsSectionProps {
   isLoading: boolean;
 }
 
-/** Estado de la pregunta en lenguaje natural (FR-033). */
-const STATE_LABEL: Record<TQuestionEntry['state'], string> = {
-  pending: 'pendiente',
-  answered: 'respondida',
-  cancelled: 'cancelada',
-};
-
-const STATE_COLOR: Record<TQuestionEntry['state'], string> = {
-  pending: 'text-status-running',
-  answered: 'text-status-done',
-  cancelled: 'text-muted-foreground',
-};
-
 /**
  * Permisos, preguntas y cola de una ejecución (FR-031..FR-034).
  *
@@ -41,7 +30,8 @@ const STATE_COLOR: Record<TQuestionEntry['state'], string> = {
  * - **Cola**: número de turnos con `delivery === 'queue'` (FR-034).
  *
  * Presentación pura: recibe los datos y los estados de pantalla desde
- * `useInspectorData` y renderiza error → loading → vacío → datos.
+ * `useInspectorData` y renderiza error → loading → vacío → datos. Cada fila
+ * delega en `PermissionRow`/`QuestionRow`.
  */
 export const QuestionsSection = ({
   permissions,
@@ -81,25 +71,7 @@ export const QuestionsSection = ({
               </span>
               <Container space="none">
                 {permissions.map((permission) => (
-                  <Container
-                    key={permission.id}
-                    space="none"
-                    className="border-b border-border py-1 last:border-b-0"
-                  >
-                    <span className="font-mono text-xs text-foreground">
-                      {permission.action}
-                    </span>
-                    {permission.resources.length > 0 ? (
-                      <span className="font-mono text-[11px] text-muted-foreground">
-                        {permission.resources.join(', ')}
-                      </span>
-                    ) : null}
-                    {permission.message ? (
-                      <span className="text-[11px] text-muted-foreground">
-                        {permission.message}
-                      </span>
-                    ) : null}
-                  </Container>
+                  <PermissionRow key={permission.id} permission={permission} />
                 ))}
               </Container>
             </Container>
@@ -112,45 +84,7 @@ export const QuestionsSection = ({
               </span>
               <Container space="none">
                 {questions.map((question) => (
-                  <Container
-                    key={question.id}
-                    space="small"
-                    className="border-b border-border py-1 last:border-b-0"
-                  >
-                    <Container
-                      row
-                      space="small"
-                      align="center"
-                      justify="between"
-                    >
-                      <span className="min-w-0 text-xs text-foreground">
-                        {question.title}
-                      </span>
-                      <span
-                        className={`shrink-0 font-mono text-[11px] ${STATE_COLOR[question.state]}`}
-                      >
-                        {STATE_LABEL[question.state]}
-                      </span>
-                    </Container>
-                    {question.fields.map((field) => (
-                      <span
-                        key={field.key}
-                        className="text-[11px] text-muted-foreground"
-                      >
-                        {field.title ?? field.key}
-                        {field.options.length > 0
-                          ? ` · ${field.options
-                              .map((option) => option.label)
-                              .join(', ')}`
-                          : null}
-                      </span>
-                    ))}
-                    {question.state === 'answered' && question.answer ? (
-                      <span className="text-[11px] text-status-done">
-                        Respuesta: {question.answer}
-                      </span>
-                    ) : null}
-                  </Container>
+                  <QuestionRow key={question.id} question={question} />
                 ))}
               </Container>
             </Container>

@@ -27,7 +27,7 @@ interface NowProps {
 
 const renderNow = (initialProps: NowProps) =>
   renderHook(
-    ({ enabled, intervalMs }: NowProps) => useNow(intervalMs, enabled),
+    ({ enabled, intervalMs }: NowProps) => useNow({ enabled, intervalMs }),
     { initialProps },
   );
 

@@ -3,6 +3,12 @@ import { useQuery, useQueryClient, Updater } from '@tanstack/react-query';
 
 type QueryDataUpdater<TData> = Updater<TData | undefined, TData>;
 
+/** Claves compartidas del store global (evita magic strings). */
+export const STORE_KEY = {
+  isMobile: 'isMobile',
+  backButtonEnabled: 'backButtonEnabled',
+} as const;
+
 /**
  * @param queryKey - The key used to save or get data from global store.
  */

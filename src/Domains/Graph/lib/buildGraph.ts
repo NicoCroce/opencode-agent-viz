@@ -7,18 +7,16 @@ import type {
   SessionStatus,
 } from "@opencode/client";
 import type {
+  TActivityMap,
   TEnrichmentState,
   TExecutionSignal,
   TGraphEdge,
   TGraphModel,
   TGraphNode,
 } from "../Graph.entity";
-import {
-  deriveMetricBase,
-  resolveMetrics,
-  type TSessionMessageLike,
-} from "./deriveMetrics";
-import { toNodeStatus } from "./nodeStatus";
+import type { TSessionMessageLike } from "./deriveMetrics";
+import { buildEdges } from "./graphBuild/buildEdges";
+import { toGraphNode } from "./graphBuild/toGraphNode";
 
 export interface BuildGraphInput {
   sessions: SessionInfo[];
@@ -54,14 +52,16 @@ export interface BuildGraphInput {
    * consumidores previos no pasan el campo y obtienen el grafo enriquecido.
    */
   enrichment?: TEnrichmentState;
+  /**
+   * Marca de última actividad observada por sesión
+   * (`queryKeys.sessions.activity()`). Se propaga a `toGraphNode` para ampliar
+   * el fin del intervalo de cada nodo (`updatedAt = max(lista, actividad)`,
+   * contract session-activity §4). **Opcional** para preservar la paridad de
+   * los consumidores previos: sin marca, `updatedAt` cae a `SessionInfo.time`.
+   */
+  activity?: TActivityMap;
   now: number;
 }
-
-/** Un formulario cuenta como pendiente solo si su estado resuelto es `pending`. */
-const hasPendingForm = (forms: FormDetail[], sessionId: string): boolean =>
-  forms.some(
-    (form) => form.sessionID === sessionId && form.state.status === "pending",
-  );
 
 export const buildGraph = ({
   sessions,
@@ -72,81 +72,25 @@ export const buildGraph = ({
   signals,
   forms,
   enrichment = "ready",
+  activity,
   now,
 }: BuildGraphInput): TGraphModel => {
-  const nodes: TGraphNode[] = sessions.map((session) => {
-    const sessionMessages = messages[session.id];
-    const permission = permissions.some((p) => p.sessionID === session.id);
-    const sessionStatus = statuses[session.id];
-    const signal = signals[session.id];
-
-    // V2 expone el agente en `SessionInfo.agent`; antes habia que deducirlo del
-    // primer mensaje de usuario.
-    const agentName =
-      session.agent ?? (session.parentID === undefined ? "root" : "subagent");
-    const agent = agents.find((a) => a.id === agentName);
-
-    // La base de métricas es independiente del reloj (R3) y expone además
-    // `model`/`currentTool`/`lastAssistantErrored`, que antes recorrían los
-    // mensajes por separado; `resolveMetrics` solo añade `durationMs`.
-    const base = deriveMetricBase(sessionMessages ?? []);
-    const metrics = resolveMetrics(base, sessionStatus, now, 0);
-
-    const status = toNodeStatus({
-      status: sessionStatus,
-      hasActivity: (sessionMessages?.length ?? 0) > 0,
-      hasPermission: permission,
-      hasPendingForm: hasPendingForm(forms, session.id),
-      compaction: signal?.compaction ?? null,
-      outcome: signal?.outcome ?? null,
-      lastAssistantErrored: base.lastAssistantErrored,
-    });
-
-    return {
-      id: session.id,
-      type: "agent" as const,
-      position: { x: 0, y: 0 },
-      data: {
-        sessionId: session.id,
-        title: session.title ?? null,
-        createdAt: session.time.created,
-        updatedAt: session.time.idle ?? session.time.updated,
-        agentName,
-        directory: session.location.directory,
-        model: base.model ?? agent?.model ?? null,
-        status,
-        // `retry`/`interruptReason` solo se exponen cuando el estado los hace
-        // pertinentes (FR-018/FR-019); si la señal no los trae se cae al
-        // `SessionStatus` retry, que ya lleva `attempt`/`next`.
-        retry:
-          status === "retrying"
-            ? (signal?.retry ??
-              (sessionStatus?.type === "retry"
-                ? { attempt: sessionStatus.attempt, next: sessionStatus.next }
-                : null))
-            : null,
-        interruptReason:
-          status === "interrupted" ? (signal?.interruptReason ?? null) : null,
-        metrics,
-        isRoot: session.parentID === undefined,
-        currentTool: base.currentTool,
-        // El paralelismo es una propiedad de la vista (depende del subárbol y
-        // de `now`); se completa en `useGraphModel`.
-        parallel: null,
-        enrichment,
-      },
-    };
-  });
+  const nodes: TGraphNode[] = sessions.map((session) =>
+    toGraphNode(session, {
+      statuses,
+      agents,
+      messages,
+      permissions,
+      signals,
+      forms,
+      enrichment,
+      activity,
+      now,
+    }),
+  );
 
   const nodeIds = new Set(nodes.map((n) => n.id));
-  const edges: TGraphEdge[] = sessions
-    .filter((s) => s.parentID !== undefined && nodeIds.has(s.parentID))
-    .map((s) => ({
-      id: `${s.parentID}->${s.id}`,
-      source: s.parentID as string,
-      target: s.id,
-      type: "agent" as const,
-    }));
+  const edges: TGraphEdge[] = buildEdges(sessions, nodeIds);
 
   return { nodes, edges };
 };

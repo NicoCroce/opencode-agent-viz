@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { SessionStatus } from '@opencode/client';
+import type { TActivityMap } from '@app/Domains/Graph/Graph.entity';
 import { opencodeService } from '@app/Infrastructure/Services/opencodeClient';
 import { queryKeys } from '../queryKeys';
 
@@ -30,6 +31,32 @@ export const useGetSessionStatus = () => {
       Promise.resolve(
         queryClient.getQueryData<Record<string, SessionStatus>>(
           queryKeys.sessions.status(),
+        ) ?? {},
+      ),
+    staleTime: Infinity,
+    initialData: {},
+  });
+};
+
+/**
+ * Lee el mapa global de última actividad (sessionID -> timestamp ms,
+ * `TActivityMap`). Espejo de `useGetSessionStatus()`: el mapa lo parchea
+ * `EventStreamProvider` con `reduceActivity` a partir de los eventos SSE
+ * (mismo batching, sin red adicional); este hook es solo un lector reactivo.
+ *
+ * El `queryFn` devuelve el valor cacheado (no `{}`): la clave cuelga de
+ * `queryKeys.sessions.all`, así que cualquier invalidación de esa lista
+ * (session.created, renamed, …) dispara un refetch y devolver `{}` borraría
+ * las marcas de actividad en vivo.
+ */
+export const useGetSessionActivity = () => {
+  const queryClient = useQueryClient();
+  return useQuery({
+    queryKey: queryKeys.sessions.activity(),
+    queryFn: () =>
+      Promise.resolve(
+        queryClient.getQueryData<TActivityMap>(
+          queryKeys.sessions.activity(),
         ) ?? {},
       ),
     staleTime: Infinity,

@@ -23,9 +23,10 @@ interface NowProps {
 }
 
 const renderNow = (initialProps: NowProps) =>
-  renderHook(({ active, intervalMs }: NowProps) => useNow(active, intervalMs), {
-    initialProps,
-  });
+  renderHook(
+    ({ active, intervalMs }: NowProps) => useNow({ enabled: active, intervalMs }),
+    { initialProps },
+  );
 
 describe('useNow — reloj en vivo (FR-022, SC-007)', () => {
   beforeEach(() => {
