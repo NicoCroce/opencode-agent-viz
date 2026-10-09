@@ -336,7 +336,7 @@ describe('AgentNode — medidor de esfuerzo (T017, S9)', () => {
     ).toBeInTheDocument();
   });
 
-  it('places the meter in the header row, alongside the parallel badge', () => {
+  it('anchors the meter to the bottom-right of the card, outside the header row', () => {
     renderAgentNode({
       data: withData({
         effort: effort({ level: 4 }),
@@ -346,10 +346,17 @@ describe('AgentNode — medidor de esfuerzo (T017, S9)', () => {
 
     const meter = screen.getByRole('img', { name: /^Esfuerzo 4 de 5/ });
     const badge = screen.getByText('∥3');
+    const anchor = meter.parentElement;
 
-    // Misma fila: ambos comparten el contenedor del grupo derecho del encabezado
-    // (no se añade una fila nueva, effort-contract §5).
-    expect(meter.parentElement).toBe(badge.parentElement);
+    // El medidor ya no comparte fila con el badge del encabezado.
+    expect(anchor).not.toBe(badge.parentElement);
+    // Se ancla a la esquina inferior derecha del card, por encima del contenido
+    // y sin capturar el puntero (no es un control, FR-027).
+    expect(anchor).toHaveClass('absolute');
+    expect(anchor).toHaveClass('bottom-2');
+    expect(anchor).toHaveClass('right-2.5');
+    expect(anchor).toHaveClass('z-10');
+    expect(anchor).toHaveClass('pointer-events-none');
   });
 
   it('does not render the meter when the node has no effort', () => {

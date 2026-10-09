@@ -3,6 +3,5 @@
   "instructions": [
     ".opencode/instructions/app.instructions.md",
     ".opencode/instructions/memory.instructions.md"
-  ],
-  "agent": {}
+  ]
 }

@@ -28,6 +28,11 @@ interface AgentNodeFooterProps {
  * Pie del card: consumo (tokens · costo · duración), rango horario y, cuando
  * aplica, herramienta en curso (FR-018), reintento (FR-018) e interrupción
  * (FR-019). Los valores ausentes caen a "no disponible" (edge case).
+ *
+ * Las líneas que pueden quedar por debajo del medidor de esfuerzo —anclado a la
+ * esquina inferior derecha del card— reservan el canal derecho (`pr-7`, ~28 px,
+ * `EFFORT_METER_WIDTH`) para que el texto no quede tapado. La fila de consumo no
+ * lo reserva: es `flex-wrap` y reservarlo cambiaría el alto estimado del pie.
  */
 export const AgentNodeFooter = ({
   metrics,
@@ -78,12 +83,12 @@ export const AgentNodeFooter = ({
         <span aria-hidden>·</span>
         <span>{formatDuration(metrics.durationMs)}</span>
       </Container>
-      <span className="min-w-0 truncate font-mono text-[11px] tabular-nums text-muted-foreground">
+      <span className="min-w-0 truncate pr-7 font-mono text-[11px] tabular-nums text-muted-foreground">
         {timeRange}
       </span>
       {currentTool ? (
         <span
-          className="min-w-0 truncate font-mono text-[11px] text-foreground/80"
+          className="min-w-0 truncate pr-7 font-mono text-[11px] text-foreground/80"
           title={currentTool.name}
         >
           {currentTool.name}
@@ -91,7 +96,7 @@ export const AgentNodeFooter = ({
       ) : null}
       {retryLabel ? (
         <span
-          className="min-w-0 truncate font-mono text-[11px] tabular-nums text-status-running"
+          className="min-w-0 truncate pr-7 font-mono text-[11px] tabular-nums text-status-running"
           title={retryLabel}
         >
           {retryLabel}
@@ -99,7 +104,7 @@ export const AgentNodeFooter = ({
       ) : null}
       {interruptLabel ? (
         <span
-          className="min-w-0 truncate font-mono text-[11px] text-status-error"
+          className="min-w-0 truncate pr-7 font-mono text-[11px] text-status-error"
           title={interruptLabel}
         >
           {interruptLabel}

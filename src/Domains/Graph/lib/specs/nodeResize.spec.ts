@@ -5,10 +5,9 @@ import type {
   NodePositionChange,
 } from '@xyflow/react';
 import type { TGraphNode, TNodeSizeOverride } from '../../Graph.entity';
-import { reduceNodeOverrides } from '../nodeResize';
+import { MIN_NODE_WIDTH, reduceNodeOverrides } from '../nodeResize';
 
 // Valores fijados por el contrato de la vista del grafo (`graph-view-contract.md`).
-const MIN_NODE_WIDTH = 180;
 const MIN_NODE_HEIGHT = 72;
 
 type TOverrides = Record<string, TNodeSizeOverride>;
@@ -63,9 +62,9 @@ const select = (id: string, selected: boolean): NodeChange<TGraphNode> => ({
 
 describe('reduceNodeOverrides', () => {
   it('stores width and height from a dimension change', () => {
-    const result = reduceNodeOverrides({}, [dimensions('n1', 320, 240)]);
+    const result = reduceNodeOverrides({}, [dimensions('n1', 520, 240)]);
 
-    expect(result).toEqual({ n1: { width: 320, height: 240 } });
+    expect(result).toEqual({ n1: { width: 520, height: 240 } });
   });
 
   it('clamps width and height up to the minimum node size', () => {
@@ -113,10 +112,10 @@ describe('reduceNodeOverrides', () => {
   });
 
   it('still stores the final dimensions emitted at the end of a user resize', () => {
-    const result = reduceNodeOverrides({}, [dimensions('n1', 340, 220, false)]);
+    const result = reduceNodeOverrides({}, [dimensions('n1', 560, 420, false)]);
 
     // `resizing: false` marca el fin del resize del usuario y sí se conserva.
-    expect(result).toEqual({ n1: { width: 340, height: 220 } });
+    expect(result).toEqual({ n1: { width: 560, height: 420 } });
   });
 
   it('updates x and y from a resize position change without touching the size', () => {
@@ -132,21 +131,21 @@ describe('reduceNodeOverrides', () => {
 
     const result = reduceNodeOverrides(overrides, [
       position('n1', -30, -10),
-      dimensions('n1', 360, 260),
+      dimensions('n1', 560, 260),
     ]);
 
-    expect(result.n1).toEqual({ width: 360, height: 260, x: -30, y: -10 });
+    expect(result.n1).toEqual({ width: 560, height: 260, x: -30, y: -10 });
   });
 
   it('handles several nodes in the same batch', () => {
     const result = reduceNodeOverrides({}, [
-      dimensions('n1', 320, 240),
-      dimensions('n2', 260, 180),
+      dimensions('n1', 520, 240),
+      dimensions('n2', 500, 180),
     ]);
 
     expect(result).toEqual({
-      n1: { width: 320, height: 240 },
-      n2: { width: 260, height: 180 },
+      n1: { width: 520, height: 240 },
+      n2: { width: 500, height: 180 },
     });
   });
 
@@ -177,23 +176,23 @@ describe('reduceNodeOverrides', () => {
     const snapshot = structuredClone(overrides);
 
     const result = reduceNodeOverrides(overrides, [
-      dimensions('n1', 400, 300),
+      dimensions('n1', 520, 300),
       position('n1', 12, 34),
     ]);
 
     expect(overrides).toEqual(snapshot);
     expect(result).not.toBe(overrides);
     expect(result.n1).not.toBe(overrides.n1);
-    expect(result.n1).toEqual({ width: 400, height: 300, x: 12, y: 34 });
+    expect(result.n1).toEqual({ width: 520, height: 300, x: 12, y: 34 });
   });
 
   describe('reset base', () => {
     it('rebuilds from an empty map without leaking previous overrides', () => {
       const previous: TOverrides = { old: override({ x: 1, y: 2 }) };
 
-      const result = reduceNodeOverrides({}, [dimensions('new', 260, 160)]);
+      const result = reduceNodeOverrides({}, [dimensions('new', 520, 160)]);
 
-      expect(result).toEqual({ new: { width: 260, height: 160 } });
+      expect(result).toEqual({ new: { width: 520, height: 160 } });
       expect(result.old).toBeUndefined();
       expect(previous).toEqual({ old: override({ x: 1, y: 2 }) });
     });

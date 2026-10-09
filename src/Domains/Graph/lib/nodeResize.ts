@@ -1,8 +1,12 @@
 import type { NodeChange } from '@xyflow/react';
 import type { TGraphNode, TNodeSizeOverride } from '../Graph.entity';
 
-/** Tamaño mínimo al que se puede reducir un nodo (debe coincidir con AgentNode). */
-export const MIN_NODE_WIDTH = 180;
+/**
+ * Tamaño mínimo al que se puede reducir un nodo (debe coincidir con AgentNode).
+ * El ancho mínimo es 340 px, igual que el ancho base (`NODE_WIDTH`): el nodo
+ * nunca se reduce por debajo de su tamaño por defecto.
+ */
+export const MIN_NODE_WIDTH = 340;
 export const MIN_NODE_HEIGHT = 72;
 
 /**

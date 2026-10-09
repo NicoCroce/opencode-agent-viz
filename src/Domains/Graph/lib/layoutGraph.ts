@@ -1,7 +1,10 @@
 import type { TGraphModel } from '../Graph.entity';
 
-/** Ancho base de un nodo de agente (compartido con el resize y la vista). */
-export const NODE_WIDTH = 220;
+/**
+ * Ancho base de un nodo de agente (compartido con el resize y la vista).
+ * Es también el suelo del resize del usuario (`MIN_NODE_WIDTH` en `nodeResize`).
+ */
+export const NODE_WIDTH = 340;
 /**
  * Alto fijo de la card de agente. Fijarlo evita el recorte por medición tardía
  * y permite dimensionar el carril de ejecución en proporción al nodo.
