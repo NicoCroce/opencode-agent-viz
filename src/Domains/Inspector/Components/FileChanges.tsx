@@ -21,12 +21,6 @@ const STATUS_LABEL: Record<TFileChange['status'], string> = {
   deleted: 'borrado',
 };
 
-const STATUS_COLOR: Record<TFileChange['status'], string> = {
-  added: 'text-status-done',
-  modified: 'text-status-running',
-  deleted: 'text-status-error',
-};
-
 /** Punto LED por estado del archivo, reutilizando el lenguaje de LEDs (FR-019). */
 const STATUS_DOT_COLOR: Record<TFileChange['status'], string> = {
   added: 'bg-status-done',
@@ -35,11 +29,23 @@ const STATUS_DOT_COLOR: Record<TFileChange['status'], string> = {
 };
 
 /**
- * Impacto del agente en el repositorio (FR-028..FR-030): lista de archivos con
- * su estado (punto LED + etiqueta, FR-019) y líneas añadidas/quitadas.
- * Seleccionar un archivo muestra su parche con el diff estilo editor
- * (`FileDiff`, FR-016..FR-018); un parche vacío/ausente no bloquea la vista y
- * se indica como "parche no disponible". Sin cambios → estado vacío explícito.
+ * Ancho de las columnas numéricas del pie de fila. Fijas y alineadas a la
+ * derecha (`tabular-nums`) para que estados y deltas formen una tabla que se lee
+ * en vertical, no una fila que se desalinea con cada ruta.
+ */
+const STATUS_COL = 'w-[70px]';
+const DELTA_COL = 'w-9';
+
+/**
+ * Impacto del agente en el repositorio (FR-028..FR-030): lista de archivos como
+ * **tabla alineada** — LED + ruta (que trunca) + estado + líneas añadidas/quitadas
+ * en columnas fijas. La fila es un botón con hover y estado seleccionado; al
+ * seleccionar un archivo se muestra su parche con el diff estilo editor
+ * (`FileDiff`, FR-016..FR-018). Un parche vacío/ausente no bloquea la vista y se
+ * indica como "parche no disponible". Sin cambios → estado vacío explícito.
+ *
+ * El color del estado vive en el LED; la etiqueta va neutra para no duplicar la
+ * señal. Los deltas en cero se atenúan (una fila solo-añade no grita `-0`).
  *
  * Presentación pura: recibe `changes`/`isError`/`isLoading` desde el hook
  * (`useSessionDiff`) y solo gestiona la selección local del archivo.
@@ -63,19 +69,24 @@ export const FileChanges = ({
     >
       <Container space="small">
         <Container space="none">
-          {changes.map((change) => (
-            <button
-              key={change.file}
-              type="button"
-              aria-pressed={change.file === selectedFile}
-              onClick={() =>
-                setSelectedFile((current) =>
-                  current === change.file ? null : change.file,
-                )
-              }
-              className="flex w-full min-w-0 items-center justify-between gap-2 border-b border-border py-1 text-left last:border-b-0"
-            >
-              <span className="flex min-w-0 items-center gap-2">
+          {changes.map((change) => {
+            const isSelected = change.file === selectedFile;
+            return (
+              <button
+                key={change.file}
+                type="button"
+                aria-pressed={isSelected}
+                onClick={() =>
+                  setSelectedFile((current) =>
+                    current === change.file ? null : change.file,
+                  )
+                }
+                className={cn(
+                  'flex w-full min-w-0 items-center gap-1.5 border-b border-border px-1 py-1 text-left transition-colors last:border-b-0',
+                  'hover:bg-surface-2',
+                  isSelected && 'bg-surface-2',
+                )}
+              >
                 <span
                   data-dot={change.status}
                   aria-hidden
@@ -84,23 +95,45 @@ export const FileChanges = ({
                     STATUS_DOT_COLOR[change.status],
                   )}
                 />
-                <span className="min-w-0 truncate font-mono text-xs text-foreground">
+                <span
+                  className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground"
+                  title={change.file}
+                >
                   {change.file}
                 </span>
-              </span>
-              <span
-                className={`shrink-0 font-mono text-[11px] ${STATUS_COLOR[change.status] ?? 'text-muted-foreground'}`}
-              >
-                {STATUS_LABEL[change.status] ?? change.status}
-              </span>
-              <span className="shrink-0 font-mono text-[11px] tabular-nums text-status-done">
-                +{change.additions}
-              </span>
-              <span className="shrink-0 font-mono text-[11px] tabular-nums text-status-error">
-                -{change.deletions}
-              </span>
-            </button>
-          ))}
+                <span
+                  className={cn(
+                    STATUS_COL,
+                    'shrink-0 text-right font-mono text-[11px] text-muted-foreground',
+                  )}
+                >
+                  {STATUS_LABEL[change.status] ?? change.status}
+                </span>
+                <span
+                  className={cn(
+                    DELTA_COL,
+                    'shrink-0 text-right font-mono text-[11px] tabular-nums',
+                    change.additions > 0
+                      ? 'text-status-done'
+                      : 'text-muted-foreground/60',
+                  )}
+                >
+                  +{change.additions}
+                </span>
+                <span
+                  className={cn(
+                    DELTA_COL,
+                    'shrink-0 text-right font-mono text-[11px] tabular-nums',
+                    change.deletions > 0
+                      ? 'text-status-error'
+                      : 'text-muted-foreground/60',
+                  )}
+                >
+                  -{change.deletions}
+                </span>
+              </button>
+            );
+          })}
         </Container>
 
         {selected ? (

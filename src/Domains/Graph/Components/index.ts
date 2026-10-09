@@ -1,5 +1,6 @@
 export * from './AgentGraph';
 export * from './AgentNode';
+export * from './AgentNodeEffortBand';
 export * from './EffortMeter';
 export * from './ExecutionLanes';
 export * from './InvocationEdge';

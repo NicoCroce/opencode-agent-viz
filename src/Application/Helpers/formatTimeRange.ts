@@ -1,4 +1,5 @@
 import { UNAVAILABLE_LABEL } from './format/constants';
+import { formatClock } from './format/clock';
 
 export interface TTimeRangeInput {
   startedAt: number | null;
@@ -8,12 +9,7 @@ export interface TTimeRangeInput {
 
 const RUNNING_LABEL = 'en curso';
 const RANGE_SEPARATOR = ' – ';
-
-const formatClock = (ms: number): string =>
-  new Date(ms).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+const RANGE_ARROW = ' → ';
 
 const pad = (value: number): string => String(value).padStart(2, '0');
 
@@ -29,6 +25,7 @@ const formatDateTime = (ms: number): string => {
 const buildRange = (
   format: (ms: number) => string,
   { startedAt, endedAt, isRunning }: TTimeRangeInput,
+  separator: string,
 ): string => {
   const start = startedAt === null ? UNAVAILABLE_LABEL : format(startedAt);
 
@@ -40,13 +37,17 @@ const buildRange = (
       ? UNAVAILABLE_LABEL
       : format(endedAt);
 
-  return `${start}${RANGE_SEPARATOR}${end}`;
+  return `${start}${separator}${end}`;
 };
 
-/** Rango hora–hora (`HH:mm – HH:mm`), como el de la lista de sesiones. */
+/**
+ * Rango hora–hora compacto `HH:mm → HH:mm`, para el nodo del grafo, donde el
+ * ancho es acotado y la fecha se sobreentiende (el `→` marca la secuencia
+ * inicio–fin frente al guion de la lista de sesiones).
+ */
 export const formatTimeRange = (input: TTimeRangeInput): string =>
-  buildRange(formatClock, input);
+  buildRange(formatClock, input, RANGE_ARROW);
 
-/** Rango fecha-hora–fecha-hora (`dd/mm HH:mm – dd/mm HH:mm`), para el grafo. */
+/** Rango fecha-hora–fecha-hora (`dd/mm HH:mm – dd/mm HH:mm`), para listas. */
 export const formatDateTimeRange = (input: TTimeRangeInput): string =>
-  buildRange(formatDateTime, input);
+  buildRange(formatDateTime, input, RANGE_SEPARATOR);

@@ -73,8 +73,8 @@
 
 ### 6. Niveles de esfuerzo
 
-- Medidor de 5 muescas en el encabezado del nodo, **en la misma fila** que el badge de paralelos para **no alterar `cardHeight`** (riesgo del recon).
-- Nivel provisional (run en curso) = muescas encendidas con opacidad reducida y una marca de "provisional"; nivel cerrado = muescas plenas.
+- **Banda de esfuerzo al pie del card**: etiqueta `esfuerzo`, barra de 5 segmentos (`flex-1`, 2 px) y nivel `N/5`. Da nombre a la firma y hace comparables los nodos de una misma fila; `cardHeight` reserva su fila.
+- Nivel provisional (run en curso) = barra atenuada y etiqueta "esfuerzo · provisional"; nivel cerrado = segmentos plenos en `--primary`.
 - Leyenda accesible: el medidor expone un texto tipo "Esfuerzo 3 de 5: lanzó paralelos y supera 2× la línea".
 - Solo lectura: nunca es un control.
 
@@ -87,7 +87,7 @@
 
 ## 5. Restricciones de implementación que el diseño impone
 
-- Colocar el medidor en una fila existente del nodo o actualizar `cardHeight` en consecuencia.
+- La banda de esfuerzo se apila al pie del nodo; `cardHeight` debe reservar su fila.
 - Todo color sale de tokens; prohibido hex suelto o `text-green-500`.
 - Sin `div` con `flex`: usar `<Container>`.
 - Toda animación debe tener su variante estática bajo `prefers-reduced-motion`.

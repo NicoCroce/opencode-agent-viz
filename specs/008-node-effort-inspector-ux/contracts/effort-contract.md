@@ -4,7 +4,7 @@
 **Cubre**: FR-021, FR-022, FR-023, FR-024, FR-025, FR-026, FR-027, FR-028 · SC-002, SC-006
 **Implementa**: `Domains/Graph/lib/effort/deriveEffort.ts`, `Domains/Graph/lib/effort/constants.ts`,
 `Domains/Graph/Graph.entity.ts` (`TNodeEffort`, `effort`), `Domains/Graph/lib/reconcile/comparators.ts` (`sameEffort`),
-`Domains/Graph/Hooks/useGraphModel.ts`, `Domains/Graph/Components/EffortMeter.tsx`, `Domains/Graph/Components/AgentNodeHeader.tsx`,
+`Domains/Graph/Hooks/useGraphModel.ts`, `Domains/Graph/Components/EffortMeter.tsx`, `Domains/Graph/Components/AgentNodeEffortBand.tsx`,
 `Domains/Graph/lib/cardHeight.ts`.
 
 ---
@@ -52,7 +52,7 @@ export const deriveEffortByNode = (
 
 - `provisional = true` si el nodo es activo **o** algún nodo de su línea es activo (los tiempos de la línea no están cerrados).
 - Al cerrarse la línea, el recálculo produce el nivel final.
-- Presentación: muescas con opacidad reducida + marca de "provisional" (design-direction §3.6).
+- Presentación: barra con opacidad reducida + etiqueta "provisional" (design-direction §3.6).
 
 ## 4. Identidad y comparador (SC-006, recon)
 
@@ -62,11 +62,11 @@ export const deriveEffortByNode = (
 
 ## 5. Presentación (FR-026, FR-027, SC-002)
 
-- **Signature**: medidor de **5 muescas** en el `AgentNodeHeader`, en la **misma fila** que el badge de paralelos (no añade filas).
-- Muescas encendidas = `--primary` (exclusivo del esfuerzo); apagadas = borde/base neutra. **Prohibido** hex suelto o usar colores de estado.
-- Provisional: opacidad reducida + marca; cerrado: muescas plenas.
+- **Signature**: banda de esfuerzo al pie del card (`AgentNodeEffortBand`): etiqueta `esfuerzo`, barra de **5 segmentos** (`EffortMeter`, `flex-1`) y nivel `N/5`. La etiqueta y el nivel son `aria-hidden`; la semántica la da el medidor.
+- Segmentos encendidos = `--primary` (exclusivo del esfuerzo); apagados = borde/base neutra. **Prohibido** hex suelto o usar colores de estado. Barra fina (2 px) para no competir con el contenido.
+- Provisional: opacidad reducida + etiqueta "esfuerzo · provisional"; cerrado: segmentos plenos.
 - **Solo lectura** (FR-027): `role="img"` (no botón); `aria-label` = `"Esfuerzo N de 5: <reasons>"`.
-- `cardHeight.ts`: se ajusta `STATUS_WIDTH` para reservar el ancho del medidor en la fila, manteniendo la estimación de líneas del título.
+- `cardHeight.ts`: la banda suma su propia fila (`EFFORT_BAND_PAD + EFFORT_BAND_HEIGHT`); el encabezado reserva solo el cluster meta (`STATUS_WIDTH = punto + estado + badge`).
 
 | # | Criterio | Cómo se valida |
 |---|----------|----------------|
@@ -79,5 +79,5 @@ export const deriveEffortByNode = (
 | S7 | `provisional` verdadero con la línea en curso; falso al cerrar | spec puro |
 | S8 | `sameEffort` detecta cambios y `sameNodeData` los propaga | spec `reconcileGraph.spec.ts` extendido |
 | S9 | El medidor muestra N muescas encendidas y `aria-label` | spec de `EffortMeter`/`AgentNode` |
-| S10 | El medidor no añade filas ni rompe `cardHeight` | spec `cardHeight.spec.ts` extendido |
+| S10 | La banda de esfuerzo suma su fila y `cardHeight` la reserva | spec `cardHeight.spec.ts` extendido |
 | S11 | Identidad de nodo estable ante tick sin cambio de nivel | spec `useGraphModel.spec.tsx` extendido |

@@ -4,7 +4,7 @@ import { MIN_NODE_HEIGHT } from './nodeResize';
 /**
  * Métrica vertical del card de agente, en píxeles. Debe mantenerse alineada con
  * el markup de `AgentNode` (`py-2.5`, `text-xs leading-snug`, `text-[11px]`,
- * `mt-1`, `border-t pt-1.5`, `gap-1`).
+ * `mt-1`, `border-t pt-1.5`, `gap-1`, banda de esfuerzo).
  */
 const PAD_Y = 20;
 const TITLE_LINE = 17;
@@ -14,33 +14,24 @@ const FOOTER_PAD = 7;
 const FOOTER_GAP = 4;
 /** Ancho base reservado al estado y al badge de paralelismo en el encabezado. */
 const STATUS_BASE_WIDTH = 72;
-/** Muescas del medidor de esfuerzo (contrato: escala de 5, effort-contract §5). */
-const EFFORT_NOTCHES = 5;
-/** Ancho de cada muesca del medidor (`w-1`). */
-const EFFORT_NOTCH_WIDTH = 4;
-/** Separación entre muescas del medidor (`gap-0.5`). */
-const EFFORT_NOTCH_GAP = 2;
+/** Punto de estado del cluster meta del encabezado (`size-1.5` + `gap-1.5`). */
+const STATUS_DOT_WIDTH = 12;
 /**
- * Ancho real del medidor de esfuerzo: 5 muescas más sus separaciones (~28 px).
- * El encabezado ya **no** lo reserva —el medidor se ancla a la esquina inferior
- * derecha del card—, pero se mantiene exportado como referencia del canal
- * derecho (`pr-7`) que reserva `AgentNodeFooter` para que el texto del pie no
- * quede por debajo del medidor.
+ * Ancho reservado en el encabezado al **cluster meta**: punto de estado + badge
+ * de paralelismo + etiqueta de estado. El medidor de esfuerzo no va aquí (vive
+ * en su banda al pie), así que no suma a esta reserva.
  */
-export const EFFORT_METER_WIDTH =
-  EFFORT_NOTCHES * EFFORT_NOTCH_WIDTH +
-  (EFFORT_NOTCHES - 1) * EFFORT_NOTCH_GAP;
-/**
- * Ancho reservado en el encabezado al estado y al badge de paralelismo. El
- * medidor de esfuerzo va anclado al pie, así que ya no suma a esta reserva.
- */
-export const STATUS_WIDTH = STATUS_BASE_WIDTH;
+export const STATUS_WIDTH = STATUS_BASE_WIDTH + STATUS_DOT_WIDTH;
 /** Ancho reservado al tag de variante del modelo. */
 const VARIANT_WIDTH = 48;
 /** Padding horizontal del card (`pl-3 pr-2.5`). */
 const PAD_X = 22;
 /** Ancho aproximado de un carácter en la tipografía de datos. */
 const CHAR_WIDTH = 6.6;
+/** Padding superior de la banda de esfuerzo (`border-t pt-1.5`). */
+const EFFORT_BAND_PAD = 7;
+/** Alto de la banda de esfuerzo (etiqueta + barra + nivel). */
+const EFFORT_BAND_HEIGHT = 12;
 
 const estimatedLines = (
   text: string,
@@ -54,8 +45,8 @@ const estimatedLines = (
 
 /**
  * Alto del card de un agente **según su contenido**, sin medir el DOM: estima
- * las líneas del título (clampeado a 2), la línea de modelo (nombre + variante)
- * y las del pie (consumo, rango horario y herramienta en curso).
+ * las líneas del título (clampeado a 2), la línea de modelo (nombre + variante),
+ * las del pie (consumo + contexto) y, cuando hay esfuerzo, su banda al pie.
  *
  * Función pura y determinística (Principio V): los carriles de ejecución usan
  * este alto para dimensionar cada fila, así el nodo no se recorta y la fila
@@ -78,15 +69,16 @@ export const cardHeight = (data: TGraphNodeData, width: number): number => {
     height += MODEL_GAP + modelLines * BODY_LINE;
   }
 
-  // El pie suma, además del consumo y el rango horario, la herramienta en
-  // curso y —cuando existen— el reintento (FR-018) y el motivo de interrupción
-  // (FR-019), para que el card nunca los recorte.
+  // El pie suma el consumo (vitals) y el contexto (hora + herramienta), más una
+  // línea propia cuando hay reintento (FR-018) o motivo de interrupción (FR-019).
   const footerLines =
-    2 +
-    (data.currentTool ? 1 : 0) +
-    (data.retry ? 1 : 0) +
-    (data.status === 'interrupted' ? 1 : 0);
+    2 + (data.retry ? 1 : 0) + (data.status === 'interrupted' ? 1 : 0);
   height += FOOTER_PAD + footerLines * BODY_LINE + (footerLines - 1) * FOOTER_GAP;
+
+  // La banda de esfuerzo se apila al pie, sobre su propio borde superior.
+  if (data.effort) {
+    height += EFFORT_BAND_PAD + EFFORT_BAND_HEIGHT;
+  }
 
   return Math.max(MIN_NODE_HEIGHT, Math.round(height));
 };

@@ -49,13 +49,13 @@ export const GraphPane = ({
   onOpenHistory,
   rootId,
 }: GraphPaneProps) => (
-  <Container space="none" className="h-full min-h-0">
+  <Container space="none" className="h-full min-h-0 min-w-0">
     <Container
       row
       space="small"
       justify="between"
       align="center"
-      className="shrink-0 border-b border-border px-3 py-2"
+      className="min-w-0 shrink-0 border-b border-border px-3 py-2"
     >
       <Container row space="small" align="center" className="min-w-0">
         <span className="shrink-0 font-mono text-xs text-muted-foreground">
@@ -71,7 +71,7 @@ export const GraphPane = ({
         {follow.enabled ? 'Siguiendo' : 'Seguir'}
       </Button>
     </Container>
-    <Container block className="min-h-0 flex-1">
+    <Container block className="min-h-0 min-w-0 flex-1">
       {graph.isError ? (
         <EmptyScreenError message={graph.error?.message} />
       ) : graph.isLoading ? (
