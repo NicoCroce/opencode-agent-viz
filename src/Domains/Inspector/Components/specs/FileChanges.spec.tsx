@@ -13,6 +13,10 @@ const change = (overrides: Partial<TFileChange>): TFileChange => ({
   ...overrides,
 });
 
+/** Punto LED del estado del archivo (FR-019, D9). */
+const statusDot = (container: HTMLElement, status: TFileChange['status']) =>
+  container.querySelector(`[data-dot="${status}"]`);
+
 describe('FileChanges', () => {
   it('lists the files with status and added/removed lines', () => {
     render(
@@ -66,6 +70,87 @@ describe('FileChanges', () => {
     await user.click(screen.getByRole('button', { name: /src\/empty\.ts/ }));
 
     expect(screen.getByText('parche no disponible')).toBeInTheDocument();
+  });
+
+  it('indicates an unavailable patch for a whitespace-only patch (D4)', async () => {
+    const user = userEvent.setup();
+    render(
+      <FileChanges
+        changes={[change({ file: 'src/blank.ts', patch: '   \n  ' })]}
+        isError={false}
+        isLoading={false}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /src\/blank\.ts/ }));
+
+    expect(screen.getByText('parche no disponible')).toBeInTheDocument();
+  });
+
+  it('renders the selected patch with the editor diff instead of a raw pre (D4)', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <FileChanges
+        changes={[
+          change({
+            file: 'src/a.ts',
+            patch: '@@ -1,3 +1,3 @@\n context\n-removed\n+added',
+          }),
+        ]}
+        isError={false}
+        isLoading={false}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /src\/a\.ts/ }));
+
+    expect(container.querySelector('[data-number="old"]')).not.toBeNull();
+    expect(container.querySelector('[data-number="new"]')).not.toBeNull();
+    expect(container.querySelector('pre')).toBeNull();
+  });
+
+  it('distinguishes the file status with a token-coloured LED dot (D9)', () => {
+    const { container } = render(
+      <FileChanges
+        changes={[
+          change({ file: 'src/a.ts', status: 'added' }),
+          change({ file: 'src/b.ts', status: 'modified' }),
+          change({ file: 'src/c.ts', status: 'deleted' }),
+        ]}
+        isError={false}
+        isLoading={false}
+      />,
+    );
+
+    expect(statusDot(container, 'added')).toHaveClass('bg-status-done');
+    expect(statusDot(container, 'modified')).toHaveClass('bg-status-running');
+    expect(statusDot(container, 'deleted')).toHaveClass('bg-status-error');
+  });
+
+  it('keeps aria-pressed on the selected file and toggles it (D9)', async () => {
+    const user = userEvent.setup();
+    render(
+      <FileChanges
+        changes={[change({ file: 'src/a.ts' }), change({ file: 'src/b.ts' })]}
+        isError={false}
+        isLoading={false}
+      />,
+    );
+
+    const a = screen.getByRole('button', { name: /src\/a\.ts/ });
+    const b = screen.getByRole('button', { name: /src\/b\.ts/ });
+
+    expect(a).toHaveAttribute('aria-pressed', 'false');
+
+    await user.click(a);
+    expect(a).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(b);
+    expect(a).toHaveAttribute('aria-pressed', 'false');
+    expect(b).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(b);
+    expect(b).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('shows an explicit empty state when the agent changed no files', () => {
