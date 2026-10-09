@@ -8,7 +8,7 @@ const resizeChanges = (id: string): NodeChange<TGraphNode>[] => [
   {
     id,
     type: 'dimensions',
-    dimensions: { width: 300, height: 200 },
+    dimensions: { width: 640, height: 200 },
     resizing: true,
   },
   {
@@ -27,7 +27,7 @@ describe('useNodeResize', () => {
     act(() => result.current.onNodesChange(resizeChanges('node-1')));
 
     expect(result.current.overrides['node-1']).toMatchObject({
-      width: 300,
+      width: 640,
       height: 200,
       x: 40,
       y: 30,
@@ -109,7 +109,7 @@ describe('useNodeResize — paridad de resize al cambiar de sesión (FR-007)', (
 
     act(() => result.current.onNodesChange(resizeChanges('node-1')));
     expect(result.current.overrides['node-1']).toMatchObject({
-      width: 300,
+      width: 640,
       height: 200,
       x: 40,
       y: 30,

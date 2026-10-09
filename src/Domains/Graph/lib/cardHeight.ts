@@ -20,21 +20,21 @@ const EFFORT_NOTCHES = 5;
 const EFFORT_NOTCH_WIDTH = 4;
 /** Separación entre muescas del medidor (`gap-0.5`). */
 const EFFORT_NOTCH_GAP = 2;
-/** Separación entre el medidor y el resto del encabezado (`gap-1`). */
-const HEADER_GAP = 4;
 /**
- * Ancho del medidor de esfuerzo: 5 muescas más sus separaciones. Lo reserva
- * `STATUS_WIDTH` en la fila del encabezado (effort-contract §5; research R8).
+ * Ancho real del medidor de esfuerzo: 5 muescas más sus separaciones (~28 px).
+ * El encabezado ya **no** lo reserva —el medidor se ancla a la esquina inferior
+ * derecha del card—, pero se mantiene exportado como referencia del canal
+ * derecho (`pr-7`) que reserva `AgentNodeFooter` para que el texto del pie no
+ * quede por debajo del medidor.
  */
 export const EFFORT_METER_WIDTH =
   EFFORT_NOTCHES * EFFORT_NOTCH_WIDTH +
   (EFFORT_NOTCHES - 1) * EFFORT_NOTCH_GAP;
 /**
- * Ancho reservado en el encabezado al estado, al badge de paralelismo y al
- * medidor de esfuerzo. Al ir el medidor en la **misma fila** que el badge
- * (design-direction §6), la reserva crece para que el título no se recorte.
+ * Ancho reservado en el encabezado al estado y al badge de paralelismo. El
+ * medidor de esfuerzo va anclado al pie, así que ya no suma a esta reserva.
  */
-export const STATUS_WIDTH = STATUS_BASE_WIDTH + EFFORT_METER_WIDTH + HEADER_GAP;
+export const STATUS_WIDTH = STATUS_BASE_WIDTH;
 /** Ancho reservado al tag de variante del modelo. */
 const VARIANT_WIDTH = 48;
 /** Padding horizontal del card (`pl-3 pr-2.5`). */

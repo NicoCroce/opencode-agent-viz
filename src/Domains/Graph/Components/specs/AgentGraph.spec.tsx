@@ -130,7 +130,7 @@ vi.mock('@xyflow/react', async () => {
                   {
                     id: node.id,
                     type: 'dimensions',
-                    dimensions: { width: 480, height: 320 },
+                    dimensions: { width: 640, height: 320 },
                     resizing: false,
                   },
                 ]),
@@ -608,14 +608,14 @@ describe('AgentGraph — paridad de resize e histórico (FR-007, SC-006)', () =>
 
     fireEvent.click(screen.getByTestId('resize-root'));
     const resized = reactFlowSpy.nodes.find((node) => node.id === 'root');
-    expect(resized?.width).toBe(480);
+    expect(resized?.width).toBe(640);
     expect(resized?.height).toBe(320);
 
     rerender(lineageElement(null, lineageGraph, 'session-b'));
 
     const afterReset = reactFlowSpy.nodes.find((node) => node.id === 'root');
     expect(afterReset?.width).toBe(defaultWidth);
-    expect(afterReset?.width).not.toBe(480);
+    expect(afterReset?.width).not.toBe(640);
   });
 
   it('mantiene el tamaño dentro de la misma sesión', () => {
@@ -628,7 +628,7 @@ describe('AgentGraph — paridad de resize e histórico (FR-007, SC-006)', () =>
 
     expect(
       reactFlowSpy.nodes.find((node) => node.id === 'root')?.width,
-    ).toBe(480);
+    ).toBe(640);
   });
 
   it('sigue abriendo el histórico del nodo correcto tras cambiar de sesión', async () => {

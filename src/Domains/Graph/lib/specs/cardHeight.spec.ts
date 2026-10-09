@@ -49,7 +49,10 @@ describe('cardHeight', () => {
   it('gives a long title two lines and a short title one', () => {
     const short = cardHeight(data({ title: 'Corta' }), NODE_WIDTH);
     const long = cardHeight(
-      data({ title: 'Definiciones de ejecuciones multi subajentes en Speckit' }),
+      data({
+        title:
+          'Definiciones de ejecuciones multi subagentes en Speckit y despliegue extendido de la vista',
+      }),
       NODE_WIDTH,
     );
 
@@ -78,21 +81,23 @@ describe('cardHeight', () => {
       effort: { level: 5, provisional: true, reasons: ['lanzó paralelos'] },
     });
 
-    // El esfuerzo se pinta en la fila existente del encabezado: no debe
+    // El esfuerzo se ancla a la esquina inferior derecha del card: no debe
     // cambiar la altura estimada del card.
     expect(cardHeight(withEffort, NODE_WIDTH)).toBe(
       cardHeight(data(), NODE_WIDTH),
     );
   });
 
-  it('reserva el ancho del medidor de 5 muescas en la fila del encabezado (T015)', () => {
-    // 72 px era el ancho reservado previo (estado + badge de paralelos); el
-    // encabezado debe reservar además el medidor, sin recortar el título.
+  it('el encabezado vuelve a reservar solo el estado y el badge (72 px)', () => {
+    // El medidor de esfuerzo se ancla al pie, así que el encabezado ya no
+    // reserva su ancho: la reserva vuelve a la base (estado + badge de
+    // paralelos). `EFFORT_METER_WIDTH` sigue siendo el ancho real del medidor
+    // (referencia del canal derecho `pr-7` del pie).
     expect(EFFORT_METER_WIDTH).toBeGreaterThan(0);
-    expect(STATUS_WIDTH).toBeGreaterThanOrEqual(72 + EFFORT_METER_WIDTH);
+    expect(STATUS_WIDTH).toBe(72);
   });
 
-  it('estima las líneas del título contra el ancho reservado actualizado (T015)', () => {
+  it('estima las líneas del título contra la reserva base del encabezado (72 px)', () => {
     // Contenido pesado para superar el alto mínimo y aislar las líneas del
     // título (modelo + herramienta en curso + reintento).
     const heavy = data({
@@ -100,11 +105,11 @@ describe('cardHeight', () => {
       currentTool: { name: 'bash', state: 'running' },
       retry: { attempt: 2, next: null },
     });
-    // 13 caracteres caben en una línea con el ancho reservado actualizado; 16
-    // caracteres desbordan a una segunda línea. Con la reserva previa (72 px)
-    // ambos cabían en una línea y el alto no distinguía el wrap.
-    const fits = cardHeight({ ...heavy, title: 'x'.repeat(13) }, NODE_WIDTH);
-    const wraps = cardHeight({ ...heavy, title: 'x'.repeat(16) }, NODE_WIDTH);
+    // Con el ancho base (340 px) y la reserva base (72 px) el ancho útil del
+    // título es ~246 px: 30 caracteres caben en una línea y 60 desbordan a una
+    // segunda.
+    const fits = cardHeight({ ...heavy, title: 'x'.repeat(30) }, NODE_WIDTH);
+    const wraps = cardHeight({ ...heavy, title: 'x'.repeat(60) }, NODE_WIDTH);
 
     expect(wraps).toBeGreaterThan(fits);
   });
