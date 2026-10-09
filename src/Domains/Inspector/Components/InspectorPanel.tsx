@@ -1,4 +1,10 @@
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faMaximize,
+  faMinimize,
+} from '@fortawesome/free-solid-svg-icons';
 import { CompactionContext, Container } from '@app/Application/Components';
+import { useDevice } from '@app/Application/Hooks';
 import type { TGraphNode } from '@app/Domains/Graph/Graph.entity';
 import { useControlledReasoning } from '../Hooks/useControlledReasoning';
 import { useInspectorData } from '../Hooks/useInspectorData';
@@ -37,6 +43,16 @@ interface InspectorPanelProps {
    * queda visible pero inerte.
    */
   onOpenHistory?: () => void;
+  /**
+   * Estado de pantalla completa del panel (US6/FR-013). Controlado desde
+   * `WorkspacePage` a través del layout; el panel solo refleja el estado.
+   */
+  isFullscreen?: boolean;
+  /**
+   * Alterna la pantalla completa (US6/FR-013). Sin handler, el control no se
+   * monta. El control es solo de presentación de escritorio (AGENTS §9).
+   */
+  onToggleFullscreen?: () => void;
 }
 
 /**
@@ -56,7 +72,12 @@ export const InspectorPanel = ({
   showReasoning,
   onToggleReasoning,
   onOpenHistory,
+  isFullscreen = false,
+  onToggleFullscreen,
 }: InspectorPanelProps) => {
+  // El control de fullscreen es de presentación de escritorio (AGENTS §9).
+  const { isDesktop } = useDevice();
+
   // Modo no controlado por defecto (US1); US2 puede imponer la visibilidad
   // compartida con el overlay pasando `showReasoning`/`onToggleReasoning`.
   const { visible: reasoningVisible, toggle: toggleReasoning } =
@@ -83,8 +104,38 @@ export const InspectorPanel = ({
 
   return (
     <Container space="medium" className="overflow-auto p-4">
-      {/* Identidad: título completo (sin cortar) + agente + estado + directorio */}
-      <InspectorIdentity node={node} invokedBy={invokedBy} />
+      {/*
+        Encabezado del panel: título/estado del nodo + control de expandir/
+        colapsar (FR-013..FR-015). El botón solo se monta en escritorio y cuando
+        hay un handler; en móvil el panel sigue siendo una pestaña (AGENTS §9).
+      */}
+      <Container
+        row={isDesktop}
+        space="small"
+        align="start"
+        justify={isDesktop ? 'between' : 'start'}
+        className="min-w-0"
+      >
+        {/* Identidad: título completo (sin cortar) + agente + estado + directorio */}
+        <InspectorIdentity node={node} invokedBy={invokedBy} />
+
+        {isDesktop && onToggleFullscreen ? (
+          <button
+            type="button"
+            aria-pressed={isFullscreen}
+            aria-label={
+              isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'
+            }
+            onClick={onToggleFullscreen}
+            className="inline-flex size-7 shrink-0 items-center justify-center rounded-flat text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            <FontAwesomeIcon
+              icon={isFullscreen ? faMinimize : faMaximize}
+              aria-hidden
+            />
+          </button>
+        ) : null}
+      </Container>
 
       {/* Modelo: nombre y razonamiento (variante del modelo) (FR-003) */}
       <ModelSection model={model} />

@@ -1,8 +1,12 @@
+import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import type { SessionMessageAssistant } from '@opencode/client';
 import type { TSessionMessage } from '@app/Infrastructure/Services/opencodeClient';
+import { STORE_KEY } from '@app/Application/Hooks';
 import { renderWithProviders } from '@app/test/renderWithProviders';
 import { InspectorPanel } from '../InspectorPanel';
 import type { TGraphNode } from '@app/Domains/Graph/Graph.entity';
@@ -103,6 +107,26 @@ const peerNode = (id: string, title: string): TGraphNode => ({
   id,
   data: { ...node.data, sessionId: id, title, isRoot: false },
 });
+
+/**
+ * `useDevice` arranca en móvil por defecto (el store no está sembrado), así que
+ * el control de fullscreen solo se monta cuando el store global marca escritorio.
+ * El store (`useGlobalStore`) lee el valor vía TanStack Query, así que se siembra
+ * **antes** de renderizar: sembrarlo después no notifica al observador en el
+ * mismo tick y el control no llegaría a montarse.
+ */
+const renderDesktop = (ui: ReactElement) => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  queryClient.setQueryData([STORE_KEY.isMobile], false);
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>,
+  );
+};
 
 beforeEach(() => {
   service.getSessionMessages.mockResolvedValue([]);
@@ -371,5 +395,104 @@ describe('InspectorPanel', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/^En paralelo/)).not.toBeInTheDocument();
     expect(screen.queryByText('Tareas del subagente')).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// US6 — Pantalla completa del panel (FR-013..FR-015, T046, P7)
+// ---------------------------------------------------------------------------
+
+describe('InspectorPanel — control de pantalla completa (US6, T046, P7)', () => {
+  it('escritorio: el encabezado incluye el control expandir/colapsar con aria-pressed/aria-label', async () => {
+    const user = userEvent.setup();
+    const onToggle = vi.fn();
+    renderDesktop(
+      <InspectorPanel node={node} onToggleFullscreen={onToggle} />,
+    );
+
+    // El encabezado conserva el título/estado del nodo.
+    expect(screen.getByText('Tarea raíz')).toBeInTheDocument();
+    expect(screen.getByText('develop')).toBeInTheDocument();
+
+    const toggle = screen.getByRole('button', { name: 'Pantalla completa' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+    await user.click(toggle);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it('en fullscreen el mismo control refleja el estado y vuelve a colapsar', async () => {
+    const user = userEvent.setup();
+    const onToggle = vi.fn();
+    renderDesktop(
+      <InspectorPanel
+        node={node}
+        isFullscreen
+        onToggleFullscreen={onToggle}
+      />,
+    );
+
+    const toggle = screen.getByRole('button', {
+      name: 'Salir de pantalla completa',
+    });
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(toggle);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it('móvil: no monta el control de fullscreen, pero conserva el encabezado', () => {
+    renderWithProviders(
+      <InspectorPanel node={node} onToggleFullscreen={vi.fn()} />,
+    );
+
+    expect(
+      screen.queryByRole('button', { name: /pantalla completa/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Tarea raíz')).toBeInTheDocument();
+  });
+});
+
+describe('InspectorPanel — fullscreen conserva encabezado y estados (US6, T046, P7)', () => {
+  const fullscreen = () => (
+    <InspectorPanel node={node} isFullscreen onToggleFullscreen={vi.fn()} />
+  );
+
+  it('datos: conserva el encabezado y el contenido del nodo', () => {
+    renderDesktop(fullscreen());
+
+    expect(screen.getByText('Tarea raíz')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Salir de pantalla completa' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Modelo')).toBeInTheDocument();
+  });
+
+  it('vacío: conserva el encabezado y el estado vacío de los archivos', async () => {
+    service.getSessionDiff.mockResolvedValue([]);
+    renderDesktop(fullscreen());
+
+    expect(screen.getByText('Tarea raíz')).toBeInTheDocument();
+    await screen.findByText('Sin cambios de archivos');
+  });
+
+  it('carga: conserva el encabezado mientras el diff carga', () => {
+    service.getSessionDiff.mockReturnValue(new Promise(() => {}));
+    renderDesktop(fullscreen());
+
+    expect(screen.getByText('Tarea raíz')).toBeInTheDocument();
+    expect(screen.getByText('Archivos')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Sin cambios de archivos'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Error')).not.toBeInTheDocument();
+  });
+
+  it('error: conserva el encabezado y muestra el error del diff', async () => {
+    service.getSessionDiff.mockRejectedValue(new Error('fallo de red'));
+    renderDesktop(fullscreen());
+
+    expect(screen.getByText('Tarea raíz')).toBeInTheDocument();
+    await screen.findByText('Error');
   });
 });
