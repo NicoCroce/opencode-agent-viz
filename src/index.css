@@ -144,6 +144,12 @@ html {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  /* Estado estático equivalente (FR-003): sin barrido, el rail queda en el
+     color de actividad sólido de su clase base. */
+  .rail-scan::after {
+    display: none;
+  }
 }
 
 /* Entrada de los carriles de ejecución del grafo. */
@@ -158,6 +164,35 @@ html {
 
 .lane-in {
   animation: lane-in 260ms ease-out both;
+}
+
+/* Barrido de brillo del rail de un nodo activo ("pensando"): CSS puro, sin
+   estado por nodo. Una banda del token de actividad recorre el rail de arriba
+   abajo; el color base de estado queda debajo como respaldo estático (FR-003). */
+@keyframes rail-scan {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+.rail-scan {
+  overflow: hidden;
+}
+
+.rail-scan::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    hsl(var(--status-running)) 50%,
+    transparent 100%
+  );
+  animation: rail-scan 1.6s ease-in-out infinite;
 }
 
 :focus-visible {

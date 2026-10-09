@@ -11,18 +11,25 @@ const LOOP_STRIPE =
 
 interface NodeStatusRailProps {
   status: TNodeStatus;
+  /** Nodo activo (`isActiveStatus`); habilita el barrido del rail. */
+  active: boolean;
   hasLoop?: boolean;
 }
 
-export const NodeStatusRail = ({ status, hasLoop }: NodeStatusRailProps) => {
+export const NodeStatusRail = ({ status, active, hasLoop }: NodeStatusRailProps) => {
   const striped = Boolean(hasLoop) || status === 'retrying';
+  // El rayado es la firma de loop/reintento y gana al barrido: solo un activo
+  // sin rayar muestra la animación "pensando" (FR-002/FR-004).
+  const scanning = active && !striped;
 
   return (
     <span
       aria-hidden
+      data-testid="node-status-rail"
       className={cn(
         'absolute left-0 top-0 h-full w-[3px]',
         !striped && NODE_STATUS_COLOR[status],
+        scanning && 'rail-scan',
       )}
       style={striped ? { backgroundImage: LOOP_STRIPE } : undefined}
     />

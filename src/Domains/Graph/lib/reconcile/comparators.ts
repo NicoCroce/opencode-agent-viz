@@ -3,6 +3,7 @@ import type {
   TCurrentTool,
   TGraphNode,
   TGraphNodeData,
+  TNodeEffort,
   TNodeMetrics,
   TNodeParallelism,
   TTokenUsage,
@@ -81,6 +82,27 @@ export const sameParallel = (
   return a.groupId === b.groupId && a.size === b.size;
 };
 
+/**
+ * Compara el nivel de esfuerzo de vista (effort-contract §4; data-model §2.1).
+ * `effort` es opcional: `undefined` y `null` equivalen a "sin esfuerzo" y el
+ * paso de ausente a presente se detecta como cambio. Sin este comparador,
+ * `reconcileGraphModel` no reemplazaría el nodo y el medidor quedaría congelado.
+ */
+export const sameEffort = (
+  a: TNodeEffort | null | undefined,
+  b: TNodeEffort | null | undefined,
+): boolean => {
+  if (a === b) return true;
+  const effortA = a ?? null;
+  const effortB = b ?? null;
+  if (effortA === null || effortB === null) return effortA === effortB;
+  return (
+    effortA.level === effortB.level &&
+    effortA.provisional === effortB.provisional &&
+    sameStringArray(effortA.reasons, effortB.reasons)
+  );
+};
+
 /** Compara `TGraphNodeData` campo a campo (contrato de render §1.1, garantía 2). */
 export const sameNodeData = (a: TGraphNodeData, b: TGraphNodeData): boolean =>
   a === b ||
@@ -98,6 +120,7 @@ export const sameNodeData = (a: TGraphNodeData, b: TGraphNodeData): boolean =>
     a.isRoot === b.isRoot &&
     sameCurrentTool(a.currentTool, b.currentTool) &&
     sameParallel(a.parallel, b.parallel) &&
+    sameEffort(a.effort, b.effort) &&
     a.enrichment === b.enrichment);
 
 export const sameNode = (a: TGraphNode, b: TGraphNode): boolean =>

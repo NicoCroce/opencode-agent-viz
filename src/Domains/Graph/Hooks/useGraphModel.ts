@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useRef } from 'react';
-import type { TGraphModel, TParallelGroup } from '../Graph.entity';
+import type {
+  TGraphModel,
+  TGraphNode,
+  TParallelGroup,
+} from '../Graph.entity';
 import {
   deriveExecutionKey,
   deriveExecutionLayout,
   type TExecutionPlan,
 } from '../lib/executionLevels';
 import { assembleStructuralGraph } from '../lib/assembleStructuralGraph';
+import { latestActiveNodeId } from '../lib/activeNode';
+import { deriveEffortByNode } from '../lib/effort/deriveEffort';
+import { sameNode } from '../lib/reconcile/comparators';
 import { isActiveStatus } from '../lib/nodeStatus';
 import { useGraphEnrichment } from './useGraphEnrichment';
 import { useGraphStructure } from './useGraphStructure';
@@ -25,6 +32,12 @@ export interface UseGraphModelResult {
   /** Niveles de ejecución (tandas) y posiciones derivadas, para el layout. */
   executionPlan: TExecutionPlan;
   activeNodeId: string | null;
+  /**
+   * Id del nodo activo **más reciente** (FR-005): entre los activos, el de
+   * mayor `activityStartOf`. Aditivo; `activeNodeId` se conserva (primer activo
+   * en orden de nodo). Lo consume `useFollowMode` vía `WorkspacePage`.
+   */
+  latestActiveNodeId: string | null;
   isLoading: boolean;
   isError: boolean;
   error: Error | null;
@@ -118,12 +131,19 @@ export const useGraphModel = (
     [enriched, layout],
   );
 
-  // El tick de 1 s solo refresca `durationMs` sobre el grafo **posicionado**
-  // (R3): la base de métricas es independiente del reloj y ya la resolvió el
-  // enriquecimiento. Los nodos inactivos (`endedAt` fijado) conservan su objeto,
-  // así que solo los activos cambian de duración y la posición no se toca.
+  // Mapa de nodos vigente recordado tras cada commit (patrón "latest ref" del
+  // repo): permite reutilizar la identidad del nodo —y con ella su `effort`—
+  // cuando ni la duración ni el esfuerzo cambiaron (SC-006, Principio VII).
+  const previousNodesRef = useRef<Map<string, TGraphNode>>(new Map());
+
+  // El tick de 1 s refresca `durationMs` de los activos **y deriva el esfuerzo**
+  // sobre ese mismo modelo (R3/R4): `deriveEffortByNode` recibe todos los nodos
+  // con la duración ya actualizada —nunca `positioned`—. El esfuerzo no entra en
+  // `enriched` ni en `deriveExecutionKey`, así que no dispara re-layout.
   const graph = useMemo<TGraphModel>(() => {
-    const nodes = positioned.nodes.map((node) => {
+    // 1) Duración viva de los nodos activos (paso existente): la base de
+    //    métricas es independiente del reloj y ya la resolvió el enriquecimiento.
+    const tickedNodes = positioned.nodes.map((node) => {
       const { metrics } = node.data;
       if (metrics.startedAt === null) return node;
       const durationMs = (metrics.endedAt ?? now) - metrics.startedAt;
@@ -133,8 +153,41 @@ export const useGraphModel = (
         data: { ...node.data, metrics: { ...metrics, durationMs } },
       };
     });
+
+    // 2) Esfuerzo por nodo sobre el modelo con la duración ya actualizada.
+    const effortByNode = deriveEffortByNode(
+      { nodes: tickedNodes, edges: positioned.edges },
+      layout.plan,
+      layout.parallelGroups,
+    );
+
+    // 3) Se adjunta `effort` conservando el objeto de nodo anterior cuando
+    //    `durationMs` y `effort` (y el resto de datos) no cambiaron; solo se
+    //    reconstruye el nodo que realmente cambió (identidad estable, SC-006).
+    const previousById = previousNodesRef.current;
+    // eslint-disable-next-line react-hooks/refs -- lectura puntual del mapa vigente al derivar
+    const nodes = tickedNodes.map((node) => {
+      const effort = effortByNode[node.id] ?? null;
+      const previous = previousById.get(node.id);
+      if (
+        previous !== undefined &&
+        sameNode(previous, { ...node, data: { ...node.data, effort } })
+      ) {
+        return previous;
+      }
+      return { ...node, data: { ...node.data, effort } };
+    });
+
     return { nodes, edges: positioned.edges };
-  }, [positioned, now]);
+  }, [positioned, now, layout]);
+
+  // El mapa vigente se recuerda tras cada commit (no durante el render), como el
+  // resto de "latest refs" del repo.
+  useEffect(() => {
+    previousNodesRef.current = new Map(
+      graph.nodes.map((node) => [node.id, node]),
+    );
+  });
 
   // El nodo activo es el primero con un estado de ejecución en curso
   // (running/retrying/compacting/esperas), no solo `running` (FR-017). Se
@@ -146,11 +199,18 @@ export const useGraphModel = (
     [graph],
   );
 
+  // Activo **más reciente** (FR-005): entre los activos, el de mayor hora de
+  // inicio de ejecución (`activityStartOf`, desempate determinista por id). Es
+  // aditivo y no sustituye a `activeNodeId`; `useFollowMode` lo consume para
+  // centrar el viewport en el agente que empezó más tarde.
+  const latestActiveId = useMemo(() => latestActiveNodeId(graph), [graph]);
+
   return {
     graph,
     parallelGroups: layout.parallelGroups,
     executionPlan: layout.plan,
     activeNodeId,
+    latestActiveNodeId: latestActiveId,
     // Mientras no sepamos el directorio del proyecto no podemos cargar nada; el
     // esqueleto sigue gobernado por la estructura (no por el enriquecimiento).
     isLoading: structure.isLoading,

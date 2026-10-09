@@ -118,6 +118,8 @@ export const toGraphNode = (
       // El paralelismo es una propiedad de la vista (depende del subárbol y
       // de `now`); se completa en `useGraphModel`.
       parallel: null,
+      // El esfuerzo no se inicializa aquí: se deriva de forma pura en el memo
+      // final de `useGraphModel` (data-model §2.1; effort-contract §4).
       enrichment,
     },
   };
