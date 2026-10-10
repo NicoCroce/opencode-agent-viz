@@ -2,7 +2,7 @@
 
 > **Entregable de la fase de análisis. Solo lectura: no se modificó código de producto.**
 > Producido por 11 subagentes en 3 tandas (1 inventario → 7 análisis por área → 3 consolidaciones).
-> Este documento es la **síntesis**; los detalles viven en `docs/proposals/`.
+> Este documento es la **síntesis**; los detalles viven en `docs/internal/proposals/`.
 
 ## Índice
 
@@ -223,7 +223,7 @@ Máxima rentabilidad, mínimo riesgo, todos en **T1**:
 ## 9. Documentos fuente
 
 ```
-docs/proposals/
+docs/internal/proposals/
 ├── componentes-atomicos.md          ← este documento (síntesis)
 ├── inventario-gordos.md             ← 27 gordos + 8 familias de duplicación
 ├── areas/

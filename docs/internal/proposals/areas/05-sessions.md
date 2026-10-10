@@ -1,7 +1,7 @@
 # Área 05 — Sessions / Projects
 
 > Análisis **de solo lectura**. No se modifica código de producto. Umbral de archivo
-> GORDO: **≥ 150 líneas** (según `docs/proposals/inventario-gordos.md`, contando solo
+> GORDO: **≥ 150 líneas** (según `docs/internal/proposals/inventario-gordos.md`, contando solo
 > `.ts`/`.tsx` bajo `src/Domains/Sessions/**` y `src/Domains/Projects/**`, excluyendo
 > `*/specs/*`, `*.spec.ts(x)`).
 

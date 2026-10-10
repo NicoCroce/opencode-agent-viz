@@ -1,7 +1,7 @@
 # Área 06 — History + Connection
 
 > Análisis **de solo lectura**. Propuesta de descomposición atómica y reutilizable.
-> Leyenda de contexto: `docs/proposals/inventario-gordos.md`.
+> Leyenda de contexto: `docs/internal/proposals/inventario-gordos.md`.
 > Convenciones: `AGENTS.md` + `.specify/memory/constitution.md`.
 
 ## Resumen del área

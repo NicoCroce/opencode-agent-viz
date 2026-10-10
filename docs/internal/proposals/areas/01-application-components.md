@@ -1,7 +1,7 @@
 # Área 01 — `Application/Components` (Molecules, Organisms, Layout)
 
 > Análisis **de solo lectura**. Sin cambios de código de producto.
-> Leyenda base: `docs/proposals/inventario-gordos.md`. Umbral GORDO: ≥150 líneas.
+> Leyenda base: `docs/internal/proposals/inventario-gordos.md`. Umbral GORDO: ≥150 líneas.
 > Alcance: `src/Application/Components/Molecules/**`, `Organisms/**`,
 > `Layout/**`. NO se tocan dominios, `Infrastructure/` ni `ui/`.
 

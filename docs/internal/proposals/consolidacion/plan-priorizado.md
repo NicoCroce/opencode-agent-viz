@@ -1,7 +1,7 @@
 # Plan de refactor priorizado y ejecutable
 
-> Consolidación de los 7 documentos de `docs/proposals/areas/01..07-*.md` y del
-> `docs/proposals/inventario-gordos.md` en un plan de tandas **sin conflictos de
+> Consolidación de los 7 documentos de `docs/internal/proposals/areas/01..07-*.md` y del
+> `docs/internal/proposals/inventario-gordos.md` en un plan de tandas **sin conflictos de
 > archivos**. Solo lectura + propuesta: **no se modifica código de producto**.
 
 ## Método y convenciones de puntuación
@@ -395,7 +395,7 @@ Dependencias duras (no se puede adelantar la acción consumidora):
 
 ## Resumen ejecutivo
 
-- **Artefacto**: `docs/proposals/consolidacion/plan-priorizado.md`.
+- **Artefacto**: `docs/internal/proposals/consolidacion/plan-priorizado.md`.
 - **Top quick wins**: BD-01 (borrado seguro), SH-01 `totalTokens`, SH-03
   `NODE_STATUS_COLOR`, SH-04 `OUTCOME_LABEL`+`TOutcome`, SH-05 `questionState`,
   SH-07 tipos de pregunta, SH-09 `formatModelRef`, SH-16 `alertVariants`.
