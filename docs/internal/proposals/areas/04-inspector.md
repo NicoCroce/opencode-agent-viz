@@ -1,7 +1,7 @@
 # 04 — Área Inspector (propuesta de descomposición)
 
 > Análisis de solo lectura. Sin cambios de código de producto.
-> Base: `docs/proposals/inventario-gordos.md` + `AGENTS.md` + `.specify/memory/constitution.md`.
+> Base: `docs/internal/proposals/inventario-gordos.md` + `AGENTS.md` + `.specify/memory/constitution.md`.
 
 ## Resumen del área
 

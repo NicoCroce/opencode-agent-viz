@@ -2,7 +2,7 @@
 
 > Análisis **de solo lectura**. No se modificó código de producto.
 > Umbral GORDO: **≥150 líneas** (excluye `*/specs/*`, `*.spec.ts(x)`).
-> Base: `docs/proposals/inventario-gordos.md`, `AGENTS.md`, `.specify/memory/constitution.md`.
+> Base: `docs/internal/proposals/inventario-gordos.md`, `AGENTS.md`, `.specify/memory/constitution.md`.
 
 ## Resumen del área
 

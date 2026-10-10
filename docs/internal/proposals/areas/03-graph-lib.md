@@ -1,6 +1,6 @@
 # Área 03 — `Graph/lib` (+ `History/lib`, `Inspector/lib`)
 
-> Análisis **de solo lectura**. Fuente de contexto: `docs/proposals/inventario-gordos.md`
+> Análisis **de solo lectura**. Fuente de contexto: `docs/internal/proposals/inventario-gordos.md`
 > (#1, #3, #7, #12, #13, #26, #27). Convenciones: `AGENTS.md` y `.specify/memory/constitution.md`
 > (Principios IV, V, VII, VIII).
 

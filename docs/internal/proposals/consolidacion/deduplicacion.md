@@ -1,8 +1,8 @@
 # Consolidación de duplicación transversal (frontend)
 
 > Documento **de solo lectura + propuesta**. No se modificó código de producto.
-> Cruza las 7 propuestas de `docs/proposals/areas/` contra la sección
-> *Duplicación transversal* de `docs/proposals/inventario-gordos.md`.
+> Cruza las 7 propuestas de `docs/internal/proposals/areas/` contra la sección
+> *Duplicación transversal* de `docs/internal/proposals/inventario-gordos.md`.
 > Los archivos y líneas citados fueron **verificados sobre `src/`** (no solo
 > sobre lo que afirman las propuestas); donde el código real difiere del
 > inventario se deja constancia.

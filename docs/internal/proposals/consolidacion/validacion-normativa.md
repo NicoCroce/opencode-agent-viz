@@ -1,12 +1,12 @@
 # Consolidación — Validación normativa y de impacto en specs
 
 > Análisis **de solo lectura** (no se toca código de producto). Este documento
-> valida las 7 propuestas de área (`docs/proposals/areas/01..07-*.md`) contra
+> valida las 7 propuestas de área (`docs/internal/proposals/areas/01..07-*.md`) contra
 > `AGENTS.md`, `.specify/memory/constitution.md` y los `specs/` reales del repo.
 >
 > Evidencia verificada sobre el árbol actual (`src/**/*.spec.tsx|ts` = 78 specs;
 > `specs/` = 6 features spec-kit). Fuente del umbral GORDO:
-> `docs/proposals/inventario-gordos.md`.
+> `docs/internal/proposals/inventario-gordos.md`.
 
 ---
 
@@ -356,7 +356,7 @@ para cobertura → cada pieza nueva presiona a añadir specs (alineado con Princ
 
 ### Resumen ejecutivo
 
-- **Artefacto creado:** `docs/proposals/consolidacion/validacion-normativa.md`.
+- **Artefacto creado:** `docs/internal/proposals/consolidacion/validacion-normativa.md`.
 - **Veredictos:** mayormente **seguras** las de `lib/` con fachada (03) y las de
   `HistoryEntry`/`ToolCallEntry`/barrels; **requieren ajuste** las que tocan DOM/orden
   (`InspectorPanel`, `SessionSummaryBar`, `HistoryHeader`, `totalTokens`, `UNAVAILABLE`);
