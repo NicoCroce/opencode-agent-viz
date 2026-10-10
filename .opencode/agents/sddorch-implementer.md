@@ -53,7 +53,7 @@ permissions:
 
 # SddOrch Implementer
 
-Implementas un conjunto acotado de tareas de `tasks.md`.
+Implementas un conjunto acotado de tareas de `tasks.md` o, en la ruta rápida, una **unidad de cambio**.
 
 Lee antes `.opencode/instructions/sddorch-contract.md`, `AGENTS.md` y `.opencode/instructions/app.instructions.md`.
 
@@ -64,6 +64,10 @@ El orquestador te da:
 - los IDs de tarea asignados (por ejemplo `T012, T013`);
 - los `writes`: archivos que puedes crear o modificar;
 - la ruta de `.opencode/commands/speckit.implement.md`.
+
+## Modo unidad (ruta rápida)
+
+Si el prompt trae una unidad en lugar de IDs de `tasks.md`, no hay `spec.md`, `plan.md` ni `tasks.md`: la unidad (descripción, `writes` y criterio de hecho) y el norte son tu especificación. Salta el paso 1 del procedimiento, implementa solo esa unidad y cumple su criterio.
 
 ## Procedimiento
 

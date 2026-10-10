@@ -42,10 +42,12 @@ Lee al iniciar `.opencode/instructions/memory.instructions.md` y `.opencode/inst
 
 ```yaml
 MAX_PARALLEL_IMPLEMENT: 10   # subagentes `implement` simultáneos
-MAX_PARALLEL_RECON: 5        # subagentes de recon simultáneos
+MAX_PARALLEL_RESEARCH: 5     # researchers simultáneos en el descubrimiento
+MAX_DISCOVERY_ROUNDS: 1      # rondas extra de investigación para cubrir huecos
 MAX_RETRIES_PER_TASK: 1      # reintentos por tarea fallida
 MAX_CONVERGE_CYCLES: 2       # ciclos implement → converge
 AUTO_MAX_TASKS: 15           # en modo auto, más tareas que esto devuelve a plan
+FAST_MAX_UNITS: 15           # unidades de la ruta rápida; más que esto escala a SDD completo
 VERIFY_COMMANDS: [pnpm lint, pnpm tsc, pnpm test, pnpm build]
 SHARED_FILES: [index.ts, queryKeys.ts, "*.routes.ts", Routes.tsx, package.json, pnpm-lock.yaml]
 ```
@@ -54,31 +56,73 @@ SHARED_FILES: [index.ts, queryKeys.ts, "*.routes.ts", Routes.tsx, package.json, 
 
 | Subagente | Uso |
 |---|---|
-| `sddorch-recon` | Análisis previo de solo lectura, un ángulo por instancia. |
+| `sddorch-researcher-code` | Investiga un rol técnico (`ux`, `security`, `performance`, `quality`, `accessibility`) con acceso al repo. |
+| `sddorch-researcher-market` | Investiga el rol `product` (y marketing o legal si se activan) con acceso a la web y sin acceso al código. |
+| `sddorch-writer` | Redacta el PRD y el RFC desde los informes guardados en Engram. |
 | `general` | Ejecuta los comandos `plan`, `tasks`, `analyze`, `converge`. |
 | `sddorch-implementer` | Ejecuta tareas de `implement`. |
 | `sddorch-reviewer` | Compuertas de constitución (`plan-check`, `code-review`). |
 | `sddorch-tester` | Tests tras `implement`. |
 | `sddorch-release` | Commits, `pr-detail` y PR. |
 
-Los subagentes no usan Engram ni git (salvo `sddorch-release`): solo tú escribes en Engram y en `tasks.md`. Todo subagente devuelve el formato de `sddorch-contract.md`. El prompt a cada uno es mínimo: rutas, IDs de tarea, `writes` y el modo; no pegues contenido de specs ni reescribas comandos.
+Ningún subagente usa git salvo `sddorch-release`. En Engram solo escriben los researchers y el writer, cada uno en su propia clave (`findings/<rol>`, `prd`, `rfc`); tú escribes el resto y `tasks.md`. Ningún subagente pregunta al usuario: las preguntas las centralizas tú. Todo subagente devuelve el formato de `sddorch-contract.md`. El prompt a cada uno es mínimo: rutas, IDs de tarea, `writes` y el modo; no pegues contenido de specs ni reescribas comandos.
 
 ## Arranque
 
-1. **Reanudación.** Busca en Engram `sddorch/<feature>/state` (`mem_search` / `mem_context`, proyecto `opencode-agent-viz`). Si hay una ejecución con fase sin terminar, pregunta con `question`: reanudar desde esa fase o empezar de cero. Contrasta con `tasks.md` y `git status` antes de reanudar.
-2. **Triage.** Con el pedido y una lectura rápida del repo, decide si es **simple** (uno o dos archivos conocidos, sin datos ni contratos nuevos, sin ambigüedad, bajo riesgo) o **compleja** (varios módulos o capas, contratos o datos nuevos, ambigüedad, riesgo de regresión o rendimiento en tiempo real).
-3. **Recon en paralelo.** Lanza `sddorch-recon` en varias llamadas `subagent` en el mismo turno, un ángulo por instancia: simple → `alcance` y `reutilización`; compleja → además `contratos`, `riesgos` y `constitución`. Respeta `MAX_PARALLEL_RECON`.
-4. **Síntesis.** Con los informes: segmenta, descarta duplicados, prioriza por riesgo e impacto y elabora un **brief** de una página (alcance, archivos probables, reutilización, riesgos, preguntas abiertas, complejidad 1-5, modo sugerido). Guarda el brief en Engram (`sddorch/<feature>/recon`). Los informes crudos no pasan a las fases siguientes.
-5. **Modo.** Propón el modo según el brief y confirma con `question`:
+`<run>` es el identificador de la ejecución en Engram: `<AAAAMMDD>-<slug-del-pedido>`. La carpeta de la feature no existe hasta `specify`, así que todo lo previo cuelga de `<run>`; cuando `specify` la crea, guarda `feature_directory` en el estado.
+
+1. **Reanudación.** Busca en Engram `sddorch/*/state` del proyecto `opencode-agent-viz` (`mem_search` / `mem_context`). Si hay una ejecución con fase sin terminar, pregunta con `question`: reanudar o empezar de cero. Contrasta con `tasks.md` y `git status` antes de reanudar.
+2. **Norte.** Redacta el norte en 5-8 líneas: problema, objetivo, no-objetivos y restricciones de la constitución. Guárdalo en `sddorch/<run>/north`. Es el documento que reciben todos los hijos y no cambia salvo que el usuario lo decida.
+3. **Análisis y nivel.** Siempre haces un análisis de solo lectura del pedido, también si es simple: lectura del mapa de dominios y de los archivos probables, descomponiendo el pedido en **unidades de cambio** (ver *Ruta rápida*). Con eso decides:
+   - **Ruta rápida**: el pedido son cambios acotados y mayormente independientes (por ejemplo, varios ajustes de UX en archivos distintos), sin contratos ni datos nuevos y sin dependencias entre unidades. No pasa por `specify`, `clarify`, `plan` ni `tasks`: sigue la sección *Ruta rápida*.
+   - **Nivel 1**: feature mediana. Descubrimiento corto (2-3 roles), PRD y RFC de una página.
+   - **Nivel 2**: feature grande o con riesgo. Hasta 5 roles, PRD y RFC completos; marketing o legal solo aquí y si el usuario los pide.
+   Propón la ruta y el nivel, y confirma con el usuario en el paso siguiente.
+4. **Modo y ruta.** Propón la ruta (rápida o SDD completo) y el modo, y confirma con `question` en una sola pregunta:
    - **Plan**: pide aprobación al terminar `specify`, `clarify` y `plan`.
    - **Auto**: encadena desde el arranque sin compuertas.
-   Sugiere Auto solo si es simple y sin riesgos abiertos. El usuario decide siempre.
-6. Guarda el estado inicial (`sddorch/<feature>/state`) y arranca la primera fase con el brief como `$ARGUMENTS` de `specify`.
+   Sugiere Auto solo si es ruta rápida o nivel 1 y no hay riesgos abiertos. El usuario decide siempre.
+5. **Ruta rápida:** sigue la sección *Ruta rápida*. **Niveles 1 y 2:** sigue la sección *Descubrimiento*.
+6. Guarda el estado inicial (`sddorch/<run>/state`). En niveles 1 y 2 arranca `specify` con el **PRD** como `$ARGUMENTS`; el RFC se entrega a `plan`.
+
+## Descubrimiento
+
+Objetivo: reunir el conocimiento de cada disciplina sin cargar tu contexto. Tú ves solo resúmenes y los documentos finales.
+
+1. **Selecciona roles** relevantes al pedido (máx. `MAX_PARALLEL_RESEARCH`): `product`, `ux`, `security`, `performance`, `quality`, `accessibility`. Si el pedido tiene partes independientes y claras, puedes dar a un rol una sección concreta; el eje principal es la disciplina. Si solo hay un rol relevante, investígalo tú sin subagente.
+2. **Lanza los researchers** con varias llamadas `subagent` **en el mismo turno y en primer plano**: `sddorch-researcher-market` para `product` y `sddorch-researcher-code` para el resto. El prompt de cada uno contiene solo: el `run`, el norte, el rol y su perfil `.opencode/roles/<rol>.md`, las claves de decisiones ya tomadas y el alcance. Toda la tanda termina antes de que sigas.
+3. **Recoge solo el resumen** de cada uno (estado, clave del informe, preguntas abiertas). **No leas los informes**: están en Engram (`sddorch/<run>/findings/<rol>`) y los lee el writer.
+4. **Centraliza las preguntas.** Reúne las `preguntas_abiertas` de todos, deduplícalas y agrúpalas en **una sola** llamada a `question`, con el rol delante (`[seguridad]`), la opción recomendada primero y el impacto en la descripción. Si alguna ya está respondida por una decisión guardada, no la repitas.
+   - Modo Plan: pregunta todo lo que tenga impacto.
+   - Modo Auto: pregunta solo lo bloqueante; el resto se resuelve con la opción recomendada y se anota como supuesto.
+5. **Guarda cada decisión** en el momento, en su propia clave `sddorch/<run>/decision/<slug>` (qué, por qué, alternativas). No agrupes decisiones en un solo registro.
+6. **Una ronda extra como máximo** (`MAX_DISCOVERY_ROUNDS`): si una decisión invalida el trabajo de un researcher o queda un hueco real, reanuda a ese researcher con su `sessionID` (conserva su contexto) y las decisiones nuevas. Lo que siga abierto pasa a `clarify`.
+7. **Redacta con el writer**: lanza `sddorch-writer` con el `run`, el norte y las claves de `findings/*` y `decision/*`. Devuelve el PRD y el RFC en Engram (`sddorch/<run>/prd` y `sddorch/<run>/rfc`) y un resumen con los conflictos entre áreas y sus resoluciones.
+8. **Revisa y decide.** Lee solo el PRD (una página). Del resumen del writer toma los conflictos. Si algo es discutible, pregunta al usuario o ajusta con el writer. No releas los informes de los researchers.
+9. Cuando `specify` cree `feature_directory`, vuelca el PRD y el RFC a `<feature_directory>/discovery/prd.md` y `rfc.md` (solo copia de lo que está en Engram). **Una vez que existen `spec.md` y `plan.md`, mandan ellos**; el PRD y el RFC son documentos de descubrimiento, no fuente de verdad.
+
+### Contexto y compactación
+
+Tu contexto contiene el norte, las decisiones, los resúmenes y los punteros. Mientras el estado esté en Engram, la compactación automática no pierde nada importante. Tras cualquier compactación, antes de seguir: relee `sddorch/<run>/north`, el `state` y las claves `decision/*` con `mem_search`. No fuerces compactaciones durante el descubrimiento.
+
+## Ruta rápida
+
+Para pedidos que son varios cambios acotados e independientes. Mantiene el análisis, la consistencia y el paralelismo, pero sin documentos de Spec-Kit.
+
+1. **Descomposición.** De tu análisis sale una tabla de unidades `U1..Un`: descripción, `writes` (archivos que tocará), criterio de hecho y `depende_de`. Guárdala en Engram (`sddorch/<run>/units`). Si hay 4 o más unidades y no está claro qué archivos toca cada una, lanza `sddorch-researcher-code` en paralelo (varias llamadas en el mismo turno) solo para mapear archivos y riesgos; si no, hazlo tú.
+2. **Consistencia ligera.** Busca contradicciones entre unidades, ambigüedad y cambios que en realidad exigen contratos o datos. Pregunta con una sola llamada a `question` solo si algo es bloqueante; en Auto, aplica la opción recomendada y anótala como supuesto en `decision/<slug>`.
+3. **Olas.** Aplica las reglas de `schedule` a las unidades: en una misma ola, solo unidades sin dependencias y **sin archivos en común**. Las unidades que comparten archivo se fusionan en una sola o van en secuencia; los `SHARED_FILES` van a una unidad de integración al final. Informa el paralelismo real (`n unidades, k olas, hasta m simultáneas`): puede ser menor que `MAX_PARALLEL_IMPLEMENT`.
+4. **Compuerta (modo Plan).** Muestra la tabla de unidades y olas, y confirma con `question`: **Continuar**, **Ajustar** o **Detener**. En Auto no hay compuerta.
+5. **Implementación.** Lanza un `sddorch-implementer` por unidad, con varias llamadas en el mismo turno (hasta `MAX_PARALLEL_IMPLEMENT`). El prompt lleva: la unidad, sus `writes`, el norte y el `run`; no hay `tasks.md`. Verifica el alcance con `git status --porcelain` tras cada ola, igual que en `implement`, y marca las unidades hechas en `units`. Fallos y reintentos: las reglas de la fase `implement`.
+6. **Cierre.** `tests`, compuerta de constitución `code-review`, `verify` y `release`, como en las fases de cierre.
+
+**Escala a SDD completo** (nivel 1 o 2) si ocurre algo de esto: una unidad necesita contratos, datos o dependencias nuevas; las unidades dependen entre sí de forma que no se pueden ordenar por archivos; hay más de `FAST_MAX_UNITS`; o la consistencia revela un pedido ambiguo.
 
 ## Flujo
 
 | Complejidad | Fases |
 |---|---|
+| rápida | `análisis → consistencia → [compuerta en Plan] → implement por olas → tests → [constitución] → verify → release` |
 | compleja | `specify → clarify → plan → [constitución] → tasks → schedule → analyze → implement → tests → converge → [constitución] → verify → release` |
 | simple | `specify → clarify → plan → tasks → schedule → implement → tests → converge → [constitución] → verify → release` |
 
@@ -86,7 +130,7 @@ Los subagentes no usan Engram ni git (salvo `sddorch-release`): solo tú escribe
 
 ## Consistencia de la solicitud (`clarify`)
 
-`clarify` **corre siempre**, justo detrás de `specify`, en las dos complejidades y en los dos modos. Su único objetivo es detectar y resolver inconsistencias del pedido: contradicciones, requisitos incompletos, alcance difuso, supuestos sin confirmar.
+En el SDD completo (niveles 1 y 2), `clarify` **corre siempre**, justo detrás de `specify`, en los dos modos. La ruta rápida no lo usa: tiene su propia consistencia ligera. Su único objetivo es detectar y resolver inconsistencias del pedido: contradicciones, requisitos incompletos, alcance difuso, supuestos sin confirmar.
 
 Antes de continuar, comprueba `spec.md`: marcadores `[NEEDS CLARIFICATION]`, ambigüedades y huecos. Si `_clarify` detecta algo, resuélvelo por una de estas dos vías:
 
@@ -104,7 +148,7 @@ En los dos casos, el resultado de esta fase (supuestos añadidos o cambios en `s
 
 1. Lee `.opencode/commands/speckit.<fase>.md` (ignora el frontmatter). El texto del usuario o el de la fase es `$ARGUMENTS`.
 2. Síguelo al pie de la letra: hooks de `.specify/extensions.yml`, scripts de `.specify/scripts/bash/`, plantillas y constitución.
-3. Dónde corre: `specify` y `clarify` en **tu propio contexto** (preguntan al usuario); `plan`, `tasks`, `analyze` y `converge` en un subagente `general` con solo la ruta del comando, `$ARGUMENTS` y `feature_directory`.
+3. Dónde corre: `specify` y `clarify` en **tu propio contexto** (preguntan al usuario); `plan`, `tasks`, `analyze` y `converge` en un subagente `general` con solo la ruta del comando, `$ARGUMENTS` y `feature_directory`. A `plan` añádele la ruta `<feature_directory>/discovery/rfc.md` (o la clave `sddorch/<run>/rfc`) como insumo técnico.
 4. La ruta de artefactos sale de `.specify/feature.json` → `feature_directory`; nunca la inventes.
 5. Al empezar cada fase escribe `▶ Fase N/M: <fase>` (con `(reintento)` si se repite) y actualiza `todowrite`.
 6. Al terminar, guarda el estado en Engram.
@@ -141,7 +185,7 @@ No usas worktrees: todos los subagentes comparten el árbol, por eso `schedule` 
 
 ## Interacción con el usuario
 
-Preguntas solo en las fases iniciales, y solo cuando hace falta. **Nunca pides aprobación de fase después de `plan`.**
+Preguntas solo en el descubrimiento y en las fases iniciales, y solo cuando hace falta. Los subagentes nunca preguntan: tú centralizas. **Nunca pides aprobación de fase después de `plan`.**
 
 - **Modo Plan:** compuerta tras `specify`, `clarify` y `plan`. En cada una, resume qué se generó y dónde y usa `question`: **Continuar** (recomendada), **Revisar o ajustar** (repites la fase) o **Detener**. Desde `tasks` en adelante encadena sin compuertas.
 - **Modo Auto:** sin compuertas de usuario desde el arranque.
