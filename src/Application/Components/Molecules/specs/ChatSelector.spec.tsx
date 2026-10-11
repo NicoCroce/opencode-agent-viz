@@ -11,18 +11,30 @@ import type {
 import { ChatSelector, type ChatSelectorProps } from '../ChatSelector';
 
 /**
- * Specs de `ChatSelector` (feature 009, T043, FR-008, FR-021, SC-008).
+ * Specs de `ChatSelector` (feature 009, T043, FR-008, FR-021, SC-008; iteración UX E).
  *
  * Contrato: `specs/009-interactive-chat/contracts/chat-panel-contract.md` §3.
  * P6: la variante de razonamiento se acota al modelo elegido; sin variantes el
  * selector queda vacío/deshabilitado y el envío sigue funcionando.
  *
- * Radix `Select` depende de APIs que jsdom no implementa
- * (`hasPointerCapture`/`releasePointerCapture`/`scrollIntoView`); se mockean y
- * se desactiva la comprobación de `pointer-events` en `userEvent`.
+ * Iteración UX E: agente y modelo pasan de `ui/select` (Radix) a un **combobox**
+ * (`Popover` + `Command`) con buscador interno y lista de altura máxima. El
+ * razonamiento se mantiene con `ui/select` (lista corta acotada al modelo). Los
+ * tres disparadores siguen siendo chips compactos; el razonamiento conserva el
+ * rol `combobox` de Radix y los chips nuevos exponen `role="combobox"` en el
+ * `<button>` (patrón combobox select-only).
+ *
+ * cmdk usa `ResizeObserver` (jsdom no lo implementa) y Radix depende de APIs que
+ * jsdom tampoco implementa (`hasPointerCapture`/`releasePointerCapture`/
+ * `scrollIntoView`); se stubbean.
  */
 
 beforeAll(() => {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   Element.prototype.hasPointerCapture = vi.fn();
   Element.prototype.releasePointerCapture = vi.fn();
   Element.prototype.scrollIntoView = vi.fn();
@@ -72,6 +84,9 @@ const renderSelector = (overrides: Partial<ChatSelectorProps> = {}) => {
 };
 
 const getTrigger = (name: string): HTMLElement =>
+  screen.getByRole('combobox', { name });
+
+const getSearch = (name: string): HTMLElement =>
   screen.getByRole('combobox', { name });
 
 describe('ChatSelector', () => {
@@ -138,6 +153,39 @@ describe('ChatSelector', () => {
     expect(
       screen.getAllByRole('option').map((option) => option.textContent),
     ).toEqual(['GPT-4o', 'Claude']);
+  });
+
+  it('filters agents by label, case-insensitive (UX E)', async () => {
+    const { user } = renderSelector();
+
+    await user.click(getTrigger('Agente'));
+    await user.type(getSearch('Buscar agente'), 'PLAN');
+
+    expect(
+      screen.getAllByRole('option').map((option) => option.textContent),
+    ).toEqual(['Plan']);
+  });
+
+  it('shows the empty state when no option matches (UX E)', async () => {
+    const { user } = renderSelector();
+
+    await user.click(getTrigger('Modelo'));
+    await user.type(getSearch('Buscar modelo'), 'zzz');
+
+    expect(screen.queryAllByRole('option')).toHaveLength(0);
+    expect(screen.getByText('Sin resultados')).toBeInTheDocument();
+  });
+
+  it('no mezcla las variantes de razonamiento en la lista de modelos (FR-008)', async () => {
+    const { user } = renderSelector();
+
+    await user.click(getTrigger('Modelo'));
+    // "Bajo" es una variante de razonamiento de GPT-4o, no un modelo: no debe
+    // aparecer ni ser encontrable en el combobox de modelos.
+    await user.type(getSearch('Buscar modelo'), 'Bajo');
+
+    expect(screen.queryAllByRole('option')).toHaveLength(0);
+    expect(screen.getByText('Sin resultados')).toBeInTheDocument();
   });
 
   it('reflects the active selection on the triggers (FR-008)', () => {

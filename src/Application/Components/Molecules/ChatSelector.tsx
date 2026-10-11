@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
+import { ChatOptionCombobox } from './ChatOptionCombobox';
 
 export interface ChatSelectorProps {
   /** Agentes disponibles para la sesión (FR-008). */
@@ -48,7 +49,12 @@ interface SelectChipProps {
 }
 
 /**
- * Chip compacto (estilo Copilot) reutilizado por los tres selectores.
+ * Chip compacto (estilo Copilot) para listas cortas (razonamiento).
+ *
+ * Agente y modelo usan `ChatOptionCombobox` (Popover + Command, con buscador y
+ * altura máxima) porque son listas largas; el razonamiento se acota al modelo
+ * elegido y rara vez tiene más de un puñado de variantes, así que conserva el
+ * `ui/select` (Radix) —más simple y ya probado— con el disparador como chip.
  *
  * Usa los primitivos Radix de `ui/select` (el wrapper `Select` no expone
  * `disabled`) para poder deshabilitar el razonamiento sin variantes y bloquear
@@ -99,11 +105,13 @@ const SelectChip = ({
  * Molecule presentacional: no conoce el SDK ni los servicios; recibe las
  * opciones ya derivadas y emite la `TChatSelection` resultante. Cada control es
  * un **chip compacto** que muestra el valor vigente (p. ej. `sddorch`,
- * `DeepSeek V4.1 Flash`, `high`) con un chevron, sin label visible encima. La
- * variante de razonamiento se acota al modelo elegido (`reasoning`); si el modelo
- * no tiene variantes la lista queda vacía y el control deshabilitado, sin
- * bloquear el envío. Operable por teclado, con foco visible y sin comunicar
- * estado solo por color (FR-021).
+ * `DeepSeek V4.1 Flash`, `high`) con un chevron, sin label visible encima.
+ * Agente y modelo abren un **combobox** con buscador interno y lista de altura
+ * acotada (listas largas); la variante de razonamiento se acota al modelo
+ * elegido (`reasoning`) y sigue con `ui/select`: si el modelo no tiene variantes
+ * la lista queda vacía y el control deshabilitado, sin bloquear el envío.
+ * Operable por teclado, con foco visible y sin comunicar estado solo por color
+ * (FR-021).
  */
 export const ChatSelector = ({
   agents,
@@ -152,7 +160,7 @@ export const ChatSelector = ({
 
   return (
     <Container row align="center" space="small" className="w-auto flex-wrap">
-      <SelectChip
+      <ChatOptionCombobox
         label="Agente"
         value={selection.agent ?? ''}
         placeholder="Elegir agente"
@@ -160,7 +168,7 @@ export const ChatSelector = ({
         onValueChange={handleAgentChange}
         disabled={isPending}
       />
-      <SelectChip
+      <ChatOptionCombobox
         label="Modelo"
         value={selection.model?.id ?? ''}
         placeholder="Elegir modelo"
