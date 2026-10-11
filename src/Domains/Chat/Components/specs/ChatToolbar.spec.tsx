@@ -3,88 +3,95 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
-  CHAT_PROMPT_LABEL_MAX,
+  CHAT_TOOLS_HIDDEN_LABEL,
+  CHAT_TOOLS_VISIBLE_LABEL,
   ChatToolbar,
-  promptLabel,
   type ChatToolbarProps,
 } from '../ChatToolbar';
 
 /**
- * Spec de la barra superior del chat (iteración UX U2/U3/U4): toggle de
- * herramientas (visibles por defecto, `aria-pressed`), select "Ir a mi mensaje"
- * con la etiqueta truncada de cada prompt propio y botón-icono que abre el
- * historial completo (U2). Radix `Select` depende de APIs que jsdom no
- * implementa (`hasPointerCapture`/`releasePointerCapture`/`scrollIntoView`); se
- * mockean como en `ChatSelector.spec.tsx`.
+ * Spec de la barra del chat (iteración UX): botón-icono "ojo" que oculta/muestra
+ * las herramientas (visibles por defecto, `aria-pressed`, `aria-label` textual y
+ * tooltip) y botón-icono que abre el historial completo (U2). El select "Ir a mi
+ * mensaje" se retiró: el salto a un mensaje propio lo cubre el modal de historial.
+ *
+ * Radix `Tooltip` monta su contenido en un portal y usa `ResizeObserver`, que
+ * jsdom no implementa; se stubbea como en `ChatPendingRequest.spec.tsx`.
  */
 
 beforeAll(() => {
-  Element.prototype.hasPointerCapture = vi.fn();
-  Element.prototype.releasePointerCapture = vi.fn();
-  Element.prototype.scrollIntoView = vi.fn();
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
 });
-
-const PROMPTS = [
-  { id: 'u1:0', text: 'primer mensaje' },
-  { id: 'u2:0', text: 'segundo mensaje' },
-];
 
 const renderToolbar = (overrides: Partial<ChatToolbarProps> = {}) => {
   const onToggleTools = vi.fn();
-  const onSelectPrompt = vi.fn();
   const onOpenHistory = vi.fn();
   const user = userEvent.setup({ pointerEventsCheck: 0 });
   const view = render(
     <ChatToolbar
       showTools
       onToggleTools={onToggleTools}
-      prompts={PROMPTS}
-      onSelectPrompt={onSelectPrompt}
       onOpenHistory={onOpenHistory}
       {...overrides}
     />,
   );
-  return { user, onToggleTools, onSelectPrompt, onOpenHistory, view };
+  return { user, onToggleTools, onOpenHistory, view };
 };
 
-const getToggle = (): HTMLElement =>
-  screen.getByRole('button', { name: 'Herramientas' });
-const getSelect = (): HTMLElement =>
-  screen.getByRole('combobox', { name: 'Ir a mi mensaje' });
+const getToggle = (): HTMLElement => screen.getByTestId('chat-tools-toggle');
 const getHistoryButton = (): HTMLElement =>
   screen.getByRole('button', { name: 'Historial de mensajes' });
 
-describe('ChatToolbar — estructura y a11y (U2/U3/U4)', () => {
-  it('expone una barra etiquetada con el toggle, el select y el historial', () => {
+describe('ChatToolbar — estructura y a11y', () => {
+  it('expone una barra etiquetada con el ojo de herramientas y el historial', () => {
     renderToolbar();
 
     expect(
       screen.getByRole('toolbar', { name: 'Controles del chat' }),
     ).toBeInTheDocument();
     expect(getToggle()).toBeInTheDocument();
-    expect(getSelect()).toBeInTheDocument();
     expect(getHistoryButton()).toBeInTheDocument();
+    // Ya no hay select "Ir a mi mensaje" en la barra.
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   });
 
-  it('asocia el label del select a su disparador', () => {
+  it('da un nombre accesible no vacío a cada control', () => {
     renderToolbar();
 
-    const label = screen.getByText('Ir a mi mensaje');
-    expect(label).toHaveAttribute('for', getSelect().id);
+    const toolbar = screen.getByRole('toolbar', {
+      name: 'Controles del chat',
+    });
+
+    expect(
+      within(toolbar).getByRole('button', { name: CHAT_TOOLS_VISIBLE_LABEL }),
+    ).toBeInTheDocument();
+    expect(
+      within(toolbar).getByRole('button', { name: 'Historial de mensajes' }),
+    ).toBeInTheDocument();
   });
 });
 
-describe('ChatToolbar — toggle de herramientas (U3)', () => {
-  it('arranca mostrando las herramientas (aria-pressed true)', () => {
+describe('ChatToolbar — ojo de herramientas (U3)', () => {
+  it('arranca mostrando las herramientas (aria-pressed true, ojo abierto)', () => {
     renderToolbar();
 
-    expect(getToggle()).toHaveAttribute('aria-pressed', 'true');
+    const toggle = getToggle();
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(toggle).toHaveAccessibleName(CHAT_TOOLS_VISIBLE_LABEL);
+    expect(toggle.querySelector('svg')).toHaveAttribute('data-icon', 'eye');
   });
 
-  it('refleja el estado desactivado (aria-pressed false)', () => {
+  it('refleja el estado oculto (aria-pressed false, ojo tachado)', () => {
     renderToolbar({ showTools: false });
 
-    expect(getToggle()).toHaveAttribute('aria-pressed', 'false');
+    const toggle = getToggle();
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(toggle).toHaveAccessibleName(CHAT_TOOLS_HIDDEN_LABEL);
+    expect(toggle.querySelector('svg')).toHaveAttribute('data-icon', 'eye-slash');
   });
 
   it('notifica el nuevo estado al pulsar', async () => {
@@ -95,7 +102,15 @@ describe('ChatToolbar — toggle de herramientas (U3)', () => {
     expect(onToggleTools).toHaveBeenCalledWith(false);
   });
 
-  it('se opera por teclado: tab al chip y activación con Enter', async () => {
+  it('vuelve a mostrar las herramientas al pulsar cuando están ocultas', async () => {
+    const { user, onToggleTools } = renderToolbar({ showTools: false });
+
+    await user.click(getToggle());
+
+    expect(onToggleTools).toHaveBeenCalledWith(true);
+  });
+
+  it('se opera por teclado: tab al botón y activación con Enter', async () => {
     const { user, onToggleTools } = renderToolbar();
 
     await user.tab();
@@ -107,92 +122,30 @@ describe('ChatToolbar — toggle de herramientas (U3)', () => {
   });
 });
 
-describe('ChatToolbar — select de mis mensajes (U4)', () => {
-  it('lista mis prompts en orden con su etiqueta', async () => {
+describe('ChatToolbar — tooltip del ojo de herramientas', () => {
+  it('muestra el tooltip textual al pasar el puntero', async () => {
     const { user } = renderToolbar();
 
-    await user.click(getSelect());
+    await user.hover(getToggle());
 
-    expect(
-      screen.getAllByRole('option').map((option) => option.textContent),
-    ).toEqual(['primer mensaje', 'segundo mensaje']);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      CHAT_TOOLS_VISIBLE_LABEL,
+    );
   });
 
-  it('emite el id de la entrada elegida para el salto', async () => {
-    const { user, onSelectPrompt } = renderToolbar();
+  it('muestra el tooltip contrario cuando las herramientas están ocultas', async () => {
+    const { user } = renderToolbar({ showTools: false });
 
-    await user.click(getSelect());
-    await user.click(screen.getByRole('option', { name: 'segundo mensaje' }));
+    await user.hover(getToggle());
 
-    expect(onSelectPrompt).toHaveBeenCalledWith('u2:0');
-  });
-
-  it('queda deshabilitado cuando no hay prompts', () => {
-    renderToolbar({ prompts: [] });
-
-    expect(getSelect()).toBeDisabled();
-  });
-
-  it('comunica el estado con un placeholder textual (con y sin prompts)', () => {
-    const { view } = renderToolbar();
-    expect(getSelect()).toHaveTextContent('Mis mensajes');
-
-    view.unmount();
-
-    renderToolbar({ prompts: [] });
-    expect(getSelect()).toHaveTextContent('Sin mensajes');
-  });
-
-  it('se abre por teclado desde el chip', async () => {
-    const { user } = renderToolbar();
-
-    await user.tab();
-    await user.tab();
-    expect(getSelect()).toHaveFocus();
-
-    await user.keyboard('{Enter}');
-
-    expect(
-      screen.getAllByRole('option').map((option) => option.textContent),
-    ).toEqual(['primer mensaje', 'segundo mensaje']);
-  });
-
-  it('ensancha el chip del mensaje sin perder la selección (U4)', async () => {
-    const { user, onSelectPrompt } = renderToolbar();
-
-    const trigger = getSelect();
-    expect(trigger).toHaveClass('min-w-56');
-    expect(trigger).toHaveClass('w-auto');
-
-    await user.click(trigger);
-    await user.click(screen.getByRole('option', { name: 'primer mensaje' }));
-
-    expect(onSelectPrompt).toHaveBeenCalledWith('u1:0');
-  });
-});
-
-describe('ChatToolbar — nombres accesibles de los chips (U2/U3/U4)', () => {
-  it('da un nombre accesible no vacío a cada chip del footer', () => {
-    renderToolbar();
-
-    const toolbar = screen.getByRole('toolbar', {
-      name: 'Controles del chat',
-    });
-
-    expect(
-      within(toolbar).getByRole('button', { name: 'Herramientas' }),
-    ).toBeInTheDocument();
-    expect(
-      within(toolbar).getByRole('combobox', { name: 'Ir a mi mensaje' }),
-    ).toBeInTheDocument();
-    expect(
-      within(toolbar).getByRole('button', { name: 'Historial de mensajes' }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      CHAT_TOOLS_HIDDEN_LABEL,
+    );
   });
 });
 
 describe('ChatToolbar — botón de historial (U2)', () => {
-  it('expone un botón-icono con nombre accesible y tooltip', () => {
+  it('expone un botón-icono con nombre accesible y title', () => {
     renderToolbar();
 
     const button = getHistoryButton();
@@ -213,34 +166,5 @@ describe('ChatToolbar — botón de historial (U2)', () => {
     renderToolbar({ historyButtonRef });
 
     expect(historyButtonRef.current).toBe(getHistoryButton());
-  });
-});
-
-describe('promptLabel (U4)', () => {
-  it('deja intacto un texto corto en una línea', () => {
-    expect(promptLabel('hola')).toBe('hola');
-  });
-
-  it('colapsa saltos de línea y espacios sobrantes', () => {
-    expect(promptLabel('hola\n  mundo')).toBe('hola mundo');
-  });
-
-  it('trunca a ~40 caracteres con elipsis', () => {
-    const long = 'a'.repeat(CHAT_PROMPT_LABEL_MAX + 10);
-
-    const label = promptLabel(long);
-
-    expect(label).toBe(`${'a'.repeat(CHAT_PROMPT_LABEL_MAX)}…`);
-    expect(label.length).toBe(CHAT_PROMPT_LABEL_MAX + 1);
-  });
-
-  it('deja intacto un texto de exactamente la longitud máxima', () => {
-    const exact = 'a'.repeat(CHAT_PROMPT_LABEL_MAX);
-
-    expect(promptLabel(exact)).toBe(exact);
-  });
-
-  it('devuelve cadena vacía con texto solo de espacios', () => {
-    expect(promptLabel('   ')).toBe('');
   });
 });

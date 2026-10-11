@@ -145,7 +145,7 @@ describe('ChatPanel — composición del orquestador (T023, FR-014)', () => {
     expect(screen.getByTestId('chat-panel')).toBeInTheDocument();
     expect(screen.getByTestId('chat-timeline')).toBeInTheDocument();
     expect(getTextarea()).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Enviar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Enviar mensaje' })).toBeInTheDocument();
   });
 
   it('proyecta los mensajes cacheados de la sesión en el timeline (FR-002)', () => {
@@ -163,15 +163,15 @@ describe('ChatPanel — composición del orquestador (T023, FR-014)', () => {
       ]);
     });
 
-    // El `Select` de "mis mensajes" vive dentro del `<form>` del compositor
-    // (footer U1), así que Radix refleja cada opción en un `<select>` nativo
-    // oculto; se acota la consulta al timeline para no colisionar con él.
+    // Los `Select` de agente/modelo del selector (footer U1) viven dentro del
+    // `<form>` del compositor, así que Radix refleja cada opción en un `<select>`
+    // nativo oculto; se acota la consulta al timeline para no colisionar con él.
     const timeline = within(screen.getByTestId('chat-timeline'));
     expect(timeline.getByText('hola')).toBeInTheDocument();
     expect(timeline.getByText('respuesta')).toBeInTheDocument();
   });
 
-  it('muestra la parte provisional del buffer en texto plano ("En curso")', () => {
+  it('muestra la parte provisional del buffer con el indicador animado', () => {
     const view = renderPanel();
 
     act(() => {
@@ -181,8 +181,11 @@ describe('ChatPanel — composición del orquestador (T023, FR-014)', () => {
       });
     });
 
+    // El cuerpo provisional se pinta en markdown y se anuncia con el indicador
+    // animado, ya no con el literal "En curso".
     expect(screen.getByText('en curso')).toBeInTheDocument();
-    expect(screen.getByText('En curso')).toBeInTheDocument();
+    expect(screen.getByTestId('chat-typing-indicator')).toBeInTheDocument();
+    expect(screen.queryByText('En curso')).not.toBeInTheDocument();
   });
 });
 
@@ -193,7 +196,7 @@ describe('ChatPanel — envío desde el compositor (T023, FR-001)', () => {
     renderPanel();
 
     await userEventSetup.type(getTextarea(), 'hola');
-    await userEventSetup.click(screen.getByRole('button', { name: 'Enviar' }));
+    await userEventSetup.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
 
     await waitFor(() =>
       expect(write.sendPrompt).toHaveBeenCalledWith({
@@ -215,7 +218,7 @@ describe('ChatPanel — envío desde el compositor (T023, FR-001)', () => {
   it('no envía texto vacío (FR-001)', () => {
     renderPanel();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
 
     expect(write.sendPrompt).not.toHaveBeenCalled();
   });
@@ -226,7 +229,7 @@ describe('ChatPanel — envío desde el compositor (T023, FR-001)', () => {
     renderPanel();
 
     await userEventSetup.type(getTextarea(), 'reintentable');
-    await userEventSetup.click(screen.getByRole('button', { name: 'Enviar' }));
+    await userEventSetup.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('fallo de red');
     expect(getTextarea()).toHaveValue('reintentable');
@@ -345,7 +348,7 @@ describe('ChatPanel — bandeja de pendientes (T037, FR-005/FR-006/FR-007)', () 
     expect(screen.getByText('Nombre del proyecto')).toBeInTheDocument();
     // El composer sigue montado bajo la bandeja.
     expect(getTextarea()).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Enviar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Enviar mensaje' })).toBeInTheDocument();
   });
 
   it('no monta la bandeja cuando no hay pendientes', () => {
@@ -545,8 +548,8 @@ describe('ChatPanel — estados de pantalla (T056, FR-012)', () => {
 
     renderWithClient(queryClient);
 
-    // El `<select>` nativo oculto del footer (Radix) refleja el texto del
-    // mensaje como `<option>`; se acota la consulta al timeline.
+    // El `<select>` nativo oculto de los `Select` de agente/modelo del footer
+    // (Radix) vive en el compositor; se acota la consulta al timeline.
     expect(
       within(screen.getByTestId('chat-timeline')).getByText('hola'),
     ).toBeInTheDocument();
@@ -595,7 +598,7 @@ describe('ChatPanel — aviso de canal desconectado (T057, FR-012)', () => {
     renderPanel();
 
     await userEventSetup.type(getTextarea(), 'hola');
-    await userEventSetup.click(screen.getByRole('button', { name: 'Enviar' }));
+    await userEventSetup.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
 
     await waitFor(() => expect(write.sendPrompt).toHaveBeenCalled());
     expect(
@@ -610,7 +613,7 @@ describe('ChatPanel — aviso de canal desconectado (T057, FR-012)', () => {
     renderPanel();
 
     await userEventSetup.type(getTextarea(), 'hola');
-    await userEventSetup.click(screen.getByRole('button', { name: 'Enviar' }));
+    await userEventSetup.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
 
     expect(
       await screen.findByTestId('chat-disconnected-notice'),
@@ -626,7 +629,7 @@ describe('ChatPanel — aviso de canal desconectado (T057, FR-012)', () => {
     renderPanel();
 
     await userEventSetup.type(getTextarea(), 'hola');
-    await userEventSetup.click(screen.getByRole('button', { name: 'Enviar' }));
+    await userEventSetup.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
 
     expect(
       await screen.findByTestId('chat-disconnected-notice'),
@@ -812,10 +815,10 @@ describe('ChatPanel — auto-scroll del timeline (U2, UX)', () => {
 });
 
 /**
- * Barra superior del chat (iteración UX U3/U4): toggle de herramientas (visibles
- * por defecto) y select "Ir a mi mensaje" que salta a un prompt propio con un
- * resaltado temporal. El salto reutiliza el contenedor scrolleable de
- * `useChatAutoScroll` (nunca `window`).
+ * Barra del chat (iteración UX U3): botón-icono "ojo" que oculta/muestra las
+ * herramientas (visibles por defecto, `aria-pressed`). El salto a un mensaje
+ * propio lo cubre ahora el modal de historial (ver más abajo); reutiliza el
+ * contenedor scrolleable de `useChatAutoScroll` (nunca `window`).
  */
 const toolPart = (
   overrides: Partial<SessionMessageAssistantTool> = {},
@@ -846,10 +849,8 @@ const renderWithMessages = (messages: TSessionMessage[]) => {
 
 const getTimelineScroll = (): HTMLElement =>
   screen.getByTestId('chat-timeline-scroll');
-const getPromptSelect = (): HTMLElement =>
-  screen.getByRole('combobox', { name: 'Ir a mi mensaje' });
 const getToolsToggle = (): HTMLElement =>
-  screen.getByRole('button', { name: 'Herramientas' });
+  screen.getByTestId('chat-tools-toggle');
 const anchorOf = (entryId: string): HTMLElement | null =>
   document.querySelector(`[data-chat-entry-id="${entryId}"]`);
 
@@ -892,75 +893,6 @@ describe('ChatPanel — barra superior: toggle de herramientas (U3)', () => {
       'role',
       'status',
     );
-  });
-});
-
-describe('ChatPanel — barra superior: salto a mis mensajes (U4)', () => {
-  it('deshabilita el select cuando no hay prompts propios', () => {
-    renderWithMessages([
-      msg(assistant([{ type: 'text', text: 'respuesta' }], { id: 'a1' })),
-    ]);
-
-    expect(getPromptSelect()).toBeDisabled();
-  });
-
-  it('salta al mensaje elegido dentro del contenedor y lo resalta un instante', async () => {
-    const userEventSetup = userEvent.setup({ pointerEventsCheck: 0 });
-    renderWithMessages([
-      msg(user({ id: 'u1', time: { created: 500 }, text: 'primer mensaje' })),
-      msg(user({ id: 'u2', time: { created: 600 }, text: 'segundo mensaje' })),
-    ]);
-
-    const container = getTimelineScroll();
-    const target = anchorOf('u1:0') as HTMLElement;
-    expect(target).not.toBeNull();
-
-    // Rects controlados: el destino se calcula respecto al contenedor.
-    container.getBoundingClientRect = () =>
-      ({ top: 0 }) as unknown as DOMRect;
-    target.getBoundingClientRect = () =>
-      ({ top: 120 }) as unknown as DOMRect;
-    const scrollTo = vi.fn();
-    (container as unknown as { scrollTo: typeof scrollTo }).scrollTo = scrollTo;
-
-    await userEventSetup.click(getPromptSelect());
-    await userEventSetup.click(
-      screen.getByRole('option', { name: 'primer mensaje' }),
-    );
-
-    expect(scrollTo).toHaveBeenCalledWith({ top: 120, behavior: 'smooth' });
-    expect(target).toHaveAttribute('data-highlighted', 'true');
-
-    // El resaltado es temporal: se limpia solo (~1.5-2 s).
-    await waitFor(
-      () => expect(target).not.toHaveAttribute('data-highlighted'),
-      { timeout: 3000 },
-    );
-  });
-
-  it('salta con scroll instantáneo cuando el sistema pide movimiento reducido (U4)', async () => {
-    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
-    const userEventSetup = userEvent.setup({ pointerEventsCheck: 0 });
-    renderWithMessages([
-      msg(user({ id: 'u1', time: { created: 500 }, text: 'primer mensaje' })),
-      msg(user({ id: 'u2', time: { created: 600 }, text: 'segundo mensaje' })),
-    ]);
-
-    const container = getTimelineScroll();
-    const target = anchorOf('u1:0') as HTMLElement;
-    container.getBoundingClientRect = () => ({ top: 0 }) as unknown as DOMRect;
-    target.getBoundingClientRect = () => ({ top: 120 }) as unknown as DOMRect;
-    const scrollTo = vi.fn();
-    (container as unknown as { scrollTo: typeof scrollTo }).scrollTo = scrollTo;
-
-    await userEventSetup.click(getPromptSelect());
-    await userEventSetup.click(
-      screen.getByRole('option', { name: 'primer mensaje' }),
-    );
-
-    expect(scrollTo).toHaveBeenCalledWith({ top: 120, behavior: 'auto' });
-
-    vi.unstubAllGlobals();
   });
 });
 

@@ -44,7 +44,7 @@ import {
   scrollEntryIntoView,
 } from './ChatTimeline';
 import { ChatHistoryDialog } from './ChatHistoryDialog';
-import { ChatToolbar, type TChatPrompt } from './ChatToolbar';
+import { ChatToolbar } from './ChatToolbar';
 
 /**
  * Panel de chat (FR-014; `contracts/chat-panel-contract.md` §1): orquestador
@@ -227,8 +227,8 @@ export const ChatPanel = ({
   const contentSignal = `${timeline.length}:${lastEntry?.id ?? ''}:${lastEntry?.text.length ?? 0}`;
   const { ref: timelineScrollRef } = useChatAutoScroll(contentSignal);
 
-  // Barra superior (U3/U4): visibilidad de herramientas y salto a mis mensajes.
-  // La barra es presentación pura; el estado y el salto viven aquí.
+  // Barra superior (U3): visibilidad de herramientas y salto resaltado a un
+  // mensaje. La barra es presentación pura; el estado y el salto viven aquí.
   const [showTools, setShowTools] = useState(true);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
@@ -249,19 +249,9 @@ export const ChatPanel = ({
     return () => clearTimeout(timer);
   }, [highlightedId]);
 
-  // "Mis mensajes" (U4): mis prompts de texto (entradas del usuario) en orden,
-  // con su `id` de entrada como ancla. La barra deriva la etiqueta truncada.
-  const prompts = useMemo<TChatPrompt[]>(
-    () =>
-      timeline
-        .filter((entry) => entry.role === 'user')
-        .map((entry) => ({ id: entry.id, text: entry.text })),
-    [timeline],
-  );
-
   // Salta a la fila elegida dentro del contenedor scrolleable del timeline y la
-  // resalta un instante (U4). Reutiliza el `ref` de `useChatAutoScroll`: no
-  // duplica la lógica de scroll, solo añade el salto puntual.
+  // resalta un instante. Lo reutiliza el modal de historial (U2); reusa el `ref`
+  // de `useChatAutoScroll`: no duplica la lógica de scroll, solo añade el salto.
   const handleSelectPrompt = (entryId: string) => {
     setHighlightedId(entryId);
 
@@ -492,10 +482,10 @@ export const ChatPanel = ({
       ) : null}
 
       {/* Footer estilo Copilot (U1): el compositor monta en su fila inferior los
-          controles del chat a la izquierda —toggle de herramientas + salto a mis
-          mensajes (`ChatToolbar`) y chips de agente/modelo/razonamiento
-          (`ChatSelector`)— y las acciones [Detener] [Enviar] a la derecha. El
-          slot `controls` evita el import cross-domain desde la molecule. */}
+          controles del chat a la izquierda —ojo de herramientas (`ChatToolbar`) y
+          chips de agente/modelo/razonamiento (`ChatSelector`)— y las acciones
+          [Detener] [Enviar] a la derecha. El slot `controls` evita el import
+          cross-domain desde la molecule. */}
       <ChatComposer
         className="shrink-0"
         value={text}
@@ -510,8 +500,6 @@ export const ChatPanel = ({
             <ChatToolbar
               showTools={showTools}
               onToggleTools={setShowTools}
-              prompts={prompts}
-              onSelectPrompt={handleSelectPrompt}
               onOpenHistory={() => setHistoryOpen(true)}
               historyButtonRef={historyTriggerRef}
             />
