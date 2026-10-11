@@ -11,8 +11,8 @@ import { applyReducedEvent } from '../lib/applyReducedEvent';
  * A3 (`contracts/session-activity-contract.md` §3): `applyReducedEvent` debe
  * aplicar la marca de actividad (`sessions.activity()`) por `setQueryData`
  * —sin peticiones de red— **y** conservar intacto el resultado de `reduceEvent`.
- * La actividad se escribe antes del reducer, de modo que también los eventos
- * que `reduceEvent` ignora (deltas) refrescan la marca.
+ * La actividad se escribe antes del reducer, de modo que también los deltas
+ * (que hoy producen un `set` sobre `chatStream`) refrescan la marca.
  */
 
 const makeClient = (): QueryClient =>
@@ -105,9 +105,16 @@ describe('applyReducedEvent — marca de actividad (A3)', () => {
     });
   });
 
-  it('aplica la actividad aunque reduceEvent ignore el evento (deltas)', () => {
+  it('aplica la actividad y el buffer de chat para los deltas', () => {
     const client = makeClient();
-    expect(reduceEvent(textDelta)).toBeNull();
+    const updates = reduceEvent(textDelta);
+    expect(
+      updates?.some(
+        (update) =>
+          update.kind === 'set' &&
+          sameQueryKey(update.queryKey, queryKeys.chatStream.for('ses_1')),
+      ),
+    ).toBe(true);
 
     applyReducedEvent(textDelta, client);
 

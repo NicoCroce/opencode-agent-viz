@@ -5,8 +5,12 @@ import type { TResourceUsage } from '@app/Domains/Inspector';
  * Pestañas del workspace (móvil). Extraídas a constantes para evitar magic
  * strings repetidos en el `useState` inicial, las comparaciones y el tablist
  * (AGENTS §8.5).
+ *
+ * `chat` es un destino de **primer nivel** en móvil (FR-013): se monta como
+ * panel propio, sin tabbars anidadas (el tablist `Detalle | Chat` solo vive en
+ * escritorio).
  */
-export const WORKSPACE_TABS = ['sessions', 'graph', 'inspector'] as const;
+export const WORKSPACE_TABS = ['sessions', 'graph', 'inspector', 'chat'] as const;
 
 export type TWorkspaceTab = (typeof WORKSPACE_TABS)[number];
 

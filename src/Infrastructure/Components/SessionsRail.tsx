@@ -12,6 +12,11 @@ interface SessionsRailProps {
   selectedId: string | null;
   isLoading: boolean;
   onSelect: (id: string) => void;
+  /**
+   * Pendientes por sesión raíz (FR-009/US5), calculados en `WorkspacePage` y
+   * reenviados tal cual al listado. Presentación pura.
+   */
+  attentionByRoot?: Record<string, number>;
 }
 
 /**
@@ -25,6 +30,7 @@ export const SessionsRail = ({
   selectedId,
   isLoading,
   onSelect,
+  attentionByRoot,
 }: SessionsRailProps) => (
   <Container space="small" className="p-3">
     <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -38,6 +44,7 @@ export const SessionsRail = ({
         statuses={statuses}
         selectedId={selectedId}
         onSelect={onSelect}
+        attentionByRoot={attentionByRoot}
       />
     )}
   </Container>

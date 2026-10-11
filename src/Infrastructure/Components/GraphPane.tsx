@@ -28,6 +28,11 @@ interface GraphPaneProps {
   onClearSelection: () => void;
   onOpenHistory: (sessionId: string) => void;
   rootId: string | null;
+  /**
+   * Ids de nodos con un pendiente de atención (FR-009); se reenvía a
+   * `AgentGraph` para el realce por contexto, sin tocar `data` ni re-layoutar.
+   */
+  attentionNodeIds?: ReadonlySet<string>;
 }
 
 /**
@@ -48,6 +53,7 @@ export const GraphPane = ({
   onClearSelection,
   onOpenHistory,
   rootId,
+  attentionNodeIds,
 }: GraphPaneProps) => (
   <Container space="none" className="h-full min-h-0 min-w-0">
     <Container
@@ -91,6 +97,7 @@ export const GraphPane = ({
           onOpenHistory={onOpenHistory}
           followNodeId={follow.followNodeId}
           resetKey={rootId}
+          attentionNodeIds={attentionNodeIds}
         />
       )}
     </Container>

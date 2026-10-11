@@ -2,15 +2,30 @@ import { useCallback } from 'react';
 import type {
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
+  ReactNode,
 } from 'react';
-import { Container } from '@app/Application/Components';
+import {
+  Container,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@app/Application/Components';
 import {
   INSPECTOR_MAX_WIDTH,
   INSPECTOR_MIN_WIDTH,
 } from '@app/Application/Helpers/panelWidth';
 import { InspectorPanel } from '@app/Domains/Inspector';
 import type { TGraphModel, TParallelGroup } from '@app/Domains/Graph';
+import { ChatAttentionBadge } from '@app/Domains/Chat';
 import { useInspectedNodeContext } from '../Hooks/useInspectedNodeContext';
+import {
+  CHAT_TAB_ID,
+  DETAIL_TAB_ID,
+  isDetailTab,
+  useDetailTabs,
+  type TDetailTab,
+} from '../Hooks/useDetailTabs';
 
 interface InspectorPaneProps {
   graph: TGraphModel;
@@ -29,6 +44,32 @@ interface InspectorPaneProps {
   isFullscreen?: boolean;
   /** Alterna la pantalla completa; se reenvía al encabezado del panel (US6). */
   onToggleFullscreen?: () => void;
+  /**
+   * Slot del panel `Chat` (T026). Mientras no se cablee `ChatPanel`, la pestaña
+   * `Chat` queda como un `tabpanel` vacío listo para recibirlo.
+   */
+  chat?: ReactNode;
+  /**
+   * Monta el tablist interno `Detalle | Chat` (escritorio). En móvil el chat es
+   * un destino de primer nivel, así que la presentación pasa `false` para no
+   * anidar tabbars (FR-013/FR-014). Por defecto `true`.
+   */
+  showDetailTabs?: boolean;
+  /**
+   * Nº de pendientes del subárbol de la sesión abierta (T053/FR-009). Con `> 0`
+   * el trigger de la pestaña `Chat` monta `ChatAttentionBadge` (token ≥3:1 +
+   * marca no-color + `aria-label` textual). La fuente es `useSessionAttention`,
+   * cableada en `WorkspacePage` (data-fetching cross-domain en Infrastructure).
+   */
+  attentionCount?: number;
+  /**
+   * Tab activo **controlado** por el llamador (T055/FR-010). Permite abrir la
+   * pestaña `Chat` al navegar a la request origen. Sin él, el estado es interno
+   * (`useDetailTabs`), preservando el uso actual.
+   */
+  activeTab?: TDetailTab;
+  /** Cambio de tab controlado (T055); acompaña a `activeTab`. */
+  onTabChange?: (tab: TDetailTab) => void;
 }
 
 /**
@@ -36,6 +77,16 @@ interface InspectorPaneProps {
  * invocador) y rinde `InspectorPanel`. `InspectorPanel` se importa por el
  * **barrel** de dominio para que el `vi.mock('@app/Domains/Inspector')` de los
  * specs siga interceptándolo.
+ *
+ * La columna se envuelve en **Radix Tabs** (`ui/tabs.tsx`) con `Detalle | Chat`
+ * siguiendo el patrón APG (`tablist`/`tab`/`tabpanel`, `aria-controls`, flechas,
+ * roving tabindex; FR-021). El estado del tab activo vive en `useDetailTabs`
+ * (única fuente de lógica, FR-014), salvo cuando el llamador lo **controla**
+ * (`activeTab`/`onTabChange`) para abrir la pestaña `Chat` al navegar a la
+ * request origen (T055/FR-010). El trigger de `Chat` muestra el badge de atención
+ * (`ChatAttentionBadge`, T053) cuando hay pendientes en el subárbol. El
+ * resize/fullscreen de la columna siguen intactos: se aplican a la columna
+ * completa y cubren ambos tabs.
  */
 export const InspectorPane = ({
   graph,
@@ -47,17 +98,47 @@ export const InspectorPane = ({
   isResizing = false,
   isFullscreen = false,
   onToggleFullscreen,
+  chat,
+  showDetailTabs = true,
+  attentionCount = 0,
+  activeTab,
+  onTabChange,
 }: InspectorPaneProps) => {
   const { node, peers, invokedBy } = useInspectedNodeContext({
     graph,
     parallelGroups,
     inspectedNodeId,
   });
+  const detailTabs = useDetailTabs();
+  // Estado controlado si el llamador lo aporta (T055); si no, estado interno.
+  const tab = activeTab ?? detailTabs.tab;
+  const setTab = onTabChange ?? detailTabs.setTab;
 
   const handleOpenHistory = useCallback(() => {
     if (!node) return;
     onOpenHistory(node.data.sessionId);
   }, [node, onOpenHistory]);
+
+  // Radix entrega el `value` como `string`; se valida antes de fijar el tab.
+  const handleTabChange = useCallback(
+    (value: string) => {
+      if (isDetailTab(value)) setTab(value);
+    },
+    [setTab],
+  );
+
+  const panel = (
+    <InspectorPanel
+      node={node}
+      parallelPeers={peers}
+      invokedBy={invokedBy}
+      showReasoning={showReasoning}
+      onToggleReasoning={onToggleReasoning}
+      onOpenHistory={handleOpenHistory}
+      isFullscreen={isFullscreen}
+      onToggleFullscreen={onToggleFullscreen}
+    />
+  );
 
   return (
     <Container
@@ -65,16 +146,42 @@ export const InspectorPane = ({
       className={`h-full min-h-0 ${isResizing ? 'select-none' : ''}`}
       data-resizing={isResizing || undefined}
     >
-      <InspectorPanel
-        node={node}
-        parallelPeers={peers}
-        invokedBy={invokedBy}
-        showReasoning={showReasoning}
-        onToggleReasoning={onToggleReasoning}
-        onOpenHistory={handleOpenHistory}
-        isFullscreen={isFullscreen}
-        onToggleFullscreen={onToggleFullscreen}
-      />
+      {showDetailTabs ? (
+        <Tabs
+          value={tab}
+          onValueChange={handleTabChange}
+          className="flex h-full min-h-0 flex-col"
+        >
+          <TabsList
+            aria-label="Vistas del panel de detalle"
+            className="m-2 shrink-0 self-start"
+          >
+            {detailTabs.tabs.map((item) => (
+              <TabsTrigger key={item.id} value={item.id}>
+                {item.label}
+                {item.id === CHAT_TAB_ID ? (
+                  <ChatAttentionBadge count={attentionCount} />
+                ) : null}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <TabsContent
+            value={DETAIL_TAB_ID}
+            className="mt-0 min-h-0 flex-1 overflow-auto"
+          >
+            {panel}
+          </TabsContent>
+          <TabsContent
+            value={CHAT_TAB_ID}
+            data-testid="detail-chat-slot"
+            className="mt-0 min-h-0 flex-1 overflow-auto"
+          >
+            {chat ?? null}
+          </TabsContent>
+        </Tabs>
+      ) : (
+        panel
+      )}
     </Container>
   );
 };
