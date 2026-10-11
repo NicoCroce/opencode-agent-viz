@@ -66,8 +66,11 @@ const SelectField = ({
   const id = useId();
 
   return (
-    <Container space="small" className="min-w-0 flex-1">
-      <Label htmlFor={id} className="text-muted-foreground">
+    <Container space="small" className="min-w-[8rem] flex-1">
+      <Label
+        htmlFor={id}
+        className="text-[11px] font-medium text-muted-foreground"
+      >
         {label}
       </Label>
       <Select value={value} onValueChange={onValueChange} disabled={disabled}>

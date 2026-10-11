@@ -114,7 +114,7 @@ export const ChatComposer = ({
       onSubmit={handleSubmit}
       aria-busy={isSubmitting}
     >
-      <Container space="small">
+      <Container space="medium">
         {selection ? (
           <ChatSelector
             agents={agents}
@@ -125,21 +125,26 @@ export const ChatComposer = ({
             isPending={isSubmitting}
           />
         ) : null}
-        <Label htmlFor={textareaId} className="text-muted-foreground">
-          Mensaje
-        </Label>
-        <Textarea
-          id={textareaId}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          onKeyDown={handleKeyDown}
-          onCompositionStart={() => setIsComposing(true)}
-          onCompositionEnd={() => setIsComposing(false)}
-          disabled={isDisabled}
-          rows={3}
-          placeholder="Escribe un mensaje…"
-        />
-        <Container row justify="end" space="small">
+        <Container space="small">
+          <Label
+            htmlFor={textareaId}
+            className="text-[11px] font-medium text-muted-foreground"
+          >
+            Mensaje
+          </Label>
+          <Textarea
+            id={textareaId}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            onKeyDown={handleKeyDown}
+            onCompositionStart={() => setIsComposing(true)}
+            onCompositionEnd={() => setIsComposing(false)}
+            disabled={isDisabled}
+            rows={3}
+            placeholder="Escribe un mensaje…"
+          />
+        </Container>
+        <Container row justify="end" align="center" space="small">
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button

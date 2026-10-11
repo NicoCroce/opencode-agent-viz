@@ -120,6 +120,24 @@ describe('ChatComposer', () => {
     expect(screen.getByText('Razonamiento')).toBeInTheDocument();
   });
 
+  it('lays out selectors, message and actions as grouped blocks (U5)', () => {
+    render(
+      <Harness selection={EMPTY_SELECTION} agents={AGENTS} models={MODELS} />,
+    );
+
+    // Etiquetas pequeñas y atenuadas, consistentes en selectores y mensaje.
+    for (const name of ['Agente', 'Modelo', 'Razonamiento', 'Mensaje']) {
+      const label = screen.getByText(name);
+      expect(label).toHaveClass('text-[11px]');
+      expect(label).toHaveClass('text-muted-foreground');
+    }
+
+    // Los botones se alinean al extremo de la fila de acciones.
+    const actions = screen.getByRole('button', { name: 'Enviar' })
+      .parentElement;
+    expect(actions).toHaveClass('justify-end');
+  });
+
   it('reports typed text through onChange', async () => {
     const user = userEvent.setup();
     render(<Harness />);

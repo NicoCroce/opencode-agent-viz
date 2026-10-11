@@ -83,6 +83,38 @@ describe('ChatSelector', () => {
     expect(getTrigger('Razonamiento')).toBeInTheDocument();
   });
 
+  it('associates each label with its trigger using compact muted styles (U5)', () => {
+    renderSelector();
+
+    for (const name of ['Agente', 'Modelo', 'Razonamiento']) {
+      const label = screen.getByText(name);
+      const trigger = getTrigger(name);
+
+      // a11y: el label apunta al disparador por `htmlFor` ↔ `id`.
+      expect(label).toHaveAttribute('for', trigger.id);
+      expect(trigger).toHaveAttribute('id');
+      // Estética: etiquetas pequeñas y atenuadas, consistentes entre campos.
+      expect(label).toHaveClass('text-[11px]');
+      expect(label).toHaveClass('text-muted-foreground');
+    }
+  });
+
+  it('gives the three fields equal flexible width and lets them wrap (U5)', () => {
+    renderSelector();
+
+    const fields = ['Agente', 'Modelo', 'Razonamiento'].map(
+      (name) => screen.getByText(name).parentElement,
+    );
+
+    for (const field of fields) {
+      expect(field).toHaveClass('flex-1');
+      expect(field).toHaveClass('min-w-[8rem]');
+    }
+
+    // La fila envuelve en pantallas estrechas en lugar de recortar los campos.
+    expect(fields[0]?.parentElement).toHaveClass('flex-wrap');
+  });
+
   it('offers the available agents and emits the chosen one (FR-008)', async () => {
     const { user, onChange } = renderSelector();
 
