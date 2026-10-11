@@ -35,7 +35,14 @@ import {
   useChatController,
   type TChatSelectionSeed,
 } from '../Hooks/useChatController';
-import { ChatTimeline } from './ChatTimeline';
+import { useChatAutoScroll } from '../Hooks/useChatAutoScroll';
+import { prefersReducedMotion } from '@app/Application/Helpers/prefersReducedMotion';
+import {
+  CHAT_ENTRY_ANCHOR_ATTR,
+  ChatTimeline,
+  scrollEntryIntoView,
+} from './ChatTimeline';
+import { ChatToolbar, type TChatPrompt } from './ChatToolbar';
 
 /**
  * Panel de chat (FR-014; `contracts/chat-panel-contract.md` §1): orquestador
@@ -99,6 +106,9 @@ const EMPTY_SELECTION_SEED: TChatSelectionSeed = {};
 
 /** Acción por defecto del banner cuando el llamador no aporta navegación. */
 const NOOP_GO_TO_REQUEST = () => undefined;
+
+/** Duración del resaltado temporal al saltar a un mensaje (U4, ~1.5-2 s). */
+export const CHAT_HIGHLIGHT_DURATION_MS = 1600;
 
 /** Etiqueta textual del badge de atención; el color por sí solo no comunica. */
 const attentionLabel = (count: number): string =>
@@ -207,6 +217,60 @@ export const ChatPanel = ({
     setModel,
   } = useChatController(sessionId, selectionSeed);
 
+  // Auto-scroll del timeline (U2, UX): sigue al fondo al llegar contenido nuevo
+  // sin secuestrar el scroll si el usuario está leyendo más arriba. La señal
+  // cambia con el nº de entradas y con la firma de la última (id + longitud del
+  // texto) para acompañar también el streaming del mensaje en curso.
+  const lastEntry = timeline[timeline.length - 1];
+  const contentSignal = `${timeline.length}:${lastEntry?.id ?? ''}:${lastEntry?.text.length ?? 0}`;
+  const { ref: timelineScrollRef } = useChatAutoScroll(contentSignal);
+
+  // Barra superior (U3/U4): visibilidad de herramientas y salto a mis mensajes.
+  // La barra es presentación pura; el estado y el salto viven aquí.
+  const [showTools, setShowTools] = useState(true);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+
+  // El resaltado es **temporal**: se limpia solo tras un instante (U4).
+  useEffect(() => {
+    if (highlightedId === null) return;
+    const timer = setTimeout(
+      () => setHighlightedId(null),
+      CHAT_HIGHLIGHT_DURATION_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [highlightedId]);
+
+  // "Mis mensajes" (U4): mis prompts de texto (entradas del usuario) en orden,
+  // con su `id` de entrada como ancla. La barra deriva la etiqueta truncada.
+  const prompts = useMemo<TChatPrompt[]>(
+    () =>
+      timeline
+        .filter((entry) => entry.role === 'user')
+        .map((entry) => ({ id: entry.id, text: entry.text })),
+    [timeline],
+  );
+
+  // Salta a la fila elegida dentro del contenedor scrolleable del timeline y la
+  // resalta un instante (U4). Reutiliza el `ref` de `useChatAutoScroll`: no
+  // duplica la lógica de scroll, solo añade el salto puntual.
+  const handleSelectPrompt = (entryId: string) => {
+    setHighlightedId(entryId);
+
+    const container = timelineScrollRef.current;
+    if (!container) return;
+
+    const target = container.querySelector<HTMLElement>(
+      `[${CHAT_ENTRY_ANCHOR_ATTR}="${entryId}"]`,
+    );
+    if (!target) return;
+
+    scrollEntryIntoView(
+      container,
+      target,
+      prefersReducedMotion() ? 'auto' : 'smooth',
+    );
+  };
+
   // Catálogo del selector (FR-008): el SDK solo se toca en el service; aquí se
   // pasan las opciones ya derivadas (`mapModelOptions`) a la molecule.
   const modelsQuery = useModelOptions(directory);
@@ -290,7 +354,22 @@ export const ChatPanel = ({
         className="shrink-0"
       />
 
-      <Container block className="min-h-0 flex-1 overflow-auto">
+      {/* Barra superior (U3/U4): toggle de herramientas + salto a mis mensajes.
+          Presentación pura; el estado y el salto los aporta este orquestador. */}
+      <ChatToolbar
+        className="shrink-0"
+        showTools={showTools}
+        onToggleTools={setShowTools}
+        prompts={prompts}
+        onSelectPrompt={handleSelectPrompt}
+      />
+
+      <Container
+        ref={timelineScrollRef}
+        block
+        data-testid="chat-timeline-scroll"
+        className="min-h-0 flex-1 overflow-auto"
+      >
         {/* Estados de pantalla del timeline (FR-012; Principio VI): error →
             carga → vacío → datos. `ChatTimeline` se mantiene montado en todos
             los estados para no perder el punto de anclaje/aria del hilo. */}
@@ -320,7 +399,9 @@ export const ChatPanel = ({
         <ChatTimeline
           entries={timeline}
           showReasoning={showReasoning}
+          showTools={showTools}
           sessionId={sessionId}
+          highlightedEntryId={highlightedId}
         />
       </Container>
 

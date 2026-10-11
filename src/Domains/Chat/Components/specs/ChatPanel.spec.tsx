@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -9,6 +9,7 @@ import type {
   ModelInfo,
   PermissionRequest,
   SessionMessageAssistant,
+  SessionMessageAssistantTool,
   SessionMessageInfo,
   SessionMessageUser,
 } from '@opencode/client';
@@ -77,6 +78,17 @@ vi.mock('@app/Infrastructure/EventStreamProvider', () => ({
   useEventStream: () => ({ state: connection.state }),
   EventStreamProvider: ({ children }: { children: ReactNode }) => children,
 }));
+
+/**
+ * La barra superior (U3/U4) usa Radix `Select`, que depende de APIs que jsdom no
+ * implementa (`hasPointerCapture`/`releasePointerCapture`/`scrollIntoView`); se
+ * mockean como en `ChatSelector.spec.tsx` para poder abrir el select.
+ */
+beforeAll(() => {
+  Element.prototype.hasPointerCapture = vi.fn();
+  Element.prototype.releasePointerCapture = vi.fn();
+  Element.prototype.scrollIntoView = vi.fn();
+});
 
 beforeEach(() => {
   connection.state = 'connected';
@@ -680,5 +692,292 @@ describe('ChatPanel — catálogo y semilla de selección (T077/T078, FR-008)', 
     expect(screen.getByRole('combobox', { name: 'Modelo' })).toHaveTextContent(
       'GPT-5',
     );
+  });
+});
+
+/**
+ * Auto-scroll del timeline (iteración UX U2): `ChatPanel` engancha el `ref` de
+ * `useChatAutoScroll` al contenedor `overflow-auto` del timeline y le pasa la
+ * señal de contenido. Al llegar mensajes nuevos el hilo sigue al fondo si el
+ * usuario ya estaba allí, sin secuestrar el scroll si está leyendo más arriba.
+ * El hook se cubre en detalle en su propia spec; aquí solo se verifica el
+ * cableado (ref, señal y `role="status"` intactos).
+ */
+describe('ChatPanel — auto-scroll del timeline (U2, UX)', () => {
+  const setScrollMetrics = (
+    el: HTMLElement,
+    {
+      scrollHeight,
+      clientHeight,
+      scrollTop,
+    }: { scrollHeight: number; clientHeight: number; scrollTop: number },
+  ): void => {
+    Object.defineProperty(el, 'scrollHeight', {
+      configurable: true,
+      value: scrollHeight,
+    });
+    Object.defineProperty(el, 'clientHeight', {
+      configurable: true,
+      value: clientHeight,
+    });
+    Object.defineProperty(el, 'scrollTop', {
+      configurable: true,
+      writable: true,
+      value: scrollTop,
+    });
+  };
+
+  const getScrollContainer = (): HTMLElement =>
+    screen.getByTestId('chat-timeline-scroll');
+
+  const mockScrollTo = (el: HTMLElement) => {
+    const scrollTo = vi.fn();
+    (el as unknown as { scrollTo: typeof scrollTo }).scrollTo = scrollTo;
+    return scrollTo;
+  };
+
+  const seedMessage = (
+    view: ReturnType<typeof renderPanel>,
+    id: string,
+    text: string,
+  ) =>
+    act(() => {
+      view.queryClient.setQueryData(queryKeys.sessions.messages(SESSION), [
+        msg(user({ id, text })),
+      ]);
+    });
+
+  it('engancha el ref al contenedor scrolleable del timeline', () => {
+    renderPanel();
+
+    expect(getScrollContainer()).toBeInTheDocument();
+    // El anclaje accesible del turno sigue intacto.
+    expect(screen.getByTestId('chat-turn-status')).toHaveAttribute(
+      'role',
+      'status',
+    );
+  });
+
+  it('sigue al fondo al llegar un mensaje si el usuario estaba al fondo', () => {
+    const view = renderPanel();
+    const el = getScrollContainer();
+    setScrollMetrics(el, { scrollHeight: 1000, clientHeight: 400, scrollTop: 600 });
+    const scrollTo = mockScrollTo(el);
+
+    seedMessage(view, 'u1', 'hola');
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 1000, behavior: 'smooth' });
+  });
+
+  it('no fuerza el scroll si el usuario está leyendo más arriba', () => {
+    const view = renderPanel();
+    const el = getScrollContainer();
+    setScrollMetrics(el, { scrollHeight: 1000, clientHeight: 400, scrollTop: 0 });
+    fireEvent.scroll(el);
+    const scrollTo = mockScrollTo(el);
+
+    seedMessage(view, 'u1', 'hola');
+
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it('usa scroll instantáneo con prefers-reduced-motion', () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+    const view = renderPanel();
+    const el = getScrollContainer();
+    setScrollMetrics(el, { scrollHeight: 1000, clientHeight: 400, scrollTop: 600 });
+    const scrollTo = mockScrollTo(el);
+
+    seedMessage(view, 'u1', 'hola');
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 1000, behavior: 'auto' });
+
+    vi.unstubAllGlobals();
+  });
+});
+
+/**
+ * Barra superior del chat (iteración UX U3/U4): toggle de herramientas (visibles
+ * por defecto) y select "Ir a mi mensaje" que salta a un prompt propio con un
+ * resaltado temporal. El salto reutiliza el contenedor scrolleable de
+ * `useChatAutoScroll` (nunca `window`).
+ */
+const toolPart = (
+  overrides: Partial<SessionMessageAssistantTool> = {},
+): SessionMessageAssistantTool => ({
+  type: 'tool',
+  id: 'tool-1',
+  name: 'read',
+  state: {
+    status: 'completed',
+    input: { path: 'a.ts' },
+    content: [{ type: 'text', text: 'contents' }],
+  },
+  time: { created: 1000, completed: 1200 },
+  ...overrides,
+});
+
+/**
+ * Siembra los mensajes antes de montar, sobre un `QueryClient` con `gcTime`
+ * infinito: el cliente global de test usa `gcTime: 0`, de modo que una query sin
+ * observadores se recolecta en cuanto cede el event loop (p. ej. tras un
+ * `await userEvent...`), vaciando el timeline.
+ */
+const renderWithMessages = (messages: TSessionMessage[]) => {
+  const queryClient = createStateClient();
+  queryClient.setQueryData(queryKeys.sessions.messages(SESSION), messages);
+  return renderWithClient(queryClient);
+};
+
+const getTimelineScroll = (): HTMLElement =>
+  screen.getByTestId('chat-timeline-scroll');
+const getPromptSelect = (): HTMLElement =>
+  screen.getByRole('combobox', { name: 'Ir a mi mensaje' });
+const getToolsToggle = (): HTMLElement =>
+  screen.getByRole('button', { name: 'Herramientas' });
+const anchorOf = (entryId: string): HTMLElement | null =>
+  document.querySelector(`[data-chat-entry-id="${entryId}"]`);
+
+describe('ChatPanel — barra superior: toggle de herramientas (U3)', () => {
+  it('monta la barra y muestra las herramientas por defecto', () => {
+    renderWithMessages([
+      msg(user({ id: 'u1', text: 'hola' })),
+      msg(
+        assistant([{ type: 'text', text: 'respuesta' }, toolPart()], {
+          id: 'a1',
+        }),
+      ),
+    ]);
+
+    expect(screen.getByTestId('chat-toolbar')).toBeInTheDocument();
+    expect(getToolsToggle()).toHaveAttribute('aria-pressed', 'true');
+    expect(anchorOf('a1:1')).not.toBeNull();
+  });
+
+  it('oculta las herramientas al desactivar el toggle sin perder el resto', async () => {
+    const userEventSetup = userEvent.setup();
+    renderWithMessages([
+      msg(user({ id: 'u1', text: 'hola' })),
+      msg(
+        assistant([{ type: 'text', text: 'respuesta' }, toolPart()], {
+          id: 'a1',
+        }),
+      ),
+    ]);
+
+    await userEventSetup.click(getToolsToggle());
+
+    expect(getToolsToggle()).toHaveAttribute('aria-pressed', 'false');
+    expect(anchorOf('a1:1')).toBeNull();
+    // Los mensajes (no herramienta) siguen visibles.
+    expect(anchorOf('u1:0')).not.toBeNull();
+    expect(anchorOf('a1:0')).not.toBeNull();
+    // El anuncio accesible del turno sigue intacto.
+    expect(screen.getByTestId('chat-turn-status')).toHaveAttribute(
+      'role',
+      'status',
+    );
+  });
+});
+
+describe('ChatPanel — barra superior: salto a mis mensajes (U4)', () => {
+  it('deshabilita el select cuando no hay prompts propios', () => {
+    renderWithMessages([
+      msg(assistant([{ type: 'text', text: 'respuesta' }], { id: 'a1' })),
+    ]);
+
+    expect(getPromptSelect()).toBeDisabled();
+  });
+
+  it('salta al mensaje elegido dentro del contenedor y lo resalta un instante', async () => {
+    const userEventSetup = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithMessages([
+      msg(user({ id: 'u1', time: { created: 500 }, text: 'primer mensaje' })),
+      msg(user({ id: 'u2', time: { created: 600 }, text: 'segundo mensaje' })),
+    ]);
+
+    const container = getTimelineScroll();
+    const target = anchorOf('u1:0') as HTMLElement;
+    expect(target).not.toBeNull();
+
+    // Rects controlados: el destino se calcula respecto al contenedor.
+    container.getBoundingClientRect = () =>
+      ({ top: 0 }) as unknown as DOMRect;
+    target.getBoundingClientRect = () =>
+      ({ top: 120 }) as unknown as DOMRect;
+    const scrollTo = vi.fn();
+    (container as unknown as { scrollTo: typeof scrollTo }).scrollTo = scrollTo;
+
+    await userEventSetup.click(getPromptSelect());
+    await userEventSetup.click(
+      screen.getByRole('option', { name: 'primer mensaje' }),
+    );
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 120, behavior: 'smooth' });
+    expect(target).toHaveAttribute('data-highlighted', 'true');
+
+    // El resaltado es temporal: se limpia solo (~1.5-2 s).
+    await waitFor(
+      () => expect(target).not.toHaveAttribute('data-highlighted'),
+      { timeout: 3000 },
+    );
+  });
+
+  it('salta con scroll instantáneo cuando el sistema pide movimiento reducido (U4)', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+    const userEventSetup = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithMessages([
+      msg(user({ id: 'u1', time: { created: 500 }, text: 'primer mensaje' })),
+      msg(user({ id: 'u2', time: { created: 600 }, text: 'segundo mensaje' })),
+    ]);
+
+    const container = getTimelineScroll();
+    const target = anchorOf('u1:0') as HTMLElement;
+    container.getBoundingClientRect = () => ({ top: 0 }) as unknown as DOMRect;
+    target.getBoundingClientRect = () => ({ top: 120 }) as unknown as DOMRect;
+    const scrollTo = vi.fn();
+    (container as unknown as { scrollTo: typeof scrollTo }).scrollTo = scrollTo;
+
+    await userEventSetup.click(getPromptSelect());
+    await userEventSetup.click(
+      screen.getByRole('option', { name: 'primer mensaje' }),
+    );
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 120, behavior: 'auto' });
+
+    vi.unstubAllGlobals();
+  });
+});
+
+/**
+ * El filtro de herramientas (U3) solo decide qué filas se pintan: no reordena
+ * ni deduplica (eso vive en `buildChatTimeline`). Reactivar el toggle debe
+ * restaurar la fila de herramienta **una sola vez** y dejar intactas las demás.
+ */
+describe('ChatPanel — el toggle de herramientas no duplica ni pierde filas (U3)', () => {
+  it('restaura la herramienta exactamente una vez al reactivar el toggle', async () => {
+    const userEventSetup = userEvent.setup();
+    renderWithMessages([
+      msg(user({ id: 'u1', text: 'hola' })),
+      msg(
+        assistant([{ type: 'text', text: 'respuesta' }, toolPart()], {
+          id: 'a1',
+        }),
+      ),
+    ]);
+
+    const toolAnchorCount = (): number =>
+      document.querySelectorAll('[data-chat-entry-id="a1:1"]').length;
+
+    expect(toolAnchorCount()).toBe(1);
+
+    await userEventSetup.click(getToolsToggle());
+    expect(toolAnchorCount()).toBe(0);
+
+    await userEventSetup.click(getToolsToggle());
+    expect(toolAnchorCount()).toBe(1);
+    // Las filas no-herramienta siguen presentes y sin duplicar.
+    expect(anchorOf('u1:0')).not.toBeNull();
+    expect(anchorOf('a1:0')).not.toBeNull();
   });
 });
