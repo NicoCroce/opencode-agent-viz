@@ -93,6 +93,24 @@ describe('ChatComposer', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('usa un tratamiento neutro (no primario) para el botón único de acción (F2)', () => {
+    const { rerender } = render(<Harness initialValue="hola" />);
+
+    // Sin turno: el botón de enviar no lleva el fondo de color primario y usa
+    // el tratamiento ghost (hover sutil, sin relleno de color).
+    const send = screen.getByRole('button', { name: 'Enviar mensaje' });
+    expect(send).not.toHaveClass('bg-primary');
+    expect(send).not.toHaveClass('text-primary-foreground');
+    expect(send).toHaveClass('hover:bg-accent');
+
+    // Con turno: el botón de detener mantiene el mismo tratamiento neutro.
+    rerender(<Harness initialValue="hola" busy />);
+    const stop = screen.getByRole('button', { name: 'Detener el turno' });
+    expect(stop).not.toHaveClass('bg-primary');
+    expect(stop).not.toHaveClass('text-primary-foreground');
+    expect(stop).toHaveClass('hover:bg-accent');
+  });
+
   it('renders the chat controls slot in the footer row (U1)', () => {
     render(<Harness controls={<span>chips del chat</span>} />);
 

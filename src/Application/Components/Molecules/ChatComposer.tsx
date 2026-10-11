@@ -143,13 +143,14 @@ export const ChatComposer = ({
                 <AlertDialogTrigger asChild>
                   <Button
                     type="button"
+                    variant="ghost"
                     showIcon
                     icon={faStop}
                     aria-label="Detener el turno"
                     disabled={!canInterrupt}
                     isLoading={isInterrupting}
                     aria-busy={isInterrupting}
-                    className="h-8 w-8 rounded-lg p-0"
+                    className="h-8 w-8 rounded-lg p-0 text-muted-foreground hover:text-foreground"
                   />
                 </AlertDialogTrigger>
                 <AlertDialogContent>
@@ -171,13 +172,14 @@ export const ChatComposer = ({
             ) : (
               <Button
                 type="submit"
+                variant="ghost"
                 showIcon
                 icon={faPaperPlane}
                 aria-label="Enviar mensaje"
                 disabled={!canSubmit}
                 isLoading={isSubmitting}
                 aria-busy={isSubmitting}
-                className="h-8 w-8 rounded-lg p-0"
+                className="h-8 w-8 rounded-lg p-0 text-muted-foreground hover:text-foreground"
               />
             )}
           </Container>
