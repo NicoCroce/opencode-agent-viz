@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import type { THistoryEntry } from '@app/Domains/History/History.entity';
 import { ToolCallEntry } from '../ToolCallEntry';
 import { CompactionEntryBody } from './bodies/CompactionEntryBody';
@@ -25,11 +25,11 @@ interface HistoryEntryBodyProps {
 }
 
 /** Cuerpo de la entrada según su `kind` (FR-003/006). */
-export const HistoryEntryBody = ({
+export const HistoryEntryBody = memo(function HistoryEntryBody({
   entry,
   sessionId,
   renderCompactionContext,
-}: HistoryEntryBodyProps): ReactNode => {
+}: HistoryEntryBodyProps): ReactNode {
   switch (entry.kind) {
     case 'user':
       return <UserEntryBody entry={entry} />;
@@ -76,4 +76,4 @@ export const HistoryEntryBody = ({
     case 'idle':
       return <IdleEntryBody entry={entry} />;
   }
-};
+});
