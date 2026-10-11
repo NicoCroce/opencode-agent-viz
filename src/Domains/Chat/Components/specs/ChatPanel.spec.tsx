@@ -1084,10 +1084,29 @@ describe('ChatPanel — padding lateral del panel (U3, UX)', () => {
 
     const scroll = screen.getByTestId('chat-timeline-scroll');
     // El gutter vive en la raíz: el contenedor de scroll sigue a ras del panel,
-    // conservando su `overflow-auto` y sin padding lateral propio.
+    // conservando su scroll vertical y sin padding lateral propio.
     expect(scroll).not.toHaveClass('px-4');
     expect(scroll).not.toHaveClass('px-3');
-    expect(scroll).toHaveClass('overflow-auto');
+    expect(scroll).toHaveClass('overflow-y-auto');
     expect(screen.getByTestId('chat-panel')).toContainElement(scroll);
+  });
+});
+
+/**
+ * Sin scroll horizontal (iteración UX, fix del chat): el hilo solo debe
+ * desplazarse en vertical; los bloques anchos (código, tablas, URLs largas) se
+ * contienen en su propia fila. En jsdom no hay layout real, así que la
+ * verificación es por clases: el contenedor scrolleable del timeline acota el
+ * eje X (`overflow-x-hidden`) y no habilita el scroll en ambos ejes.
+ */
+describe('ChatPanel — sin scroll horizontal (UX, fix)', () => {
+  it('acota el eje X del contenedor scrolleable del timeline', () => {
+    renderPanel();
+
+    const scroll = screen.getByTestId('chat-timeline-scroll');
+    expect(scroll).toHaveClass('overflow-y-auto');
+    expect(scroll).toHaveClass('overflow-x-hidden');
+    // `overflow-auto` habilitaba ambos ejes: ya no debe estar.
+    expect(scroll).not.toHaveClass('overflow-auto');
   });
 });

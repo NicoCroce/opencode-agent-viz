@@ -83,7 +83,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
     <article
       data-testid="chat-message-row"
       data-role={entry.role}
-      className={`flex max-w-[85%] flex-col gap-1 ${
+      className={`flex min-w-0 max-w-[85%] flex-col gap-1 break-words ${
         isUser ? 'self-end items-end' : 'self-start items-start'
       }`}
     >

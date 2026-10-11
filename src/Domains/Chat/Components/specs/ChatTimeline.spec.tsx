@@ -245,6 +245,16 @@ describe('ChatTimeline — anclas y resaltado del salto (U4)', () => {
     expect(anchor).toHaveAttribute('id', chatEntryAnchorId('a1:0'));
   });
 
+  it('acota la fila al ancho del timeline (min-w-0 + max-w-full, sin scroll horizontal)', () => {
+    render(<ChatTimeline entries={[consolidated(answerHistory())]} />);
+
+    const anchor = anchorOf('a1:0');
+    // La fila puede encoger por debajo de su `min-content` y no excede el ancho
+    // del hilo: el contenido ancho se contiene dentro de su propia fila.
+    expect(anchor?.className).toContain('min-w-0');
+    expect(anchor?.className).toContain('max-w-full');
+  });
+
   it('resalta solo la entrada indicada y con un estilo no solo-color', () => {
     render(
       <ChatTimeline

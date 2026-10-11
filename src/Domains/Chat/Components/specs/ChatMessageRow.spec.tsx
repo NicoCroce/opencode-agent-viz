@@ -239,3 +239,46 @@ describe('ChatMessageRow — cuerpo compartido y visibilidad', () => {
     expect(screen.getByText('Razonamiento')).toBeInTheDocument();
   });
 });
+
+/**
+ * Contención de ancho (fix UX del chat): el `article` de la fila puede encoger
+ * por debajo de su `min-content` (`min-w-0`) y envuelve palabras/URLs largas
+ * (`break-words`) para no ensanchar el hilo. Los bloques de código (`pre`) del
+ * markdown compartido conservan su **scroll horizontal propio** y no se envuelven
+ * (no se toca `RichText`). En jsdom no hay layout real: se verifica por clases.
+ */
+describe('ChatMessageRow — contención de ancho (UX, fix)', () => {
+  it('permite encoger la fila y envolver el texto largo (min-w-0 + break-words)', () => {
+    render(
+      <ChatMessageRow
+        entry={consolidated(
+          answerHistory({
+            text: 'https://example.com/ruta/muy/larga/sin/espacios/que/no/deberia/desbordar',
+          }),
+        )}
+      />,
+    );
+
+    const row = screen.getByTestId('chat-message-row');
+    expect(row).toHaveClass('min-w-0');
+    expect(row).toHaveClass('break-words');
+    // El tope de ancho relativo se conserva.
+    expect(row).toHaveClass('max-w-[85%]');
+  });
+
+  it('no envuelve los bloques de código: conservan su scroll horizontal propio', () => {
+    render(
+      <ChatMessageRow
+        entry={consolidated(answerHistory({ text: '```\nconst x = 1;\n```' }))}
+      />,
+    );
+
+    const row = screen.getByTestId('chat-message-row');
+    // `break-words` vive en la fila y es heredable, pero `pre` fija
+    // `white-space: pre` + `overflow-x-auto`, así que mantiene su scroll interno.
+    expect(row).toHaveClass('break-words');
+    const pre = row.querySelector('pre');
+    expect(pre).not.toBeNull();
+    expect(pre).toHaveClass('overflow-x-auto');
+  });
+});

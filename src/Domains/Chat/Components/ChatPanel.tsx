@@ -357,7 +357,7 @@ export const ChatPanel = ({
         ref={timelineScrollRef}
         block
         data-testid="chat-timeline-scroll"
-        className="min-h-0 flex-1 overflow-auto"
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
       >
         {/* Estados de pantalla del timeline (FR-012; Principio VI): error →
             carga → vacío → datos. `ChatTimeline` se mantiene montado en todos

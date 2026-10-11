@@ -131,6 +131,10 @@ export const ChatTimeline = memo(function ChatTimeline({
             {...{ [CHAT_ENTRY_ANCHOR_ATTR]: entry.id }}
             data-highlighted={isHighlighted ? 'true' : undefined}
             className={[
+              // `min-w-0`/`max-w-full`: la fila se acota al ancho del timeline
+              // (y puede encoger por debajo de su `min-content`), de modo que el
+              // contenido ancho no ensancha el hilo ni fuerza scroll horizontal.
+              'min-w-0 max-w-full',
               entry.role === 'user' ? 'self-end' : 'self-start',
               isHighlighted ? CHAT_ENTRY_HIGHLIGHT_CLASS : '',
             ]
