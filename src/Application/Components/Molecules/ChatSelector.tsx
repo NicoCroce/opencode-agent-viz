@@ -35,8 +35,8 @@ export interface ChatSelectorProps {
   isPending?: boolean;
 }
 
-interface SelectFieldProps {
-  /** Nombre visible y accesible del control. */
+interface SelectChipProps {
+  /** Nombre accesible del chip (solo lector de pantalla, sin label visible). */
   label: string;
   /** Valor controlado; vacío muestra el placeholder. */
   value: string;
@@ -48,33 +48,35 @@ interface SelectFieldProps {
 }
 
 /**
- * Selector etiquetado reutilizado por los tres campos.
+ * Chip compacto (estilo Copilot) reutilizado por los tres selectores.
  *
  * Usa los primitivos Radix de `ui/select` (el wrapper `Select` no expone
  * `disabled`) para poder deshabilitar el razonamiento sin variantes y bloquear
- * todo mientras hay una escritura en curso. El `<label>` asocia el nombre
- * accesible con el disparador; el estado nunca se comunica solo por color.
+ * todo mientras hay una escritura en curso. El nombre accesible se asocia con un
+ * `<label class="sr-only">` al disparador (no hay etiqueta visible encima); el
+ * estado nunca se comunica solo por color. El `chevron` del `SelectTrigger`
+ * señala que es un control desplegable.
  */
-const SelectField = ({
+const SelectChip = ({
   label,
   value,
   placeholder,
   options,
   onValueChange,
   disabled = false,
-}: SelectFieldProps) => {
+}: SelectChipProps) => {
   const id = useId();
 
   return (
-    <Container space="small" className="min-w-[8rem] flex-1">
-      <Label
-        htmlFor={id}
-        className="text-[11px] font-medium text-muted-foreground"
-      >
+    <Container row align="center" className="w-auto">
+      <Label htmlFor={id} className="sr-only">
         {label}
       </Label>
       <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-        <SelectTrigger id={id} className="w-full">
+        <SelectTrigger
+          id={id}
+          className="h-8 w-auto gap-1 rounded-full border-input bg-transparent px-3 text-xs"
+        >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
@@ -92,14 +94,16 @@ const SelectField = ({
 };
 
 /**
- * Selectores de agente, modelo y razonamiento del chat (FR-008, SC-008).
+ * Chips de agente, modelo y razonamiento del chat (FR-008, SC-008).
  *
  * Molecule presentacional: no conoce el SDK ni los servicios; recibe las
- * opciones ya derivadas y emite la `TChatSelection` resultante. La variante de
- * razonamiento se acota al modelo elegido (`reasoning`); si el modelo no tiene
- * variantes la lista queda vacía y el control deshabilitado, sin bloquear el
- * envío. Operable por teclado, con foco visible y sin comunicar estado solo por
- * color (FR-021).
+ * opciones ya derivadas y emite la `TChatSelection` resultante. Cada control es
+ * un **chip compacto** que muestra el valor vigente (p. ej. `sddorch`,
+ * `DeepSeek V4.1 Flash`, `high`) con un chevron, sin label visible encima. La
+ * variante de razonamiento se acota al modelo elegido (`reasoning`); si el modelo
+ * no tiene variantes la lista queda vacía y el control deshabilitado, sin
+ * bloquear el envío. Operable por teclado, con foco visible y sin comunicar
+ * estado solo por color (FR-021).
  */
 export const ChatSelector = ({
   agents,
@@ -147,8 +151,8 @@ export const ChatSelector = ({
   };
 
   return (
-    <Container row space="small" className="flex-wrap">
-      <SelectField
+    <Container row align="center" space="small" className="w-auto flex-wrap">
+      <SelectChip
         label="Agente"
         value={selection.agent ?? ''}
         placeholder="Elegir agente"
@@ -156,7 +160,7 @@ export const ChatSelector = ({
         onValueChange={handleAgentChange}
         disabled={isPending}
       />
-      <SelectField
+      <SelectChip
         label="Modelo"
         value={selection.model?.id ?? ''}
         placeholder="Elegir modelo"
@@ -164,7 +168,7 @@ export const ChatSelector = ({
         onValueChange={handleModelChange}
         disabled={isPending}
       />
-      <SelectField
+      <SelectChip
         label="Razonamiento"
         value={selection.model?.variant ?? ''}
         placeholder={hasReasoning ? 'Elegir variante' : 'Sin variantes'}

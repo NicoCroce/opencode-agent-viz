@@ -83,36 +83,35 @@ describe('ChatSelector', () => {
     expect(getTrigger('Razonamiento')).toBeInTheDocument();
   });
 
-  it('associates each label with its trigger using compact muted styles (U5)', () => {
+  it('keeps each chip accessible via an sr-only label (U1)', () => {
     renderSelector();
 
     for (const name of ['Agente', 'Modelo', 'Razonamiento']) {
       const label = screen.getByText(name);
       const trigger = getTrigger(name);
 
-      // a11y: el label apunta al disparador por `htmlFor` ↔ `id`.
+      // a11y: el nombre accesible se asocia por `htmlFor` ↔ `id` y no hay label
+      // visible encima del chip (solo lector de pantalla).
       expect(label).toHaveAttribute('for', trigger.id);
       expect(trigger).toHaveAttribute('id');
-      // Estética: etiquetas pequeñas y atenuadas, consistentes entre campos.
-      expect(label).toHaveClass('text-[11px]');
-      expect(label).toHaveClass('text-muted-foreground');
+      expect(label).toHaveClass('sr-only');
     }
   });
 
-  it('gives the three fields equal flexible width and lets them wrap (U5)', () => {
+  it('renders the three selectors as compact chips that wrap (U1)', () => {
     renderSelector();
 
-    const fields = ['Agente', 'Modelo', 'Razonamiento'].map(
-      (name) => screen.getByText(name).parentElement,
-    );
+    const triggers = ['Agente', 'Modelo', 'Razonamiento'].map(getTrigger);
 
-    for (const field of fields) {
-      expect(field).toHaveClass('flex-1');
-      expect(field).toHaveClass('min-w-[8rem]');
+    for (const trigger of triggers) {
+      // Chips compactos: pastilla redondeada, ancho al contenido y altura pequeña.
+      expect(trigger).toHaveClass('rounded-full');
+      expect(trigger).toHaveClass('w-auto');
+      expect(trigger).toHaveClass('h-8');
     }
 
-    // La fila envuelve en pantallas estrechas en lugar de recortar los campos.
-    expect(fields[0]?.parentElement).toHaveClass('flex-wrap');
+    // La fila envuelve en pantallas estrechas en lugar de recortar los chips.
+    expect(triggers[0]?.closest('.flex-wrap')).not.toBeNull();
   });
 
   it('offers the available agents and emits the chosen one (FR-008)', async () => {

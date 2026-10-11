@@ -1,13 +1,8 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type {
-  TAgentOption,
-  TChatSelection,
-  TModelOption,
-  TReasoningOption,
-} from '@app/Domains/Chat/Chat.entity';
 import { ChatComposer } from '../ChatComposer';
 
 interface HarnessProps {
@@ -18,11 +13,7 @@ interface HarnessProps {
   onInterrupt?: () => void;
   isInterrupting?: boolean;
   disabled?: boolean;
-  agents?: TAgentOption[];
-  models?: TModelOption[];
-  reasoning?: TReasoningOption[];
-  selection?: TChatSelection;
-  onSelectionChange?: (next: TChatSelection) => void;
+  controls?: ReactNode;
 }
 
 /**
@@ -44,11 +35,7 @@ const Harness = ({
   onInterrupt,
   isInterrupting = false,
   disabled = false,
-  agents,
-  models,
-  reasoning,
-  selection,
-  onSelectionChange,
+  controls,
 }: HarnessProps) => {
   const [value, setValue] = useState(initialValue);
   return (
@@ -61,46 +48,13 @@ const Harness = ({
       onInterrupt={onInterrupt}
       isInterrupting={isInterrupting}
       disabled={disabled}
-      agents={agents}
-      models={models}
-      reasoning={reasoning}
-      selection={selection}
-      onSelectionChange={onSelectionChange}
+      controls={controls}
     />
   );
 };
 
 const getTextarea = (): HTMLTextAreaElement =>
   screen.getByRole('textbox', { name: 'Mensaje' });
-
-/**
- * Selector embebido (T044, FR-008): el compositor monta `ChatSelector` cuando
- * recibe una `selection` y reenvía las opciones ya derivadas.
- */
-const REASONING: TReasoningOption[] = [
-  { value: 'low', label: 'Bajo' },
-  { value: 'high', label: 'Alto' },
-];
-
-const AGENTS: TAgentOption[] = [
-  { id: 'build', label: 'Build' },
-  { id: 'plan', label: 'Plan' },
-];
-
-const MODELS: TModelOption[] = [
-  {
-    id: 'gpt-4o',
-    label: 'GPT-4o',
-    ref: { id: 'gpt-4o', providerID: 'openai' },
-    reasoning: REASONING,
-  },
-];
-
-const EMPTY_SELECTION: TChatSelection = {
-  agent: null,
-  model: null,
-  isDirty: false,
-};
 
 describe('ChatComposer', () => {
   it('renders an accessible textarea and the send button', () => {
@@ -110,32 +64,38 @@ describe('ChatComposer', () => {
     expect(screen.getByRole('button', { name: 'Enviar' })).toBeInTheDocument();
   });
 
-  it('mounts the selector when a selection is provided (T044, FR-008)', () => {
-    render(
-      <Harness selection={EMPTY_SELECTION} agents={AGENTS} models={MODELS} />,
-    );
+  it('renders the chat controls slot in the footer row (U1)', () => {
+    render(<Harness controls={<span>chips del chat</span>} />);
 
-    expect(screen.getByText('Agente')).toBeInTheDocument();
-    expect(screen.getByText('Modelo')).toBeInTheDocument();
-    expect(screen.getByText('Razonamiento')).toBeInTheDocument();
+    expect(screen.getByTestId('chat-composer-controls')).toHaveTextContent(
+      'chips del chat',
+    );
   });
 
-  it('lays out selectors, message and actions as grouped blocks (U5)', () => {
-    render(
-      <Harness selection={EMPTY_SELECTION} agents={AGENTS} models={MODELS} />,
-    );
+  it('lays out the controls and the actions in a single footer row (U1)', () => {
+    render(<Harness controls={<span>chips</span>} />);
 
-    // Etiquetas pequeñas y atenuadas, consistentes en selectores y mensaje.
-    for (const name of ['Agente', 'Modelo', 'Razonamiento', 'Mensaje']) {
-      const label = screen.getByText(name);
-      expect(label).toHaveClass('text-[11px]');
-      expect(label).toHaveClass('text-muted-foreground');
-    }
+    const controls = screen.getByTestId('chat-composer-controls');
+    const actions = screen.getByTestId('chat-composer-actions');
 
-    // Los botones se alinean al extremo de la fila de acciones.
-    const actions = screen.getByRole('button', { name: 'Enviar' })
-      .parentElement;
-    expect(actions).toHaveClass('justify-end');
+    // Chips a la izquierda y acciones a la derecha comparten la misma fila.
+    expect(controls.parentElement).toBe(actions.parentElement);
+    expect(controls.parentElement).toHaveClass('flex-row');
+    expect(controls.parentElement).toHaveClass('justify-between');
+    // El slot de controles ocupa el espacio libre; las acciones no se encogen.
+    expect(controls).toHaveClass('flex-1');
+    expect(actions).toHaveClass('shrink-0');
+  });
+
+  it('deja que los chips envuelvan sin desbordar la fila (U1)', () => {
+    render(<Harness controls={<span>chips</span>} />);
+
+    const controls = screen.getByTestId('chat-composer-controls');
+
+    // El slot puede encogerse (`min-w-0`) y envolver (`flex-wrap`) para que los
+    // chips del footer no desborden en pantallas estrechas.
+    expect(controls).toHaveClass('min-w-0', 'flex-wrap');
+    expect(controls.parentElement).toHaveClass('flex-wrap');
   });
 
   it('reports typed text through onChange', async () => {

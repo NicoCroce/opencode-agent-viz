@@ -1,6 +1,13 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -156,8 +163,12 @@ describe('ChatPanel — composición del orquestador (T023, FR-014)', () => {
       ]);
     });
 
-    expect(screen.getByText('hola')).toBeInTheDocument();
-    expect(screen.getByText('respuesta')).toBeInTheDocument();
+    // El `Select` de "mis mensajes" vive dentro del `<form>` del compositor
+    // (footer U1), así que Radix refleja cada opción en un `<select>` nativo
+    // oculto; se acota la consulta al timeline para no colisionar con él.
+    const timeline = within(screen.getByTestId('chat-timeline'));
+    expect(timeline.getByText('hola')).toBeInTheDocument();
+    expect(timeline.getByText('respuesta')).toBeInTheDocument();
   });
 
   it('muestra la parte provisional del buffer en texto plano ("En curso")', () => {
@@ -534,7 +545,11 @@ describe('ChatPanel — estados de pantalla (T056, FR-012)', () => {
 
     renderWithClient(queryClient);
 
-    expect(screen.getByText('hola')).toBeInTheDocument();
+    // El `<select>` nativo oculto del footer (Radix) refleja el texto del
+    // mensaje como `<option>`; se acota la consulta al timeline.
+    expect(
+      within(screen.getByTestId('chat-timeline')).getByText('hola'),
+    ).toBeInTheDocument();
     expect(screen.queryByTestId('chat-loading')).not.toBeInTheDocument();
     expect(screen.queryByText('Sin mensajes todavía')).not.toBeInTheDocument();
   });
@@ -979,5 +994,168 @@ describe('ChatPanel — el toggle de herramientas no duplica ni pierde filas (U3
     // Las filas no-herramienta siguen presentes y sin duplicar.
     expect(anchorOf('u1:0')).not.toBeNull();
     expect(anchorOf('a1:0')).not.toBeNull();
+  });
+});
+
+/**
+ * Historial en modal (iteración UX U2): un botón-icono en el footer abre un modal
+ * con **todos** los mensajes etiquetados por autor; al elegir uno, el modal se
+ * cierra y el hilo salta a esa fila con el **mismo** resaltado temporal del select
+ * (reutiliza `handleSelectPrompt`, sin duplicar la lógica de scroll).
+ */
+const getHistoryButton = (): HTMLElement =>
+  screen.getByRole('button', { name: 'Historial de mensajes' });
+
+describe('ChatPanel — historial en modal (U2)', () => {
+  it('abre el modal con todos los mensajes etiquetados por autor', async () => {
+    const userEventSetup = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithMessages([
+      msg(user({ id: 'u1', time: { created: 500 }, text: 'primer mensaje' })),
+      msg(assistant([{ type: 'text', text: 'respuesta' }], { id: 'a1' })),
+    ]);
+
+    await userEventSetup.click(getHistoryButton());
+
+    const dialog = screen.getByRole('dialog', {
+      name: 'Historial de mensajes',
+    });
+    const items = within(dialog).getAllByTestId('chat-history-item');
+    expect(items).toHaveLength(2);
+    expect(within(items[0]).getByText('Tú')).toBeInTheDocument();
+    expect(within(items[0]).getByText('primer mensaje')).toBeInTheDocument();
+    expect(within(items[1]).getByText('Agente')).toBeInTheDocument();
+    expect(within(items[1]).getByText('respuesta')).toBeInTheDocument();
+  });
+
+  it('muestra el estado vacío del historial cuando no hay mensajes', async () => {
+    const userEventSetup = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithMessages([]);
+
+    await userEventSetup.click(getHistoryButton());
+
+    const dialog = screen.getByRole('dialog', {
+      name: 'Historial de mensajes',
+    });
+    expect(
+      within(dialog).getByText('Sin mensajes en el historial'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('chat-history-item'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('salta al mensaje elegido, lo resalta y cierra el modal', async () => {
+    const userEventSetup = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithMessages([
+      msg(user({ id: 'u1', time: { created: 500 }, text: 'primer mensaje' })),
+      msg(assistant([{ type: 'text', text: 'respuesta' }], { id: 'a1' })),
+    ]);
+
+    await userEventSetup.click(getHistoryButton());
+
+    const container = getTimelineScroll();
+    const target = anchorOf('u1:0') as HTMLElement;
+    expect(target).not.toBeNull();
+    // Rects controlados: el destino se calcula respecto al contenedor.
+    container.getBoundingClientRect = () => ({ top: 0 }) as unknown as DOMRect;
+    target.getBoundingClientRect = () => ({ top: 120 }) as unknown as DOMRect;
+    const scrollTo = vi.fn();
+    (container as unknown as { scrollTo: typeof scrollTo }).scrollTo = scrollTo;
+
+    await userEventSetup.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: /primer mensaje/,
+      }),
+    );
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 120, behavior: 'smooth' });
+    expect(target).toHaveAttribute('data-highlighted', 'true');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('cierra el modal con Escape (estado del panel)', async () => {
+    const userEventSetup = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithMessages([
+      msg(user({ id: 'u1', time: { created: 500 }, text: 'primer mensaje' })),
+    ]);
+
+    await userEventSetup.click(getHistoryButton());
+    expect(
+      screen.getByRole('dialog', { name: 'Historial de mensajes' }),
+    ).toBeInTheDocument();
+
+    await userEventSetup.keyboard('{Escape}');
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('devuelve el foco al botón de historial al cerrar con Escape (WCAG 2.2 AA)', async () => {
+    const userEventSetup = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithMessages([
+      msg(user({ id: 'u1', time: { created: 500 }, text: 'primer mensaje' })),
+    ]);
+
+    const trigger = getHistoryButton();
+    await userEventSetup.click(trigger);
+    expect(
+      screen.getByRole('dialog', { name: 'Historial de mensajes' }),
+    ).toBeInTheDocument();
+
+    await userEventSetup.keyboard('{Escape}');
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+    expect(trigger).toHaveFocus();
+  });
+
+  it('devuelve el foco al botón de historial tras elegir un mensaje', async () => {
+    const userEventSetup = userEvent.setup({ pointerEventsCheck: 0 });
+    renderWithMessages([
+      msg(user({ id: 'u1', time: { created: 500 }, text: 'primer mensaje' })),
+    ]);
+
+    const trigger = getHistoryButton();
+    await userEventSetup.click(trigger);
+
+    await userEventSetup.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: /primer mensaje/,
+      }),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+    expect(trigger).toHaveFocus();
+  });
+});
+
+/**
+ * Padding lateral del panel (iteración UX U3): a pantalla completa —y también en
+ * la columna estrecha— el contenido del chat no debe tocar los bordes. El gutter
+ * se aplica **una sola vez** en la raíz del panel (coherente con el `p-4` del
+ * panel de detalle), de modo que timeline, avisos, bandeja de pendientes y
+ * composer quedan despegados sin duplicar padding en los hijos que ya lo tienen.
+ */
+describe('ChatPanel — padding lateral del panel (U3, UX)', () => {
+  it('aplica el gutter horizontal en la raíz del panel', () => {
+    renderPanel();
+
+    expect(screen.getByTestId('chat-panel')).toHaveClass('px-4');
+  });
+
+  it('no duplica el gutter en el contenedor scrolleable del timeline', () => {
+    renderPanel();
+
+    const scroll = screen.getByTestId('chat-timeline-scroll');
+    // El gutter vive en la raíz: el contenedor de scroll sigue a ras del panel,
+    // conservando su `overflow-auto` y sin padding lateral propio.
+    expect(scroll).not.toHaveClass('px-4');
+    expect(scroll).not.toHaveClass('px-3');
+    expect(scroll).toHaveClass('overflow-auto');
+    expect(screen.getByTestId('chat-panel')).toContainElement(scroll);
   });
 });

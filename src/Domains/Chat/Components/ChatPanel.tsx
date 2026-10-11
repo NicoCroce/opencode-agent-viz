@@ -12,6 +12,7 @@ import {
   ListSkeleton,
 } from '@app/Application/Components/Molecules';
 import { ChatAttentionBanner } from '@app/Application/Components/Molecules/ChatAttentionBanner';
+import { ChatSelector } from '@app/Application/Components/Molecules/ChatSelector';
 import { useEventStream } from '@app/Infrastructure/EventStreamProvider';
 import { queryKeys } from '../../queryKeys';
 import {
@@ -42,6 +43,7 @@ import {
   ChatTimeline,
   scrollEntryIntoView,
 } from './ChatTimeline';
+import { ChatHistoryDialog } from './ChatHistoryDialog';
 import { ChatToolbar, type TChatPrompt } from './ChatToolbar';
 
 /**
@@ -230,6 +232,13 @@ export const ChatPanel = ({
   const [showTools, setShowTools] = useState(true);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
+  // Historial completo (U2): el modal lista **todos** los mensajes del timeline y
+  // reutiliza el mismo salto resaltado de la barra (no duplica la lógica). El
+  // `ref` apunta al botón de la barra para devolverle el foco al cerrar el modal
+  // (WCAG 2.2 AA): sin `DialogTrigger`, Radix no sabría a quién restaurarlo.
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const historyTriggerRef = useRef<HTMLButtonElement | null>(null);
+
   // El resaltado es **temporal**: se limpia solo tras un instante (U4).
   useEffect(() => {
     if (highlightedId === null) return;
@@ -343,7 +352,7 @@ export const ChatPanel = ({
     <Container
       space="small"
       data-testid="chat-panel"
-      className={`h-full min-h-0 ${className ?? ''}`}
+      className={`h-full min-h-0 px-4 ${className ?? ''}`}
     >
       {/* Banner de atención (T055, FR-009/FR-010): resume el pendiente más
           antiguo del subárbol y ofrece la acción a su request origen. Sin
@@ -352,16 +361,6 @@ export const ChatPanel = ({
         items={attention}
         onGoToRequest={onGoToRequest ?? NOOP_GO_TO_REQUEST}
         className="shrink-0"
-      />
-
-      {/* Barra superior (U3/U4): toggle de herramientas + salto a mis mensajes.
-          Presentación pura; el estado y el salto los aporta este orquestador. */}
-      <ChatToolbar
-        className="shrink-0"
-        showTools={showTools}
-        onToggleTools={setShowTools}
-        prompts={prompts}
-        onSelectPrompt={handleSelectPrompt}
       />
 
       <Container
@@ -492,6 +491,11 @@ export const ChatPanel = ({
         </p>
       ) : null}
 
+      {/* Footer estilo Copilot (U1): el compositor monta en su fila inferior los
+          controles del chat a la izquierda —toggle de herramientas + salto a mis
+          mensajes (`ChatToolbar`) y chips de agente/modelo/razonamiento
+          (`ChatSelector`)— y las acciones [Detener] [Enviar] a la derecha. El
+          slot `controls` evita el import cross-domain desde la molecule. */}
       <ChatComposer
         className="shrink-0"
         value={text}
@@ -501,11 +505,38 @@ export const ChatPanel = ({
         busy={busy}
         onInterrupt={interrupt}
         isInterrupting={isInterrupting}
-        agents={agents}
-        models={models}
-        reasoning={reasoning}
-        selection={selection}
-        onSelectionChange={handleSelectionChange}
+        controls={
+          <>
+            <ChatToolbar
+              showTools={showTools}
+              onToggleTools={setShowTools}
+              prompts={prompts}
+              onSelectPrompt={handleSelectPrompt}
+              onOpenHistory={() => setHistoryOpen(true)}
+              historyButtonRef={historyTriggerRef}
+            />
+            <ChatSelector
+              agents={agents}
+              models={models}
+              reasoning={reasoning}
+              selection={selection}
+              onChange={handleSelectionChange}
+              isPending={isSubmitting}
+            />
+          </>
+        }
+      />
+
+      {/* Historial completo (U2): modal con todos los mensajes, etiquetados por
+          autor. El salto reutiliza `handleSelectPrompt` (mismo resaltado y
+          contenedor de scroll); el modal se cierra solo al elegir una entrada y
+          devuelve el foco al botón de la barra (`historyTriggerRef`). */}
+      <ChatHistoryDialog
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        entries={timeline}
+        onSelectEntry={handleSelectPrompt}
+        triggerRef={historyTriggerRef}
       />
     </Container>
   );
