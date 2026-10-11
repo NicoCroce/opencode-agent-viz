@@ -80,4 +80,31 @@ describe('SessionList', () => {
     expect(screen.getByLabelText('1 sesión')).toHaveTextContent('1');
     expect(screen.queryByLabelText('2 sesiones')).not.toBeInTheDocument();
   });
+
+  it('muestra el badge de pendientes por raíz cuando su subárbol tiene atención (T073, FR-009)', () => {
+    render(
+      <SessionList
+        groups={groups}
+        selectedId={null}
+        onSelect={() => undefined}
+        attentionByRoot={{ a1: 2, b1: 1 }}
+      />,
+    );
+
+    // `aria-label` textual: la señal no depende del color (attention-contract §2).
+    expect(screen.getByLabelText('2 pendientes por atender')).toBeInTheDocument();
+    expect(screen.getByLabelText('1 pendiente por atender')).toBeInTheDocument();
+    // Una raíz sin entrada en el mapa no monta badge.
+    expect(
+      screen.queryByLabelText('0 pendientes por atender'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('sin `attentionByRoot` no monta ningún badge (presentación opt-in)', () => {
+    render(
+      <SessionList groups={groups} selectedId={null} onSelect={() => undefined} />,
+    );
+
+    expect(screen.queryByLabelText(/pendiente/)).not.toBeInTheDocument();
+  });
 });

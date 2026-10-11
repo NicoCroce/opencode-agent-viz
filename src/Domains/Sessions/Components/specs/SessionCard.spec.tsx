@@ -195,4 +195,82 @@ describe('SessionCard', () => {
       screen.getByText(`no disponible – ${stamp(END)}`),
     ).toBeInTheDocument();
   });
+
+  it('does not render the attention badge by default (opt-in)', () => {
+    render(
+      <SessionCard
+        item={{ session, agentName: 'develop' }}
+        status={{ type: 'idle' }}
+        selected={false}
+        onSelect={() => undefined}
+      />,
+    );
+    expect(
+      screen.queryByRole('img', { name: /pendiente/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not render the attention badge when attentionCount is 0', () => {
+    render(
+      <SessionCard
+        item={{ session, agentName: 'develop' }}
+        status={{ type: 'idle' }}
+        attentionCount={0}
+        selected={false}
+        onSelect={() => undefined}
+      />,
+    );
+    expect(
+      screen.queryByRole('img', { name: /pendiente/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders a textual badge when attentionCount is 1', () => {
+    render(
+      <SessionCard
+        item={{ session, agentName: 'develop' }}
+        status={{ type: 'idle' }}
+        attentionCount={1}
+        selected={false}
+        onSelect={() => undefined}
+      />,
+    );
+    expect(
+      screen.getByRole('img', { name: '1 pendiente por atender' }),
+    ).toBeInTheDocument();
+  });
+
+  it('pluralizes the attention label with more than one pending item', () => {
+    render(
+      <SessionCard
+        item={{ session, agentName: 'develop' }}
+        status={{ type: 'idle' }}
+        attentionCount={3}
+        selected={false}
+        onSelect={() => undefined}
+      />,
+    );
+    expect(
+      screen.getByRole('img', { name: '3 pendientes por atender' }),
+    ).toBeInTheDocument();
+  });
+
+  it('marks the attention badge with a non-color icon and a ≥3:1 token', () => {
+    render(
+      <SessionCard
+        item={{ session, agentName: 'develop' }}
+        status={{ type: 'idle' }}
+        attentionCount={2}
+        selected={false}
+        onSelect={() => undefined}
+      />,
+    );
+    const badge = screen.getByRole('img', {
+      name: '2 pendientes por atender',
+    });
+    // Marca no-color: lleva un icono además del color.
+    expect(badge.querySelector('svg')).not.toBeNull();
+    // Token de contraste ≥3:1 (ámbar de estado sobre la superficie oscura).
+    expect(badge).toHaveClass('bg-status-waiting', 'text-surface-0');
+  });
 });
