@@ -9,16 +9,26 @@ import { sessionReadService } from './session.service';
 
 /**
  * Único punto de acceso al SDK de OpenCode (Constitución III).
- * Read-only: solo se exponen métodos de lectura (FR-016).
+ *
+ * `opencodeService` es la fachada **read-only** (FR-016) y sigue blindada: la
+ * escritura vive en el singleton **hermano** `sessionWriteService`, que no se
+ * fusiona en aquella para no exponer nombres de escritura en su superficie.
  *
  * Fachada que reexporta el singleton, los tipos de mensaje y compone el
  * servicio por sub-dominio. La implementación vive en `client.ts`,
  * `message.entity.ts`, `session.service.ts`, `form.service.ts`,
- * `catalog.service.ts` y `event.service.ts`.
+ * `catalog.service.ts`, `event.service.ts` y `session.write.service.ts`.
  */
 export { opencodeClient, resolveBaseUrl } from './client';
 export { normalizeMessages } from './message.entity';
 export type { TContentPart, TSessionMessage } from './message.entity';
+export { sessionWriteService } from './session.write.service';
+export type {
+  SessionWriteService,
+  TSendPromptInput,
+  TReplyPermissionInput,
+  TReplyFormInput,
+} from './session.write.service';
 
 export interface OpenCodeService
   extends SessionReadService,
