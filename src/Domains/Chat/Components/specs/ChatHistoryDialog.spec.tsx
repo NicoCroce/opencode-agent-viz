@@ -103,6 +103,29 @@ describe('ChatHistoryDialog — estructura y a11y (U2)', () => {
   });
 });
 
+describe('ChatHistoryDialog — layout (U3)', () => {
+  it('usa un ancho fluido que vence el ancho base del diálogo', () => {
+    renderDialog({}, [entry()]);
+
+    const dialog = screen.getByTestId('chat-history-dialog');
+    expect(dialog).toHaveClass('w-[min(90vw,60rem)]');
+    expect(dialog).toHaveClass('max-w-none');
+    // `twMerge` sustituye el `w-full max-w-lg` base de `ui/dialog.tsx`.
+    expect(dialog).not.toHaveClass('w-full');
+    expect(dialog).not.toHaveClass('max-w-lg');
+  });
+
+  it('limita el texto de cada mensaje a dos líneas', () => {
+    renderDialog({}, [entry({ id: 'u1:0', text: 'primer mensaje' })]);
+
+    const label = within(screen.getByTestId('chat-history-item')).getByText(
+      'primer mensaje',
+    );
+    expect(label).toHaveClass('line-clamp-2');
+    expect(label).not.toHaveClass('truncate');
+  });
+});
+
 describe('ChatHistoryDialog — lista de mensajes (U2)', () => {
   it('lista todos los mensajes en orden con el autor etiquetado', () => {
     renderDialog({}, [

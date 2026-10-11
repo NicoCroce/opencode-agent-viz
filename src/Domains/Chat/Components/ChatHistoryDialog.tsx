@@ -197,7 +197,11 @@ export const ChatHistoryDialog = ({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         data-testid="chat-history-dialog"
-        className={`max-w-xl gap-5 ${className ?? ''}`}
+        // Ancho fluido: `min(90vw, 60rem)` no desborda en pantallas chicas y
+        // aprovecha el espacio en las grandes. `max-w-none` vence el `max-w-lg`
+        // base de `ui/dialog.tsx` (ambos se fusionan con `twMerge`, gana el
+        // último).
+        className={`w-[min(90vw,60rem)] max-w-none gap-5 ${className ?? ''}`}
         // El foco vuelve al disparador al cerrar (Escape, overlay, cierre o
         // selección). Se cancela el foco por defecto de Radix (que apunta a un
         // `DialogTrigger` inexistente) para fijarlo en el botón de la barra.
@@ -307,7 +311,7 @@ export const ChatHistoryDialog = ({
             <ul
               aria-label="Mensajes de la conversación"
               data-testid="chat-history-list"
-              className="flex max-h-[50vh] flex-col gap-0.5 overflow-y-auto pr-1"
+              className="flex max-h-[60vh] flex-col gap-0.5 overflow-y-auto pr-1"
             >
               {filtered.map((entry) => {
                 const authorLabel = historyAuthorLabel(entry.role, agentLabel);
@@ -323,7 +327,7 @@ export const ChatHistoryDialog = ({
                       <span className="text-[11px] font-medium text-muted-foreground">
                         {authorLabel}
                       </span>
-                      <span className="w-full truncate text-sm text-foreground">
+                      <span className="w-full line-clamp-2 text-sm text-foreground">
                         {historyItemLabel(entry)}
                       </span>
                     </button>
