@@ -283,3 +283,66 @@ describe('InspectorPane — badge de atención en la pestaña Chat (T053, FR-009
     expect(onTabChange).toHaveBeenCalledWith('detail');
   });
 });
+
+describe('InspectorPane — pantalla completa en la cabecera (U6)', () => {
+  it('monta el toggle junto al tablist, visible en Detalle y en Chat', () => {
+    renderPane({ onToggleFullscreen: vi.fn() });
+
+    // En `Detalle` (por defecto) el control vive en la cabecera, fuera del
+    // tabpanel: no depende del tab activo.
+    expect(
+      screen.getByRole('button', { name: 'Pantalla completa' }),
+    ).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Chat' }), {
+      button: 0,
+    });
+    expect(screen.getByTestId('detail-chat-slot')).not.toHaveAttribute('hidden');
+    expect(
+      screen.getByRole('button', { name: 'Pantalla completa' }),
+    ).toBeInTheDocument();
+  });
+
+  it('refleja isFullscreen en aria-pressed y aria-label textual', () => {
+    renderPane({ isFullscreen: true, onToggleFullscreen: vi.fn() });
+
+    const collapse = screen.getByRole('button', {
+      name: 'Salir de pantalla completa',
+    });
+    expect(collapse).toHaveAttribute('aria-pressed', 'true');
+    expect(collapse).toHaveAttribute(
+      'aria-label',
+      'Salir de pantalla completa',
+    );
+  });
+
+  it('oculta el icono a lectores de pantalla y ofrece foco visible', () => {
+    renderPane({ onToggleFullscreen: vi.fn() });
+
+    const toggle = screen.getByRole('button', { name: 'Pantalla completa' });
+    expect(toggle.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(toggle).toHaveClass('focus-visible:ring-1');
+  });
+
+  it('llama al handler al pulsar y no monta el control sin handler', () => {
+    const onToggleFullscreen = vi.fn();
+    const { unmount } = renderPane({ onToggleFullscreen });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pantalla completa' }));
+    expect(onToggleFullscreen).toHaveBeenCalledTimes(1);
+
+    unmount();
+    renderPane();
+    expect(
+      screen.queryByRole('button', { name: 'Pantalla completa' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('no monta el control sin tablist interno (showDetailTabs=false)', () => {
+    renderPane({ showDetailTabs: false, onToggleFullscreen: vi.fn() });
+
+    expect(
+      screen.queryByRole('button', { name: /pantalla completa/i }),
+    ).not.toBeInTheDocument();
+  });
+});

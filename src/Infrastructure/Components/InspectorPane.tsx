@@ -4,6 +4,8 @@ import type {
   PointerEvent as ReactPointerEvent,
   ReactNode,
 } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faMaximize, faMinimize } from '@fortawesome/free-solid-svg-icons';
 import {
   Container,
   Tabs,
@@ -40,9 +42,13 @@ interface InspectorPaneProps {
    * (evita selección de texto mientras se redimensiona).
    */
   isResizing?: boolean;
-  /** Estado de pantalla completa del panel (US6/FR-013). */
+  /** Estado de pantalla completa de la columna (US6/FR-013). */
   isFullscreen?: boolean;
-  /** Alterna la pantalla completa; se reenvía al encabezado del panel (US6). */
+  /**
+   * Alterna la pantalla completa. El control vive en la **cabecera de la
+   * columna** (junto al tablist `Detalle | Chat`) para que esté disponible en
+   * ambos tabs y aplique a la columna completa (U6). Sin handler, no se monta.
+   */
   onToggleFullscreen?: () => void;
   /**
    * Slot del panel `Chat` (T026). Mientras no se cablee `ChatPanel`, la pestaña
@@ -84,9 +90,12 @@ interface InspectorPaneProps {
  * (única fuente de lógica, FR-014), salvo cuando el llamador lo **controla**
  * (`activeTab`/`onTabChange`) para abrir la pestaña `Chat` al navegar a la
  * request origen (T055/FR-010). El trigger de `Chat` muestra el badge de atención
- * (`ChatAttentionBadge`, T053) cuando hay pendientes en el subárbol. El
- * resize/fullscreen de la columna siguen intactos: se aplican a la columna
- * completa y cubren ambos tabs.
+ * (`ChatAttentionBadge`, T053) cuando hay pendientes en el subárbol. La cabecera
+ * de la columna (junto al tablist) monta el control de pantalla completa cuando
+ * el llamador aporta `onToggleFullscreen`: vive fuera de los tabpanels, así que
+ * está disponible en `Detalle` y `Chat` y aplica a la columna completa (U6). El
+ * resize/fullscreen siguen intactos: se aplican a la columna completa y cubren
+ * ambos tabs.
  */
 export const InspectorPane = ({
   graph,
@@ -135,8 +144,6 @@ export const InspectorPane = ({
       showReasoning={showReasoning}
       onToggleReasoning={onToggleReasoning}
       onOpenHistory={handleOpenHistory}
-      isFullscreen={isFullscreen}
-      onToggleFullscreen={onToggleFullscreen}
     />
   );
 
@@ -152,19 +159,51 @@ export const InspectorPane = ({
           onValueChange={handleTabChange}
           className="flex h-full min-h-0 flex-col"
         >
-          <TabsList
-            aria-label="Vistas del panel de detalle"
-            className="m-2 shrink-0 self-start"
+          {/*
+            Cabecera de la columna: tablist `Detalle | Chat` (APG) + control de
+            pantalla completa. El control vive aquí, junto al tablist, para
+            estar disponible en **ambos** tabs y aplicar a la columna completa
+            (U6); reusa `isFullscreen`/`onToggleFullscreen` sin estado propio.
+          */}
+          <Container
+            row
+            space="small"
+            justify="between"
+            align="center"
+            className="shrink-0"
           >
-            {detailTabs.tabs.map((item) => (
-              <TabsTrigger key={item.id} value={item.id}>
-                {item.label}
-                {item.id === CHAT_TAB_ID ? (
-                  <ChatAttentionBadge count={attentionCount} />
-                ) : null}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+            <TabsList
+              aria-label="Vistas del panel de detalle"
+              className="m-2 shrink-0"
+            >
+              {detailTabs.tabs.map((item) => (
+                <TabsTrigger key={item.id} value={item.id}>
+                  {item.label}
+                  {item.id === CHAT_TAB_ID ? (
+                    <ChatAttentionBadge count={attentionCount} />
+                  ) : null}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {onToggleFullscreen ? (
+              <button
+                type="button"
+                aria-pressed={isFullscreen}
+                aria-label={
+                  isFullscreen
+                    ? 'Salir de pantalla completa'
+                    : 'Pantalla completa'
+                }
+                onClick={onToggleFullscreen}
+                className="mr-2 inline-flex size-7 shrink-0 items-center justify-center rounded-flat text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <FontAwesomeIcon
+                  icon={isFullscreen ? faMinimize : faMaximize}
+                  aria-hidden
+                />
+              </button>
+            ) : null}
+          </Container>
           <TabsContent
             value={DETAIL_TAB_ID}
             className="mt-0 min-h-0 flex-1 overflow-auto"
