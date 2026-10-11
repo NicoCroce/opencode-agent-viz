@@ -21,11 +21,11 @@ import {
 
 /**
  * FR-002/FR-003, SC-004 (`contracts/chat-stream-contract.md` §4): las partes
- * provisionales se renderizan en **texto plano** + "En curso" (sin markdown, el
- * hot spot del delta) y las consolidadas con `HistoryEntryBody`/`RichText`. El
- * render es **neutro** (sin franjas ni etiquetas mayúsculas de tipo) y el anuncio
- * accesible (`role="status"`) solo cambia al inicio/fin del turno, nunca por
- * delta (FR-021).
+ * provisionales se anuncian con el **indicador animado** (`ChatTypingIndicator`,
+ * `aria-hidden`) y su cuerpo en **markdown** (`RichText`); las consolidadas con
+ * `HistoryEntryBody`. El render es **neutro** (sin franjas ni etiquetas mayúsculas
+ * de tipo) y el anuncio accesible (`role="status"`) solo cambia al inicio/fin del
+ * turno, nunca por delta (FR-021).
  */
 
 const answerHistory = (
@@ -90,14 +90,20 @@ describe('ChatTimeline', () => {
     expect(screen.queryByText('Respuesta')).not.toBeInTheDocument();
   });
 
-  it('renders provisional parts as plain text with the "En curso" label (FR-002)', () => {
+  it('renders provisional parts with the animated "in progress" indicator and markdown (FR-002)', () => {
     render(<ChatTimeline entries={[provisional({ text: 'texto **crudo**' })]} />);
 
-    expect(screen.getByText('texto **crudo**')).toBeInTheDocument();
-    expect(screen.getByText('En curso')).toBeInTheDocument();
-    // Texto plano: el markdown NO se interpreta durante el delta (SC-004).
-    expect(screen.queryByText('crudo')).not.toBeInTheDocument();
-    expect(document.querySelector('strong')).toBeNull();
+    // La parte no consolidada no se presenta como final: indicador animado
+    // (`aria-hidden`, `title` "En curso") en lugar del literal, y el anuncio
+    // accesible a cargo del `role="status"` del timeline.
+    const indicator = screen.getByTestId('chat-typing-indicator');
+    expect(indicator).toHaveAttribute('aria-hidden', 'true');
+    expect(indicator).toHaveAttribute('title', 'En curso');
+    expect(screen.queryByText('En curso')).not.toBeInTheDocument();
+    // El cuerpo se renderiza en **markdown** (negrita interpretada), no como
+    // texto plano literal (SC-004).
+    expect(screen.getByText('crudo').tagName).toBe('STRONG');
+    expect(screen.queryByText('texto **crudo**')).not.toBeInTheDocument();
   });
 
   it('hides provisional reasoning when reasoning is not visible (FR-002)', () => {
@@ -123,7 +129,8 @@ describe('ChatTimeline', () => {
     render(<ChatTimeline entries={entries} />);
 
     expect(screen.getAllByText('hola')).toHaveLength(1);
-    expect(screen.queryByText('En curso')).not.toBeInTheDocument();
+    // Al consolidarse desaparece el indicador provisional (sin duplicar la parte).
+    expect(screen.queryByTestId('chat-typing-indicator')).not.toBeInTheDocument();
   });
 
   it('announces turn start/end via role="status" and never per delta (FR-021)', () => {

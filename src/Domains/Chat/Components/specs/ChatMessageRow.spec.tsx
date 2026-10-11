@@ -105,15 +105,16 @@ describe('ChatMessageRow — neutralidad', () => {
     expect(screen.queryByText('Usuario')).not.toBeInTheDocument();
   });
 
-  it('renderiza la provisional como texto plano neutro con "En curso"', () => {
+  it('renderiza la provisional con el indicador animado y markdown (no texto plano)', () => {
     render(<ChatMessageRow entry={provisional({ text: 'texto **crudo**' })} />);
 
     const row = screen.getByTestId('chat-message-row');
     expect(row.className).not.toMatch(/border-(accent|status)/);
-    expect(screen.getByText('texto **crudo**')).toBeInTheDocument();
-    expect(screen.getByText('En curso')).toBeInTheDocument();
-    // Texto plano: el markdown no se interpreta durante el delta.
-    expect(document.querySelector('strong')).toBeNull();
+    // Indicador animado en lugar del literal "En curso".
+    expect(screen.getByTestId('chat-typing-indicator')).toBeInTheDocument();
+    expect(screen.queryByText('En curso')).not.toBeInTheDocument();
+    // El cuerpo se renderiza siempre en markdown (negrita interpretada).
+    expect(screen.getByText('crudo').tagName).toBe('STRONG');
   });
 });
 

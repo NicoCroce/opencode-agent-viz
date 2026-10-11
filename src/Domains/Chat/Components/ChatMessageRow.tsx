@@ -1,8 +1,9 @@
 import { memo, type ReactNode } from 'react';
 import { Container } from '@app/Application/Components';
-import { InProgressText } from '@app/Application/Components/Molecules';
+import { RichText } from '@app/Application/Components/Molecules';
 import { HistoryEntryBody } from '@app/Application/Components/Organisms/HistoryEntry/HistoryEntryBody';
 import type { TChatTimelineEntry } from '../Chat.entity';
+import { ChatTypingIndicator } from './ChatTypingIndicator';
 
 /**
  * Etiqueta de la parte provisional del buffer. Solo `text`/`reasoning` llegan
@@ -10,6 +11,30 @@ import type { TChatTimelineEntry } from '../Chat.entity';
  */
 const provisionalLabel = (kind: TChatTimelineEntry['kind']): string =>
   kind === 'reasoning' ? 'Razonamiento' : 'Respuesta';
+
+/** Variante de `RichText` de la parte provisional (color por tipo de delta). */
+const provisionalVariant = (
+  kind: TChatTimelineEntry['kind'],
+): 'answer' | 'reasoning' => (kind === 'reasoning' ? 'reasoning' : 'answer');
+
+/**
+ * Cuerpo markdown de la parte provisional, memoizado por `text` (string).
+ *
+ * `ChatMessageRow` ya es `memo`, pero su `entry` cambia de identidad en cada
+ * delta/proyección; este `memo` corta el re-parseo de markdown cuando la fila se
+ * re-renderiza por un motivo ajeno con el mismo texto (el padre re-renderiza ~10
+ * veces/s durante el streaming). Tradeoff: un `memo` extra por fila a cambio de
+ * no re-parsear markdown en renders que no cambian el texto.
+ */
+const ProvisionalText = memo(function ProvisionalText({
+  text,
+  variant,
+}: {
+  text: string;
+  variant: 'answer' | 'reasoning';
+}) {
+  return <RichText text={text} variant={variant} />;
+});
 
 interface ChatMessageRowProps {
   /** Entrada del timeline proyectada por `buildChatTimeline`. */
@@ -36,9 +61,10 @@ interface ChatMessageRowProps {
  * alineación.
  *
  * Los mensajes propios (`entry.role === 'user'`) se alinean a la derecha; el
- * resto a la izquierda. Las partes provisionales del buffer se muestran como
- * **texto plano** con su etiqueta "En curso" (FR-002, SC-004): el re-parseo de
- * markdown en cada delta es el hot spot que la feature evita.
+ * resto a la izquierda. Las partes provisionales del buffer se anuncian con el
+ * indicador animado `ChatTypingIndicator` (FR-004) y su cuerpo se renderiza
+ * **siempre en markdown** con `RichText` (memoizado por texto), para que el
+ * streaming se vea con el mismo formato que el contenido consolidado.
  */
 export const ChatMessageRow = memo(function ChatMessageRow({
   entry,
@@ -73,11 +99,12 @@ export const ChatMessageRow = memo(function ChatMessageRow({
             <span className="text-[11px] font-medium text-muted-foreground">
               {provisionalLabel(entry.kind)}
             </span>
-            <InProgressText />
+            <ChatTypingIndicator />
           </Container>
-          <p className="whitespace-pre-wrap font-sans text-sm leading-6 text-foreground">
-            {entry.text}
-          </p>
+          <ProvisionalText
+            text={entry.text}
+            variant={provisionalVariant(entry.kind)}
+          />
         </>
       )}
     </article>
