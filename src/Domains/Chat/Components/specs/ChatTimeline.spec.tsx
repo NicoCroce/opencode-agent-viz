@@ -1,22 +1,31 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { SessionMessageAssistant } from '@opencode/client';
 import type { TSessionMessage } from '@app/Infrastructure/Services/opencodeClient';
-import type { THistoryAnswerEntry, THistoryEntry } from '@app/Domains/History';
+import type {
+  THistoryAnswerEntry,
+  THistoryEntry,
+  THistoryToolEntry,
+  THistoryUserEntry,
+} from '@app/Domains/History';
 import type { TChatTimelineEntry } from '../../Chat.entity';
 import { buildChatTimeline } from '../../lib/buildChatTimeline';
 import {
+  CHAT_ENTRY_HIGHLIGHT_CLASS,
   ChatTimeline,
   TURN_FINISHED_ANNOUNCEMENT,
   TURN_IN_PROGRESS_ANNOUNCEMENT,
+  chatEntryAnchorId,
+  scrollEntryIntoView,
 } from '../ChatTimeline';
 
 /**
  * FR-002/FR-003, SC-004 (`contracts/chat-stream-contract.md` §4): las partes
  * provisionales se renderizan en **texto plano** + "En curso" (sin markdown, el
- * hot spot del delta) y las consolidadas con `HistoryEntry`/`RichText`. El
- * anuncio accesible (`role="status"`) solo cambia al inicio/fin del turno,
- * nunca por delta (FR-021).
+ * hot spot del delta) y las consolidadas con `HistoryEntryBody`/`RichText`. El
+ * render es **neutro** (sin franjas ni etiquetas mayúsculas de tipo) y el anuncio
+ * accesible (`role="status"`) solo cambia al inicio/fin del turno, nunca por
+ * delta (FR-021).
  */
 
 const answerHistory = (
@@ -76,8 +85,9 @@ describe('ChatTimeline', () => {
       />,
     );
 
-    expect(screen.getByText('Respuesta')).toBeInTheDocument();
     expect(screen.getByText('mundo').tagName).toBe('STRONG');
+    // Render neutro: sin etiqueta mayúscula de tipo para las consolidadas.
+    expect(screen.queryByText('Respuesta')).not.toBeInTheDocument();
   });
 
   it('renders provisional parts as plain text with the "En curso" label (FR-002)', () => {
@@ -142,5 +152,173 @@ describe('ChatTimeline', () => {
     render(<ChatTimeline entries={[]} />);
 
     expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
+});
+
+/** Prompt propio (entrada del usuario) consolidado. */
+const userHistory = (text: string): THistoryUserEntry => ({
+  kind: 'user',
+  id: 'u1:0',
+  at: 900,
+  text,
+  attachments: [],
+});
+
+/** Llamada a herramienta consolidada (kind `tool`). */
+const toolHistory = (
+  overrides: Partial<THistoryToolEntry> = {},
+): THistoryToolEntry => ({
+  kind: 'tool',
+  id: 'a1:1',
+  at: 1500,
+  entry: {
+    id: 'tool-1',
+    name: 'read',
+    status: 'completed',
+    input: { path: 'a.ts' },
+    result: 'contents',
+    error: null,
+    startedAt: 1000,
+    completedAt: 1200,
+    durationMs: 200,
+  },
+  ...overrides,
+});
+
+const toolConsolidated = (): TChatTimelineEntry => ({
+  id: 'a1:1',
+  role: 'agent',
+  kind: 'tool',
+  text: '',
+  isComplete: true,
+  at: 1500,
+  history: toolHistory(),
+});
+
+const anchorOf = (entryId: string): HTMLElement | null =>
+  document.querySelector(`[data-chat-entry-id="${entryId}"]`);
+
+describe('ChatTimeline — filtro de herramientas (U3)', () => {
+  it('muestra las herramientas por defecto', () => {
+    render(
+      <ChatTimeline entries={[consolidated(answerHistory()), toolConsolidated()]} />,
+    );
+
+    expect(anchorOf('a1:1')).not.toBeNull();
+  });
+
+  it('oculta las entradas de herramienta con showTools=false sin tocar el resto', () => {
+    render(
+      <ChatTimeline
+        entries={[consolidated(answerHistory()), toolConsolidated()]}
+        showTools={false}
+      />,
+    );
+
+    expect(anchorOf('a1:1')).toBeNull();
+    // La respuesta (no herramienta) sigue visible.
+    expect(anchorOf('a1:0')).not.toBeNull();
+  });
+
+  it('no rompe el anuncio del turno al filtrar (role="status")', () => {
+    render(<ChatTimeline entries={[toolConsolidated()]} showTools={false} />);
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      TURN_FINISHED_ANNOUNCEMENT,
+    );
+  });
+});
+
+describe('ChatTimeline — anclas y resaltado del salto (U4)', () => {
+  it('expone un ancla estable por fila', () => {
+    render(<ChatTimeline entries={[consolidated(answerHistory())]} />);
+
+    const anchor = anchorOf('a1:0');
+    expect(anchor).not.toBeNull();
+    expect(anchor).toHaveAttribute('id', chatEntryAnchorId('a1:0'));
+  });
+
+  it('resalta solo la entrada indicada y con un estilo no solo-color', () => {
+    render(
+      <ChatTimeline
+        entries={[
+          consolidated(answerHistory()),
+          consolidated(userHistory('hola')),
+        ]}
+        highlightedEntryId="u1:0"
+      />,
+    );
+
+    const highlighted = anchorOf('u1:0');
+    const other = anchorOf('a1:0');
+
+    expect(highlighted).toHaveAttribute('data-highlighted', 'true');
+    expect(highlighted?.className).toContain(CHAT_ENTRY_HIGHLIGHT_CLASS);
+    // El resaltado añade fondo **y** contorno (no depende solo del color).
+    expect(highlighted?.className).toContain('outline');
+    expect(other).not.toHaveAttribute('data-highlighted');
+  });
+
+  it('no resalta nada sin entrada indicada', () => {
+    render(<ChatTimeline entries={[consolidated(answerHistory())]} />);
+
+    expect(anchorOf('a1:0')).not.toHaveAttribute('data-highlighted');
+  });
+
+  it('omite el envoltorio-ancla del razonamiento oculto (FR-002)', () => {
+    render(
+      <ChatTimeline
+        entries={[provisional({ kind: 'reasoning', text: 'pienso' })]}
+        showReasoning={false}
+      />,
+    );
+
+    // Sin `showReasoning` la fila no se pinta: tampoco deja un ancla vacía.
+    expect(anchorOf('stream:msg_1:0')).toBeNull();
+  });
+});
+
+describe('scrollEntryIntoView (U4)', () => {
+  it('desplaza el contenedor hasta el ancla (nunca window)', () => {
+    const container = document.createElement('div');
+    const target = document.createElement('div');
+    container.getBoundingClientRect = () =>
+      ({ top: 100 }) as unknown as DOMRect;
+    target.getBoundingClientRect = () =>
+      ({ top: 350 }) as unknown as DOMRect;
+    Object.defineProperty(container, 'scrollTop', {
+      configurable: true,
+      writable: true,
+      value: 40,
+    });
+    const scrollTo = vi.fn();
+    (container as unknown as { scrollTo: typeof scrollTo }).scrollTo = scrollTo;
+
+    scrollEntryIntoView(container, target, 'smooth');
+
+    // top = scrollTop + (target.top - container.top) = 40 + 250.
+    expect(scrollTo).toHaveBeenCalledWith({ top: 290, behavior: 'smooth' });
+  });
+
+  it('cae a scrollTop cuando el contenedor no expone scrollTo', () => {
+    const container = document.createElement('div');
+    const target = document.createElement('div');
+    container.getBoundingClientRect = () =>
+      ({ top: 0 }) as unknown as DOMRect;
+    target.getBoundingClientRect = () =>
+      ({ top: 75 }) as unknown as DOMRect;
+    (container as unknown as { scrollTo: undefined }).scrollTo = undefined;
+    let assigned: number | undefined;
+    Object.defineProperty(container, 'scrollTop', {
+      configurable: true,
+      get: () => assigned ?? 0,
+      set: (value: number) => {
+        assigned = value;
+      },
+    });
+
+    scrollEntryIntoView(container, target);
+
+    expect(container.scrollTop).toBe(75);
   });
 });
