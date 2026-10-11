@@ -61,7 +61,7 @@ export const ChatOptionCombobox = ({
   };
 
   return (
-    <Container row align="center" className="w-auto">
+    <Container row align="center" className="w-auto min-w-0">
       <Label htmlFor={triggerId} className="sr-only">
         {label}
       </Label>
@@ -74,10 +74,13 @@ export const ChatOptionCombobox = ({
             aria-expanded={open}
             aria-haspopup="listbox"
             disabled={disabled}
-            className="inline-flex h-8 w-auto cursor-pointer items-center justify-between gap-1 whitespace-nowrap rounded-full border border-input bg-transparent px-3 text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring forced-colors:focus-visible:outline-[Highlight] disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-8 w-auto min-w-0 cursor-pointer items-center justify-between gap-1 rounded-full border border-input bg-transparent px-3 text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring forced-colors:focus-visible:outline-[Highlight] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span
-              className={cn('line-clamp-1', !selected && 'text-muted-foreground')}
+              className={cn(
+                'truncate max-w-[12rem]',
+                !selected && 'text-muted-foreground',
+              )}
             >
               {selected?.label ?? placeholder}
             </span>

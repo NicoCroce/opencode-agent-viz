@@ -74,14 +74,14 @@ const SelectChip = ({
   const id = useId();
 
   return (
-    <Container row align="center" className="w-auto">
+    <Container row align="center" className="w-auto min-w-0">
       <Label htmlFor={id} className="sr-only">
         {label}
       </Label>
       <Select value={value} onValueChange={onValueChange} disabled={disabled}>
         <SelectTrigger
           id={id}
-          className="h-8 w-auto gap-1 rounded-full border-input bg-transparent px-3 text-xs"
+          className="h-8 w-auto min-w-0 gap-1 rounded-full border-input bg-transparent px-3 text-xs [&>span]:max-w-[12rem] [&>span]:truncate"
         >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>

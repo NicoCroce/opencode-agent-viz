@@ -123,7 +123,19 @@ describe('ChatSelector', () => {
       expect(trigger).toHaveClass('rounded-full');
       expect(trigger).toHaveClass('w-auto');
       expect(trigger).toHaveClass('h-8');
+      // Pueden encoger por debajo de su contenido para no forzar scroll
+      // horizontal en el footer del chat.
+      expect(trigger).toHaveClass('min-w-0');
     }
+
+    // La etiqueta del valor trunca en lugar de desbordar el chip: los combobox
+    // (agente/modelo) truncan su propio `<span>`; el chip de razonamiento (Radix)
+    // no recibe `className` en su `SelectValue`, así que trunca vía el variante
+    // `[&>span]` del trigger.
+    expect(triggers[0]?.querySelector('span')).toHaveClass('truncate');
+    expect(triggers[1]?.querySelector('span')).toHaveClass('truncate');
+    expect(triggers[2]).toHaveClass('[&>span]:truncate');
+    expect(triggers[2]).toHaveClass('[&>span]:max-w-[12rem]');
 
     // La fila envuelve en pantallas estrechas en lugar de recortar los chips.
     expect(triggers[0]?.closest('.flex-wrap')).not.toBeNull();

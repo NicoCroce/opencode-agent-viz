@@ -85,6 +85,12 @@ describe('ChatOptionCombobox', () => {
     expect(trigger).toHaveClass('rounded-full');
     expect(trigger).toHaveClass('w-auto');
     expect(trigger).toHaveClass('h-8');
+    // El chip puede encoger por debajo de su contenido y truncar etiquetas largas
+    // (p. ej. nombres de modelo extensos) sin forzar scroll horizontal.
+    expect(trigger).toHaveClass('min-w-0');
+    const valueLabel = trigger.querySelector('span');
+    expect(valueLabel).toHaveClass('truncate');
+    expect(valueLabel).toHaveClass('max-w-[12rem]');
     expect(trigger.querySelector('svg')).not.toBeNull();
   });
 
