@@ -53,6 +53,14 @@ export const queryKeys = {
     // Log durable de la sesión (siembra de señales, `follow: false`).
     log: (id: string) => [...queryKeys.sessions.all, 'log', id],
   },
+  // Buffer de streaming del chat interactivo. Clave **raíz**, deliberadamente
+  // FUERA de `['sessions']`: así la invalidación por prefijo de `sessions.all`
+  // no pisa el buffer mientras llegan deltas, y el grafo no se re-renderiza
+  // (FR-016; SC-003). Solo se indexa por sessionID (único global).
+  chatStream: {
+    all: ['chatStream'] as const,
+    for: (id: string) => [...queryKeys.chatStream.all, id],
+  },
   agents: {
     all: ['agents'] as const,
     list: (directory: string) => [...queryKeys.agents.all, directory, 'list'],
@@ -64,6 +72,12 @@ export const queryKeys = {
   config: {
     all: ['config'] as const,
     detail: (directory: string) => [...queryKeys.config.all, directory, 'detail'],
+  },
+  // Catálogo de modelos disponibles, scopeado por `directory` como el resto
+  // del catálogo (`agents`, `mcp`).
+  models: {
+    all: ['models'] as const,
+    list: (directory: string) => [...queryKeys.models.all, directory, 'list'],
   },
   permissions: {
     all: ['permissions'] as const,
