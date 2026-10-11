@@ -16,6 +16,13 @@ export interface TNodeFocus {
   lineageEdgeIds: ReadonlySet<string>;
   /** Nodo bajo el cursor; `null` = sin hover. */
   hoveredNodeId: string | null;
+  /**
+   * Ids de nodos con un pendiente de atención (FR-009). Opcional: los focos que
+   * solo derivan hover/selección lo omiten, y el nodo se lee sin realce. El
+   * realce fluye por **contexto** —nunca por `data`— para no alterar la
+   * identidad de render ni provocar relayout del grafo (Principio VII / FR-016).
+   */
+  attentionNodeIds?: ReadonlySet<string>;
 }
 
 const EMPTY_IDS: ReadonlySet<string> = new Set<string>();
@@ -31,6 +38,7 @@ export const EMPTY_NODE_FOCUS: TNodeFocus = {
   lineageNodeIds: EMPTY_IDS,
   lineageEdgeIds: EMPTY_IDS,
   hoveredNodeId: null,
+  attentionNodeIds: EMPTY_IDS,
 };
 
 const NodeFocusContext = createContext<TNodeFocus>(EMPTY_NODE_FOCUS);
@@ -56,3 +64,12 @@ export const NodeFocusProvider: FC<NodeFocusProviderProps> = ({
 
 /** Devuelve el foco actual; fuera de un provider, `EMPTY_NODE_FOCUS`. */
 export const useNodeFocus = (): TNodeFocus => useContext(NodeFocusContext);
+
+/**
+ * `true` si el nodo tiene un pendiente de atención (FR-009). Selector puro sobre
+ * el contexto: el realce llega al nodo sin tocar `data` y sin re-layoutar.
+ */
+export const useNodeAttention = (nodeId: string): boolean => {
+  const { attentionNodeIds } = useNodeFocus();
+  return attentionNodeIds?.has(nodeId) ?? false;
+};

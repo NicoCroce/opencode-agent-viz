@@ -82,6 +82,7 @@ vi.mock('@xyflow/react', async () => {
       'data-hovered': focus.hoveredNodeId ?? '',
       'data-lineage-nodes': [...focus.lineageNodeIds].sort().join(','),
       'data-lineage-edges': [...focus.lineageEdgeIds].sort().join(','),
+      'data-attention-nodes': [...(focus.attentionNodeIds ?? [])].sort().join(','),
     });
   };
 
@@ -355,12 +356,14 @@ interface FocusGraphOptions {
   selectedNodeId?: string | null;
   onSelectNode?: (id: string) => void;
   onClearSelection?: () => void;
+  attentionNodeIds?: ReadonlySet<string>;
 }
 
 const focusGraphElement = ({
   selectedNodeId = null,
   onSelectNode = vi.fn(),
   onClearSelection = vi.fn(),
+  attentionNodeIds,
 }: FocusGraphOptions = {}) => (
   <AgentGraph
     graph={focusGraph}
@@ -368,6 +371,7 @@ const focusGraphElement = ({
     selectedNodeId={selectedNodeId}
     onSelectNode={onSelectNode}
     onClearSelection={onClearSelection}
+    attentionNodeIds={attentionNodeIds}
   />
 );
 
@@ -662,5 +666,44 @@ describe('AgentGraph — paridad de resize e histórico (FR-007, SC-006)', () =>
 
     expect(onOpenHistory).toHaveBeenCalledTimes(1);
     expect(onOpenHistory).toHaveBeenCalledWith('alpha-child');
+  });
+});
+
+/**
+ * Realce de atención por contexto (T072, FR-009, A6): los ids de nodos con un
+ * pendiente viajan hasta `NodeFocusProvider` por el contexto —nunca por
+ * `data`— de modo que solo el nodo afectado se realza y el grafo **no** se
+ * re-layouta (los arrays de `nodes`/`edges` conservan su referencia).
+ */
+describe('AgentGraph — realce de atención por contexto (T072, FR-009, A6)', () => {
+  it('publica los ids de atención en el contexto al cambiar el Set', () => {
+    const { rerender } = render(focusGraphElement());
+
+    expect(focusProbe()).toHaveAttribute('data-attention-nodes', '');
+
+    rerender(focusGraphElement({ attentionNodeIds: new Set(['child']) }));
+
+    expect(focusProbe()).toHaveAttribute('data-attention-nodes', 'child');
+  });
+
+  it('no recrea los arrays de nodos/aristas al cambiar la atención (sin relayout)', () => {
+    const { rerender } = render(focusGraphElement());
+    const nodesBefore = reactFlowSpy.nodes;
+    const edgesBefore = reactFlowSpy.edges;
+
+    rerender(focusGraphElement({ attentionNodeIds: new Set(['grandchild']) }));
+
+    expect(reactFlowSpy.nodes).toBe(nodesBefore);
+    expect(reactFlowSpy.edges).toBe(edgesBefore);
+  });
+
+  it('no altera la identidad de los datos del nodo al realzarlo', () => {
+    const { rerender } = render(focusGraphElement());
+    const dataBefore = reactFlowSpy.nodes.find((node) => node.id === 'child');
+
+    rerender(focusGraphElement({ attentionNodeIds: new Set(['child']) }));
+
+    const dataAfter = reactFlowSpy.nodes.find((node) => node.id === 'child');
+    expect(dataAfter).toBe(dataBefore);
   });
 });

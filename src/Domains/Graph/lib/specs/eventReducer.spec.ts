@@ -313,7 +313,7 @@ const formCancelled: V2Event = {
 };
 
 /* ------------------------------------------------------------------ */
-/* Fixtures de deltas (deben ignorarse)                                */
+/* Fixtures de deltas                                                  */
 /* ------------------------------------------------------------------ */
 
 const textDelta: V2Event = {
@@ -525,15 +525,20 @@ describe('reduceEvent', () => {
     ]);
   });
 
-  it('ignores text/reasoning/tool deltas and progress (FR-005)', () => {
-    for (const event of [
-      textDelta,
-      reasoningDelta,
-      toolInputDelta,
-      toolProgress,
-      compactionDelta,
-    ]) {
+  it('ignores tool input/progress and compaction deltas (FR-005)', () => {
+    for (const event of [toolInputDelta, toolProgress, compactionDelta]) {
       expect(reduceEvent(event)).toBeNull();
+    }
+  });
+
+  it('routes text/reasoning deltas to the chat stream buffer (S6)', () => {
+    for (const event of [textDelta, reasoningDelta]) {
+      const updates = reduceEvent(event);
+      expect(updates?.[0]).toMatchObject({
+        kind: 'set',
+        queryKey: queryKeys.chatStream.for('ses_1'),
+      });
+      expect(updates?.[0]?.queryKey[0]).toBe('chatStream');
     }
   });
 });

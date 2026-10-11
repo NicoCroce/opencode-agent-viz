@@ -48,6 +48,12 @@ interface AgentGraphProps {
   followNodeId?: string | null;
   /** Sesión raíz: al cambiar se limpian los tamaños elegidos por el usuario. */
   resetKey?: string | null;
+  /**
+   * Ids de nodos con un pendiente de atención (FR-009). Se publica por contexto
+   * hasta `NodeFocusProvider` para realzar solo el nodo afectado, sin tocar
+   * `data` ni re-layoutar (Principio VII / FR-016).
+   */
+  attentionNodeIds?: ReadonlySet<string>;
   className?: string;
 }
 
@@ -64,6 +70,7 @@ export const AgentGraph = ({
   onOpenHistory,
   followNodeId = null,
   resetKey = null,
+  attentionNodeIds,
   className,
 }: AgentGraphProps) => {
   const { overrides, onNodesChange } = useNodeResize(resetKey);
@@ -71,6 +78,7 @@ export const AgentGraph = ({
   const { hoveredNodeId, setHoveredNodeId, focus } = useGraphFocusModel(
     stableGraph,
     selectedNodeId,
+    attentionNodeIds,
   );
   const { rowLayout, activeLevel, nodes, edges } = useGraphLayoutModel(
     stableGraph,

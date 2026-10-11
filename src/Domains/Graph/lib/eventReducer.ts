@@ -1,3 +1,4 @@
+import { reduceChatStream } from './eventReduce/slices/chatStream';
 import { reduceConnection } from './eventReduce/slices/connection';
 import { reduceExecution } from './eventReduce/slices/execution';
 import { reduceFormsInbox } from './eventReduce/slices/formsInbox';
@@ -66,9 +67,12 @@ export const reduceEvent = (event: TReducibleEvent): TEventUpdate | null => {
     case 'session.tool.failed':
       return reduceMessages(event);
 
-    /* --- deltas ignorados (FR-005, Principio VII) --- */
+    /* --- deltas de texto/razonamiento → buffer del chat (FR-002, aditivo) --- */
     case 'session.text.delta':
     case 'session.reasoning.delta':
+      return reduceChatStream(event);
+
+    /* --- deltas ignorados (FR-005, Principio VII) --- */
     case 'session.tool.input.delta':
     case 'session.tool.progress':
     case 'session.compaction.delta':
