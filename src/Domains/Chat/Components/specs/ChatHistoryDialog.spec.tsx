@@ -6,17 +6,20 @@ import type { TChatTimelineEntry } from '../../Chat.entity';
 import {
   CHAT_HISTORY_LABEL_MAX,
   ChatHistoryDialog,
+  chatHistoryAuthorOptions,
+  filterHistoryEntries,
+  historyAuthorCounts,
   historyAuthorLabel,
   historyItemLabel,
   type ChatHistoryDialogProps,
 } from '../ChatHistoryDialog';
 
 /**
- * Spec del modal de historial (iteración UX U2): lista **todos** los mensajes del
- * timeline etiquetados por autor y, al elegir uno, cierra el modal y emite el
- * salto (que el llamador reutiliza). Radix `Dialog` aporta foco, trampa de foco,
- * `Escape` y restauración de foco; aquí se verifica el contenido y el contrato de
- * selección.
+ * Spec del modal de historial (iteración UX U2 + filtros U3): lista **todos** los
+ * mensajes del timeline etiquetados por autor, con filtros combinables de autor
+ * (chips) y texto (input) y, al elegir uno, cierra el modal y emite el salto.
+ * Radix `Dialog` aporta foco, trampa de foco, `Escape` y restauración de foco;
+ * aquí se verifica el contenido, los filtros y el contrato de selección.
  */
 
 const entry = (
@@ -69,6 +72,12 @@ const StatefulDialog = ({
     />
   );
 };
+
+const mixedEntries = (): TChatTimelineEntry[] => [
+  entry({ id: 'u1:0', role: 'user', text: 'primer mensaje' }),
+  entry({ id: 'a1:0', role: 'agent', text: 'respuesta' }),
+  entry({ id: 'u2:0', role: 'user', text: 'segundo mensaje' }),
+];
 
 describe('ChatHistoryDialog — estructura y a11y (U2)', () => {
   it('expone un diálogo con título accesible', () => {
@@ -136,7 +145,267 @@ describe('ChatHistoryDialog — lista de mensajes (U2)', () => {
   });
 });
 
-describe('ChatHistoryDialog — selección (U2)', () => {
+describe('ChatHistoryDialog — filtro por autor (U3)', () => {
+  it('ofrece los tres chips con el recuento por opción', () => {
+    renderDialog({}, mixedEntries());
+
+    const all = screen.getByTestId('chat-history-author-all');
+    const user = screen.getByTestId('chat-history-author-user');
+    const agent = screen.getByTestId('chat-history-author-agent');
+
+    expect(all).toHaveTextContent('Todos');
+    expect(user).toHaveTextContent('Mis mensajes');
+    expect(agent).toHaveTextContent('Agente');
+
+    expect(within(all).getByText('3')).toBeInTheDocument();
+    expect(within(user).getByText('2')).toBeInTheDocument();
+    expect(within(agent).getByText('1')).toBeInTheDocument();
+  });
+
+  it('usa el nombre del agente en el chip de sus mensajes', () => {
+    renderDialog({ agentLabel: 'sddorch' }, mixedEntries());
+
+    expect(screen.getByTestId('chat-history-author-agent')).toHaveTextContent(
+      'sddorch',
+    );
+  });
+
+  it('arranca con "Todos" activo y los demás inactivos (aria-pressed)', () => {
+    renderDialog({}, mixedEntries());
+
+    expect(screen.getByTestId('chat-history-author-all')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByTestId('chat-history-author-user')).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    expect(screen.getByTestId('chat-history-author-agent')).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
+  it('filtra la lista al pulsar "Mis mensajes" (exclusivo)', async () => {
+    const { user } = renderDialog({}, mixedEntries());
+
+    await user.click(screen.getByTestId('chat-history-author-user'));
+
+    const items = screen.getAllByTestId('chat-history-item');
+    expect(items.map((item) => item.dataset.entryId)).toEqual(['u1:0', 'u2:0']);
+    expect(screen.getByTestId('chat-history-author-user')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByTestId('chat-history-author-all')).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
+  it('vuelve a todos los mensajes al reactivar "Todos"', async () => {
+    const { user } = renderDialog({}, mixedEntries());
+
+    await user.click(screen.getByTestId('chat-history-author-agent'));
+    expect(screen.getAllByTestId('chat-history-item')).toHaveLength(1);
+
+    await user.click(screen.getByTestId('chat-history-author-all'));
+    expect(screen.getAllByTestId('chat-history-item')).toHaveLength(3);
+  });
+});
+
+describe('ChatHistoryDialog — filtro por texto (U3)', () => {
+  it('expone un input de búsqueda con label accesible', () => {
+    renderDialog({}, mixedEntries());
+
+    expect(
+      screen.getByRole('searchbox', { name: 'Buscar en los mensajes' }),
+    ).toBeInTheDocument();
+  });
+
+  it('filtra los mensajes por texto sin distinguir mayúsculas', async () => {
+    const { user } = renderDialog({}, mixedEntries());
+
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Buscar en los mensajes' }),
+      'RESPUESTA',
+    );
+
+    const items = screen.getAllByTestId('chat-history-item');
+    expect(items).toHaveLength(1);
+    expect(items[0].dataset.entryId).toBe('a1:0');
+  });
+
+  it('permite limpiar la búsqueda con el botón de limpieza', async () => {
+    const { user } = renderDialog({}, mixedEntries());
+    const search = screen.getByRole('searchbox', {
+      name: 'Buscar en los mensajes',
+    });
+
+    expect(
+      screen.queryByRole('button', { name: 'Limpiar búsqueda' }),
+    ).not.toBeInTheDocument();
+
+    await user.type(search, 'respuesta');
+    await user.click(screen.getByRole('button', { name: 'Limpiar búsqueda' }));
+
+    expect(search).toHaveValue('');
+    expect(screen.getAllByTestId('chat-history-item')).toHaveLength(3);
+  });
+});
+
+describe('ChatHistoryDialog — filtros combinados (U3)', () => {
+  it('aplica autor AND texto', async () => {
+    const { user } = renderDialog({}, [
+      entry({ id: 'u1:0', role: 'user', text: 'alpha propio' }),
+      entry({ id: 'a1:0', role: 'agent', text: 'alpha respuesta' }),
+      entry({ id: 'u2:0', role: 'user', text: 'beta propio' }),
+    ]);
+    const search = screen.getByRole('searchbox', {
+      name: 'Buscar en los mensajes',
+    });
+
+    await user.click(screen.getByTestId('chat-history-author-user'));
+    await user.type(search, 'alpha');
+
+    const items = screen.getAllByTestId('chat-history-item');
+    expect(items).toHaveLength(1);
+    expect(items[0].dataset.entryId).toBe('u1:0');
+  });
+
+  it('distingue "sin resultados" de "sin mensajes" y permite limpiar', async () => {
+    const { user } = renderDialog({}, mixedEntries());
+    const search = screen.getByRole('searchbox', {
+      name: 'Buscar en los mensajes',
+    });
+
+    await user.type(search, 'zzz');
+
+    expect(screen.getByText('Ningún mensaje coincide')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Sin mensajes en el historial'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('chat-history-item')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+
+    expect(screen.getAllByTestId('chat-history-item')).toHaveLength(3);
+    expect(search).toHaveValue('');
+  });
+
+  it('muestra el vacío de filtros (no el de historial) al combinar autor y texto sin coincidencias', async () => {
+    const { user } = renderDialog({}, mixedEntries());
+    const search = screen.getByRole('searchbox', {
+      name: 'Buscar en los mensajes',
+    });
+
+    // "respuesta" solo existe en el mensaje del agente; filtrando por "Mis
+    // mensajes" no queda ninguna coincidencia.
+    await user.click(screen.getByTestId('chat-history-author-user'));
+    await user.type(search, 'respuesta');
+
+    expect(screen.getByText('Ningún mensaje coincide')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Sin mensajes en el historial'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('chat-history-item')).not.toBeInTheDocument();
+  });
+
+  it('restablece autor y texto a la vez con "Limpiar filtros"', async () => {
+    const { user } = renderDialog({}, mixedEntries());
+    const search = screen.getByRole('searchbox', {
+      name: 'Buscar en los mensajes',
+    });
+
+    await user.click(screen.getByTestId('chat-history-author-agent'));
+    await user.type(search, 'zzz');
+    expect(screen.getByText('Ningún mensaje coincide')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+
+    expect(screen.getAllByTestId('chat-history-item')).toHaveLength(3);
+    expect(search).toHaveValue('');
+    expect(screen.getByTestId('chat-history-author-all')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByTestId('chat-history-author-agent')).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
+  it('no muestra los filtros cuando no hay mensajes', () => {
+    renderDialog({}, []);
+
+    expect(
+      screen.queryByTestId('chat-history-author-filter'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('searchbox', { name: 'Buscar en los mensajes' }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * El estado de los filtros es local y se limpia al cerrar: cada apertura arranca
+ * sin filtrar. Se abre desde un disparador externo (como en `ChatPanel`) para
+ * poder cerrar con `Escape` y reabrir.
+ */
+const ReopenableDialog = ({ entries }: { entries: TChatTimelineEntry[] }) => {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  return (
+    <>
+      <button ref={triggerRef} type="button" onClick={() => setOpen(true)}>
+        Abrir historial
+      </button>
+      <ChatHistoryDialog
+        open={open}
+        onOpenChange={setOpen}
+        entries={entries}
+        onSelectEntry={vi.fn()}
+        triggerRef={triggerRef}
+      />
+    </>
+  );
+};
+
+describe('ChatHistoryDialog — los filtros se limpian al cerrar (U3)', () => {
+  it('reabre sin filtros tras cerrar con Escape', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    render(<ReopenableDialog entries={mixedEntries()} />);
+    const trigger = screen.getByRole('button', { name: 'Abrir historial' });
+
+    await user.click(trigger);
+    await user.click(screen.getByTestId('chat-history-author-user'));
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Buscar en los mensajes' }),
+      'primer',
+    );
+    expect(screen.getAllByTestId('chat-history-item')).toHaveLength(1);
+
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+
+    await user.click(trigger);
+
+    // Arranca sin filtrar: todos los mensajes, búsqueda vacía y "Todos" activo.
+    expect(screen.getAllByTestId('chat-history-item')).toHaveLength(3);
+    expect(
+      screen.getByRole('searchbox', { name: 'Buscar en los mensajes' }),
+    ).toHaveValue('');
+    expect(screen.getByTestId('chat-history-author-all')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+});
+
+describe('ChatHistoryDialog — selección (U2/U3)', () => {
   it('cierra el modal y emite el id de la entrada elegida', async () => {
     const { user, onOpenChange, onSelectEntry } = renderDialog({}, [
       entry({ id: 'u1:0', text: 'primer mensaje' }),
@@ -146,6 +415,19 @@ describe('ChatHistoryDialog — selección (U2)', () => {
     await user.click(
       screen.getByRole('button', { name: /segundo mensaje/ }),
     );
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(onSelectEntry).toHaveBeenCalledWith('u2:0');
+  });
+
+  it('mantiene el salto tras filtrar', async () => {
+    const { user, onOpenChange, onSelectEntry } = renderDialog(
+      {},
+      mixedEntries(),
+    );
+
+    await user.click(screen.getByTestId('chat-history-author-user'));
+    await user.click(screen.getByRole('button', { name: /segundo mensaje/ }));
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(onSelectEntry).toHaveBeenCalledWith('u2:0');
@@ -214,6 +496,59 @@ describe('historyAuthorLabel / historyItemLabel (U2)', () => {
     expect(
       historyItemLabel(entry({ kind: 'tool', role: 'agent', text: '   \n ' })),
     ).toBe('Llamada a herramienta');
+  });
+});
+
+describe('chatHistoryAuthorOptions / historyAuthorCounts / filterHistoryEntries (U3)', () => {
+  it('construye las opciones con el nombre del agente', () => {
+    expect(chatHistoryAuthorOptions()).toEqual([
+      { value: 'all', label: 'Todos' },
+      { value: 'user', label: 'Mis mensajes' },
+      { value: 'agent', label: 'Agente' },
+    ]);
+    expect(chatHistoryAuthorOptions('build')[2]).toEqual({
+      value: 'agent',
+      label: 'build',
+    });
+  });
+
+  it('cuenta las entradas por autor', () => {
+    expect(historyAuthorCounts(mixedEntries())).toEqual({
+      all: 3,
+      user: 2,
+      agent: 1,
+    });
+  });
+
+  it('combina autor y texto (case-insensitive)', () => {
+    const entries = [
+      entry({ id: 'u1:0', role: 'user', text: 'Alpha propio' }),
+      entry({ id: 'a1:0', role: 'agent', text: 'alpha respuesta' }),
+      entry({ id: 'u2:0', role: 'user', text: 'beta propio' }),
+    ];
+
+    expect(
+      filterHistoryEntries(entries, { author: 'user', query: 'ALPHA' }).map(
+        (item) => item.id,
+      ),
+    ).toEqual(['u1:0']);
+    expect(
+      filterHistoryEntries(entries, { author: 'all', query: 'alpha' }).map(
+        (item) => item.id,
+      ),
+    ).toEqual(['u1:0', 'a1:0']);
+    expect(
+      filterHistoryEntries(entries, { author: 'all', query: '   ' }),
+    ).toHaveLength(3);
+  });
+
+  it('no hace coincidir entradas sin texto con una búsqueda', () => {
+    expect(
+      filterHistoryEntries(
+        [entry({ role: 'agent', kind: 'tool', text: '' })],
+        { author: 'all', query: 'herramienta' },
+      ),
+    ).toHaveLength(0);
   });
 });
 
