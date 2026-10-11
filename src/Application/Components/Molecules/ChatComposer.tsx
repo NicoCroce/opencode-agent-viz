@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import type { FormEvent, KeyboardEvent, ReactNode } from 'react';
+import { faPaperPlane, faStop } from '@fortawesome/free-solid-svg-icons';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,11 +48,12 @@ export interface ChatComposerProps {
  * Compositor de mensajes del chat (FR-001, FR-023, FR-021, FR-004).
  *
  * Molecule presentacional: textarea + fila inferior tipo Copilot con los
- * **controles del chat a la izquierda** (slot `controls`) y las acciones
- * `[Detener] [Enviar]` a la derecha. No conoce el SDK, los servicios ni el
- * dominio `Chat`: los selectores llegan ya compuestos por el llamador. Solo
- * acepta texto (sin adjuntos). Enter envía, Shift+Enter inserta un salto de
- * línea y el envío se respeta durante la composición IME. "Detener" solo se
+ * **controles del chat a la izquierda** (slot `controls`) y **un único botón de
+ * acción** a la derecha que muta según el estado: avión (enviar) sin turno en
+ * curso y stop (detener) con un turno en curso. No conoce el SDK, los servicios
+ * ni el dominio `Chat`: los selectores llegan ya compuestos por el llamador.
+ * Solo acepta texto (sin adjuntos). Enter envía, Shift+Enter inserta un salto de
+ * línea y el envío se respeta durante la composición IME. El stop solo se
  * habilita con un turno en curso (`busy`) y pide confirmación en un
  * `AlertDialog` antes de interrumpir (FR-004).
  */
@@ -110,8 +112,8 @@ export const ChatComposer = ({
           placeholder="Escribe un mensaje…"
         />
 
-        {/* Fila inferior tipo Copilot: chips del chat a la izquierda y las
-            acciones [Detener] [Enviar] a la derecha, todo bajo el textarea. */}
+        {/* Fila inferior tipo Copilot: chips del chat a la izquierda y un
+            único botón de acción a la derecha (avión ↔ stop), bajo el textarea. */}
         <Container
           row
           align="center"
@@ -136,42 +138,48 @@ export const ChatComposer = ({
             data-testid="chat-composer-actions"
             className="shrink-0"
           >
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!canInterrupt}
-                  isLoading={isInterrupting}
-                  aria-busy={isInterrupting}
-                >
-                  Detener
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>¿Detener el turno en curso?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Se interrumpirá el turno de esta sesión. Las sesiones hijas
-                    (subagentes) continuarán en ejecución.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={onInterrupt}>
-                    Detener turno
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-            <Button
-              type="submit"
-              isLoading={isSubmitting}
-              disabled={!canSubmit}
-              aria-busy={isSubmitting}
-            >
-              Enviar
-            </Button>
+            {busy ? (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    showIcon
+                    icon={faStop}
+                    aria-label="Detener el turno"
+                    disabled={!canInterrupt}
+                    isLoading={isInterrupting}
+                    aria-busy={isInterrupting}
+                    className="h-8 w-8 rounded-lg p-0"
+                  />
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>¿Detener el turno en curso?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Se interrumpirá el turno de esta sesión. Las sesiones hijas
+                      (subagentes) continuarán en ejecución.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={onInterrupt}>
+                      Detener turno
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            ) : (
+              <Button
+                type="submit"
+                showIcon
+                icon={faPaperPlane}
+                aria-label="Enviar mensaje"
+                disabled={!canSubmit}
+                isLoading={isSubmitting}
+                aria-busy={isSubmitting}
+                className="h-8 w-8 rounded-lg p-0"
+              />
+            )}
           </Container>
         </Container>
       </Container>

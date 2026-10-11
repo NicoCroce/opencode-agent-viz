@@ -57,11 +57,40 @@ const getTextarea = (): HTMLTextAreaElement =>
   screen.getByRole('textbox', { name: 'Mensaje' });
 
 describe('ChatComposer', () => {
-  it('renders an accessible textarea and the send button', () => {
+  it('renders an accessible textarea and the send action button', () => {
     render(<Harness />);
 
     expect(getTextarea()).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Enviar' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Enviar mensaje' }),
+    ).toBeInTheDocument();
+  });
+
+  it('renders a single mutating action button: plane when idle, stop when busy', () => {
+    const { rerender } = render(<Harness initialValue="hola" />);
+
+    // Sin turno en curso: un solo botón, el de enviar (avión).
+    expect(
+      screen.getByTestId('chat-composer-actions').querySelectorAll('button'),
+    ).toHaveLength(1);
+    expect(
+      screen.getByRole('button', { name: 'Enviar mensaje' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Detener el turno' }),
+    ).not.toBeInTheDocument();
+
+    // Con turno en curso: el mismo slot muta a stop y desaparece el envío.
+    rerender(<Harness initialValue="hola" busy />);
+    expect(
+      screen.getByTestId('chat-composer-actions').querySelectorAll('button'),
+    ).toHaveLength(1);
+    expect(
+      screen.getByRole('button', { name: 'Detener el turno' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Enviar mensaje' }),
+    ).not.toBeInTheDocument();
   });
 
   it('renders the chat controls slot in the footer row (U1)', () => {
@@ -147,7 +176,7 @@ describe('ChatComposer', () => {
     const onSubmit = vi.fn();
     render(<Harness initialValue="hola" onSubmit={onSubmit} />);
 
-    await user.click(screen.getByRole('button', { name: 'Enviar' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
@@ -157,7 +186,7 @@ describe('ChatComposer', () => {
     const onSubmit = vi.fn();
     render(<Harness initialValue="   " onSubmit={onSubmit} />);
 
-    const button = screen.getByRole('button', { name: 'Enviar' });
+    const button = screen.getByRole('button', { name: 'Enviar mensaje' });
     expect(button).toBeDisabled();
 
     await user.type(getTextarea(), '{Enter}');
@@ -168,7 +197,7 @@ describe('ChatComposer', () => {
   it('announces the busy state and blocks input while submitting', () => {
     render(<Harness initialValue="hola" isSubmitting />);
 
-    const button = screen.getByRole('button', { name: 'Enviar' });
+    const button = screen.getByRole('button', { name: 'Enviar mensaje' });
     expect(button).toHaveAttribute('aria-busy', 'true');
     expect(button).toBeDisabled();
     expect(getTextarea()).toBeDisabled();
@@ -177,20 +206,62 @@ describe('ChatComposer', () => {
   it('disables the composer when disabled', () => {
     render(<Harness initialValue="hola" disabled />);
 
-    expect(screen.getByRole('button', { name: 'Enviar' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Enviar mensaje' })).toBeDisabled();
     expect(getTextarea()).toBeDisabled();
   });
 
-  it('keeps the Detener control disabled when there is no turn in progress', () => {
+  it('shows no Detener control when there is no turn in progress', () => {
     render(<Harness initialValue="hola" />);
 
-    expect(screen.getByRole('button', { name: 'Detener' })).toBeDisabled();
+    expect(
+      screen.queryByRole('button', { name: 'Detener el turno' }),
+    ).not.toBeInTheDocument();
   });
 
   it('enables the Detener control while a turn is in progress', () => {
     render(<Harness initialValue="hola" busy />);
 
-    expect(screen.getByRole('button', { name: 'Detener' })).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Detener el turno' }),
+    ).toBeEnabled();
+  });
+
+  it('envía con Enter aunque haya un turno en curso (submit en ambos estados)', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(<Harness initialValue="hola" busy onSubmit={onSubmit} />);
+
+    // El slot de acción muta a stop, pero Enter sigue enviando (steer): `busy`
+    // no bloquea el envío, solo cambia la acción visible del botón único.
+    expect(
+      screen.getByRole('button', { name: 'Detener el turno' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Enviar mensaje' }),
+    ).not.toBeInTheDocument();
+
+    await user.type(getTextarea(), '{Enter}');
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it('deshabilita Detener cuando el compositor está deshabilitado (canInterrupt)', () => {
+    render(<Harness initialValue="hola" busy disabled />);
+
+    expect(
+      screen.getByRole('button', { name: 'Detener el turno' }),
+    ).toBeDisabled();
+  });
+
+  it('el botón de detener no envía el borrador', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const onSubmit = vi.fn();
+    render(<Harness initialValue="hola" busy onSubmit={onSubmit} />);
+
+    await user.click(screen.getByRole('button', { name: 'Detener el turno' }));
+
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it('asks for confirmation before interrupting the turn', async () => {
@@ -198,7 +269,7 @@ describe('ChatComposer', () => {
     const onInterrupt = vi.fn();
     render(<Harness initialValue="hola" busy onInterrupt={onInterrupt} />);
 
-    await user.click(screen.getByRole('button', { name: 'Detener' }));
+    await user.click(screen.getByRole('button', { name: 'Detener el turno' }));
 
     expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
     expect(onInterrupt).not.toHaveBeenCalled();
@@ -209,7 +280,7 @@ describe('ChatComposer', () => {
     const onInterrupt = vi.fn();
     render(<Harness initialValue="hola" busy onInterrupt={onInterrupt} />);
 
-    await user.click(screen.getByRole('button', { name: 'Detener' }));
+    await user.click(screen.getByRole('button', { name: 'Detener el turno' }));
     await user.click(
       await screen.findByRole('button', { name: 'Detener turno' }),
     );
@@ -222,7 +293,7 @@ describe('ChatComposer', () => {
     const onInterrupt = vi.fn();
     render(<Harness initialValue="hola" busy onInterrupt={onInterrupt} />);
 
-    await user.click(screen.getByRole('button', { name: 'Detener' }));
+    await user.click(screen.getByRole('button', { name: 'Detener el turno' }));
     await user.click(await screen.findByRole('button', { name: 'Cancelar' }));
 
     expect(onInterrupt).not.toHaveBeenCalled();
@@ -231,7 +302,7 @@ describe('ChatComposer', () => {
   it('announces the interrupting state with aria-busy and a loading control', () => {
     render(<Harness initialValue="hola" busy isInterrupting />);
 
-    const button = screen.getByRole('button', { name: 'Detener' });
+    const button = screen.getByRole('button', { name: 'Detener el turno' });
     expect(button).toHaveAttribute('aria-busy', 'true');
     expect(button).toBeDisabled();
   });
@@ -261,7 +332,7 @@ describe('ChatComposer', () => {
     expect(getTextarea()).toBeEnabled();
     expect(getTextarea()).toHaveValue('reintentable');
 
-    await user.click(screen.getByRole('button', { name: 'Enviar' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 });

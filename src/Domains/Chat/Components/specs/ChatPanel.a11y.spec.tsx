@@ -19,7 +19,8 @@ import { ChatPanel } from '../ChatPanel';
  * `aria-busy` en aislamiento y `ChatTimeline.spec.tsx` el contenido del anuncio
  * de turno. Aquí se verifican las aserciones de accesibilidad que faltaban, a
  * nivel de **integración** (con `renderWithProviders`):
- *   - `aria-busy` refleja el **reposo** (`false`) en Enviar/Detener y el estado
+ *   - `aria-busy` refleja el **reposo** (`false`) en el único botón de acción
+ *     ("Enviar mensaje" en reposo / "Detener el turno" en curso) y el estado
  *     ocupado del **compositor** completo (el `<form>`), no solo el botón.
  *   - La live region de inicio/fin de turno es `role="status"`, `aria-live`
  *     `polite` y `sr-only`, y **nunca** filtra el texto del delta (FR-021).
@@ -75,18 +76,21 @@ const renderPanel = () =>
 
 const getTextarea = (): HTMLTextAreaElement =>
   screen.getByRole('textbox', { name: 'Mensaje' });
+/** Único botón de acción: avión ("Enviar mensaje") sin turno en curso. */
 const getSendButton = (): HTMLElement =>
-  screen.getByRole('button', { name: 'Enviar' });
-const getStopButton = (): HTMLElement =>
-  screen.getByRole('button', { name: 'Detener' });
+  screen.getByRole('button', { name: 'Enviar mensaje' });
 
 describe('ChatPanel — aria-busy de los controles (T066, FR-021)', () => {
-  it('expone aria-busy="false" en Enviar y Detener en reposo', () => {
+  it('expone aria-busy="false" en el único botón de acción en reposo', () => {
     renderPanel();
 
-    // `aria-busy` refleja el estado: en reposo es `false`, no un valor pegado.
+    // En reposo el compositor muestra un solo botón (avión, "Enviar mensaje"):
+    // `aria-busy` refleja el estado (`false`), no un valor pegado.
     expect(getSendButton()).toHaveAttribute('aria-busy', 'false');
-    expect(getStopButton()).toHaveAttribute('aria-busy', 'false');
+    // Sin turno en curso no existe el botón de detener.
+    expect(
+      screen.queryByRole('button', { name: 'Detener el turno' }),
+    ).not.toBeInTheDocument();
   });
 
   it('marca el compositor como ocupado (aria-busy) mientras el envío está en vuelo', async () => {
@@ -105,7 +109,7 @@ describe('ChatPanel — aria-busy de los controles (T066, FR-021)', () => {
     expect(getTextarea().closest('form')).toHaveAttribute('aria-busy', 'true');
   });
 
-  it('anuncia aria-busy en Detener mientras la interrupción está en vuelo', async () => {
+  it('anuncia aria-busy en el único botón mientras la interrupción está en vuelo', async () => {
     write.interruptSession.mockReturnValue(new Promise(() => {}));
     const view = renderPanel();
 
@@ -116,7 +120,9 @@ describe('ChatPanel — aria-busy de los controles (T066, FR-021)', () => {
     });
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    const stop = getStopButton();
+    // Con el turno en curso el único botón muta a stop ("Detener el turno");
+    // `findBy*` deja fluir la notificación de la query antes de asertarlo.
+    const stop = await screen.findByRole('button', { name: 'Detener el turno' });
     await user.click(stop);
     await user.click(
       await screen.findByRole('button', { name: 'Detener turno' }),
