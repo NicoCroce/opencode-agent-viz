@@ -2,7 +2,7 @@
 description: Researcher de SddOrch con acceso a la web y sin acceso al código. Investiga producto (y mercado o legal si se activan), guarda el informe completo en Engram y devuelve solo un resumen corto.
 mode: subagent
 color: "#f472b6"
-steps: 25
+steps: 40
 permissions:
   - action: "*"
     resource: "*"

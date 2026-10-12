@@ -20,11 +20,11 @@ Configuración para OpenCode V2 (`https://opencode.ai/v2/docs/`).
 - **roles/** — Perfil de cada rol de investigación (producto, ux, seguridad, rendimiento, calidad, accesibilidad)
 - **templates/discovery/** — Plantillas de PRD y RFC
 - **skills/** — Propias y de terceros; ver `skills/README.md` (procedencia y licencias)
-- **scripts/bash/** — `open-pr.sh` (push + PR) y `run-timeout.sh`
+- **scripts/bash/** — `open-pr.sh` (push + PR), `run-timeout.sh`, y los de SddOrch: `schedule.mjs` (olas), `mark-tasks.sh`, `scope-check.sh`, `verify.sh`. El área de trabajo de cada ejecución es `runs/` (ignorada por git)
 
 ## Configuración
 
-`opencode.json` (raíz) carga `app.instructions.md` y `memory.instructions.md`. Los agentes llevan sus permisos en el propio frontmatter.
+En V2 el campo `instructions` de `opencode.json` no se resuelve, así que los archivos de `instructions/` **no se cargan automáticamente**. Lo único que se carga una vez es `AGENTS.md` (las reglas esenciales del frontend están en su sección 11). `app.instructions.md` queda como referencia extendida con ejemplos; `memory.instructions.md` y `sddorch-contract.md` los leen explícitamente los agentes que los necesitan. Los agentes llevan sus permisos en el propio frontmatter.
 
 ## Reglas
 

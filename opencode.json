@@ -1,7 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "instructions": [
-    ".opencode/instructions/app.instructions.md",
-    ".opencode/instructions/memory.instructions.md"
-  ]
+  "compaction": {
+    "buffer": 800000
+  }
 }

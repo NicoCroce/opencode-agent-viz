@@ -2,7 +2,7 @@
 description: Researcher de SddOrch con acceso al repo. Investiga un rol (UX, seguridad, rendimiento, calidad, accesibilidad) sobre el pedido, guarda el informe completo en Engram y devuelve solo un resumen corto. Solo lectura; sin búsqueda web libre.
 mode: subagent
 color: "#38bdf8"
-steps: 25
+steps: 40
 permissions:
   - action: "*"
     resource: "*"

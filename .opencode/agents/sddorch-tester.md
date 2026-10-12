@@ -2,7 +2,7 @@
 description: Subagente de tests de SddOrch. Escribe tests de reglas reales con Vitest siguiendo la skill test-generator, solo en carpetas specs/, y no toca código de producto.
 mode: subagent
 color: "#a855f7"
-steps: 40
+steps: 60
 permissions:
   - action: "*"
     resource: "*"

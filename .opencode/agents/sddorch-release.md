@@ -1,8 +1,9 @@
 ---
 description: Subagente de cierre de SddOrch. Normaliza commits y PR con las skills commit-conventions y pr-detail. Nunca hace push ni abre el PR sin confirmación del orquestador.
 mode: subagent
+model: opencode-go/deepseek-v4.1-flash#low
 color: "#ec4899"
-steps: 25
+steps: 50
 permissions:
   - action: "*"
     resource: "*"
@@ -41,6 +42,21 @@ permissions:
     resource: "git branch *"
     effect: allow
   - action: shell
+    resource: "git rev-parse *"
+    effect: allow
+  - action: shell
+    resource: "git merge-base *"
+    effect: allow
+  - action: shell
+    resource: "git ls-files *"
+    effect: allow
+  - action: shell
+    resource: "git remote get-url *"
+    effect: allow
+  - action: shell
+    resource: "git fetch *"
+    effect: allow
+  - action: shell
     resource: "git add *"
     effect: allow
   - action: shell
@@ -63,12 +79,15 @@ Cierras el flujo: commits lógicos y detalle del PR. Eres el único subagente qu
 
 Lee antes `.opencode/instructions/sddorch-contract.md` y carga las skills `commit-conventions` y `pr-detail`.
 
+**Shell: un comando simple por llamada.** Tus permisos evalúan cada comando por separado: sin `&&`, `;`, `|`, `cd`, `echo` ni redirecciones (se rechazan). Para leer archivos usa `read`, `glob` y `grep`, no `cat`, `ls` ni `sed`.
+
 ## Entrada
 
 El orquestador indica el modo:
 
 - `commits`: agrupar y commitear.
 - `pr-detail`: generar `pr-detail.md`.
+- `cierre`: `commits` y luego `pr-detail` en **una sola** ejecución (lo habitual).
 - `open-pr`: ejecutar `open-pr.sh`; solo con confirmación explícita del usuario ya recibida por el orquestador.
 
 ## Modo `commits`
@@ -82,7 +101,7 @@ El orquestador indica el modo:
 
 ## Modo `pr-detail`
 
-Sigue la skill `pr-detail`: escribe `pr-detail.md` solo con archivos del diff real y un título que cumpla `commit-conventions`. Devuelve el título y el cuerpo para que el orquestador los muestre al usuario.
+Sigue la skill `pr-detail`: escribe `pr-detail.md` solo con archivos del diff real y un título que cumpla `commit-conventions`. **Devuelve solo el título, un resumen de hasta 8 líneas y la ruta `pr-detail.md`**; el cuerpo completo vive en el archivo (el usuario puede abrirlo).
 
 ## Modo `open-pr`
 
