@@ -9,14 +9,20 @@ formato.
 | Subagente | Modo | Rol | Permisos clave | Presupuesto |
 |---|---|---|---|---|
 | `sddorch` | primary | Orquestador: descubre, planifica, delega, verifica, escribe memoria | Todo salvo `subagent` genérico y ediciones a Spec-Kit | — |
-| `sddorch-researcher-code` | subagent | Investiga un rol técnico con acceso al repo | Solo lectura + skills de su rol + Engram (su clave) + web acotada | 25 pasos |
-| `sddorch-researcher-market` | subagent | Investiga producto/marketing/legal con web y sin código | Documentación del proyecto + skills `pm-*` + Engram (su clave) + web abierta | 25 pasos |
-| `sddorch-writer` | subagent | Redacta PRD y RFC desde los informes en Engram | Templates + constitución + Engram (`prd`/`rfc`) | 20 pasos |
+| `sddorch-researcher-code` | subagent | Investiga un rol técnico con acceso al repo | Solo lectura + skills de su rol + Engram (su clave) + web acotada | 40 pasos |
+| `sddorch-researcher-market` | subagent | Investiga producto/marketing/legal con web y sin código | Documentación del proyecto + skills `pm-*` + Engram (su clave) + web abierta | 40 pasos |
+| `sddorch-writer` | subagent | Redacta PRD y RFC desde los informes en Engram | Templates + constitución + Engram (`prd`/`rfc`) | 30 pasos |
 | `general` | subagent | Ejecuta comandos `plan`, `tasks`, `analyze`, `converge` | General | — |
-| `sddorch-implementer` | subagent | Ejecuta tareas de `implement` o una unidad de la ruta rápida | Edita solo sus `writes`; git denegado | 40 pasos |
-| `sddorch-reviewer` | subagent | Compuertas de constitución | Solo lectura + skill `code-reviewer` | 25 pasos |
-| `sddorch-tester` | subagent | Tests tras `implement` | Edita solo `specs/` y `__fixtures__/` | 40 pasos |
-| `sddorch-release` | subagent | Commits, `pr-detail` y PR | Único con `git add/commit`; push denegado salvo script de PR | 25 pasos |
+| `sddorch-implementer` | subagent | Ejecuta tareas de `implement` o una unidad de la ruta rápida | Edita solo sus `writes`; git denegado | 60 pasos |
+| `sddorch-reviewer` | subagent | Compuertas de constitución | Solo lectura + skill `code-reviewer` | 40 pasos |
+| `sddorch-tester` | subagent | Tests tras `implement` | Edita solo `specs/` y `__fixtures__/` | 60 pasos |
+| `sddorch-release` | subagent | Commits, `pr-detail` y PR | Único con `git add/commit`; push denegado salvo script de PR | 50 pasos |
+
+> **Presupuesto (`steps`).** Es el techo de pasos que puede dar cada subagente
+> antes de ser cortado. Se calibra con evidencia: si un rol lo agota antes de
+> terminar, lo reporta como señal de tipo `agent` y se sube el valor o se parte
+> el trabajo en unidades más pequeñas (ver
+> [`06-auto-learning.md`](06-auto-learning.md#ajustar-el-presupuesto-de-pasos)).
 
 ## Permisos: mínimo privilegio
 
@@ -93,6 +99,8 @@ Algunos subagentes usan secciones propias:
    mientras otros subagentes escriben en paralelo. Las globales las hace el
    orquestador.
 8. No modifica archivos de Spec-Kit.
+9. Si se está quedando sin presupuesto de pasos, **cierra limpio**: persiste lo
+   que tenga y devuelve `BLOCKED` con el contrato, en vez de quedarse sin pasos.
 
 ## Por qué el contrato importa
 

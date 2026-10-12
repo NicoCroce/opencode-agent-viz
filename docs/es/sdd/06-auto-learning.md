@@ -103,6 +103,57 @@ Puntos finos:
 - **Bajo ruido.** Como se filtran por repetición y por impacto, el usuario no
   recibe una lista infinita de sugerencias.
 
+## Ajustar el presupuesto de pasos
+
+El frontmatter de cada agente (`.opencode/agents/<agente>.md`) define `steps`:
+el techo de pasos que puede dar antes de ser cortado. No es un detalle menor de
+configuración: un techo corto deja trabajo a medias y obliga a reanudar
+sesiones.
+
+Cuando un subagente agota `steps` **antes de terminar** —sin poder guardar su
+informe en Engram, sin cerrar sus tareas o con commits pendientes— lo reporta
+como señal de tipo `agent`. El orquestador la acumula y, al cerrar, propone una
+de dos salidas:
+
+1. **Subir el presupuesto** del agente en su frontmatter.
+2. **Partir el trabajo** en unidades más pequeñas (mismo techo, menos trabajo
+   por unidad).
+
+Caso real de este repositorio (señal `step-limits`: ≥6 repeticiones y varios
+fallos): los researchers agotaban 25 pasos sin llegar a escribir en Engram, el
+implementer agotaba 40 en tareas grandes y el release quedaba con commits sin
+hacer. Valores aplicados:
+
+| Agente | Antes | Después |
+|---|---|---|
+| `sddorch-researcher-code` / `-market` | 25 | 40 |
+| `sddorch-writer` | 20 | 30 |
+| `sddorch-implementer` | 40 | 60 |
+| `sddorch-release` | 25 | 50 |
+| `sddorch-reviewer` | 25 | 40 |
+| `sddorch-tester` | 40 | 60 |
+
+`reviewer` y `tester` subieron **por coherencia** con el resto del reparto (no
+había evidencia de agotamiento en ellos): un presupuesto que se queda corto en
+la compuerta de constitución o en los tests vuelve a costar una reanudación.
+
+`release` quedó **un escalón por encima** del resto, y no por volumen de trabajo
+sino por **estado mezclado**: cortarse a mitad de los commits deja un historial
+a medias (el fallo real fue 7/12 commits), y eso es peor que no haber empezado.
+
+### La otra mitad: cerrar antes del corte
+
+Subir el techo reduce la probabilidad de corte, pero no la elimina. El contrato
+(`sddorch-contract.md`) cubre el resto: cuando un subagente se ve corto, **persiste
+lo que tenga y cierra con `BLOCKED`** incluyendo lo hecho y lo que falta, en
+lugar de quedarse sin pasos. Así el corte deja de ser una pérdida silenciosa —el
+informe que nunca se guardó, el final vacío— y pasa a ser un aviso que el
+orquestador puede leer, reportar y accionar.
+
+`steps` es un **techo, no un gasto**: subirlo no encarece una ejecución que
+termina sola, porque el agente devuelve el control al acabar. Lo que sí
+encarece —en tiempo y en contexto— es **reanudar** una sesión cortada a medias.
+
 ## Ejemplos de señal → artefacto
 
 | Señal observada | Artefacto propuesto |
@@ -113,6 +164,7 @@ Puntos finos:
 | Un análisis se hace siempre igual antes de implementar | Subagente `sddorch-researcher-code` |
 | Faltaba un perfil de disciplina para el descubrimiento | Archivo `.opencode/roles/<rol>.md` |
 | Hay que recordar el formato del PR | Skill `pr-detail` |
+| Un subagente agota su presupuesto de pasos antes de terminar | Subir `steps` del agente (`.opencode/agents/<agente>.md`) o partir la tarea en unidades |
 
 > Buena parte de las skills y subagentes de este proyecto nacieron, en la
 > práctica, de este mismo ciclo: son el resultado de detectar fricción y

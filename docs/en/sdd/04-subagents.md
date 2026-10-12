@@ -9,14 +9,20 @@ same format.
 | Subagent | Mode | Role | Key permissions | Budget |
 |---|---|---|---|---|
 | `sddorch` | primary | Orchestrator: discovers, plans, delegates, verifies, writes memory | Everything except generic `subagent` and Spec-Kit edits | — |
-| `sddorch-researcher-code` | subagent | Investigates a technical role with repo access | Read-only + role skills + Engram (its key) + limited web | 25 steps |
-| `sddorch-researcher-market` | subagent | Investigates product/marketing/legal with web and no code | Project docs + `pm-*` skills + Engram (its key) + open web | 25 steps |
-| `sddorch-writer` | subagent | Writes PRD and RFC from the reports in Engram | Templates + constitution + Engram (`prd`/`rfc`) | 20 steps |
+| `sddorch-researcher-code` | subagent | Investigates a technical role with repo access | Read-only + role skills + Engram (its key) + limited web | 40 steps |
+| `sddorch-researcher-market` | subagent | Investigates product/marketing/legal with web and no code | Project docs + `pm-*` skills + Engram (its key) + open web | 40 steps |
+| `sddorch-writer` | subagent | Writes PRD and RFC from the reports in Engram | Templates + constitution + Engram (`prd`/`rfc`) | 30 steps |
 | `general` | subagent | Runs `plan`, `tasks`, `analyze`, `converge` commands | General | — |
-| `sddorch-implementer` | subagent | Runs `implement` tasks or a fast-route unit | Edits only its `writes`; git denied | 40 steps |
-| `sddorch-reviewer` | subagent | Constitution gates | Read-only + `code-reviewer` skill | 25 steps |
-| `sddorch-tester` | subagent | Tests after `implement` | Edits only `specs/` and `__fixtures__/` | 40 steps |
-| `sddorch-release` | subagent | Commits, `pr-detail`, and PR | Only one with `git add/commit`; push denied except PR script | 25 steps |
+| `sddorch-implementer` | subagent | Runs `implement` tasks or a fast-route unit | Edits only its `writes`; git denied | 60 steps |
+| `sddorch-reviewer` | subagent | Constitution gates | Read-only + `code-reviewer` skill | 40 steps |
+| `sddorch-tester` | subagent | Tests after `implement` | Edits only `specs/` and `__fixtures__/` | 60 steps |
+| `sddorch-release` | subagent | Commits, `pr-detail`, and PR | Only one with `git add/commit`; push denied except PR script | 50 steps |
+
+> **Budget (`steps`).** It is the step ceiling each subagent can use before
+> being cut off. It is calibrated with evidence: if a role exhausts it before
+> finishing, it reports it as an `agent` signal and the value is raised or the
+> work is split into smaller units (see
+> [`06-auto-learning.md`](06-auto-learning.md#tuning-the-step-budget)).
 
 ## Permissions: least privilege
 
@@ -93,6 +99,8 @@ Some subagents use their own sections:
    repo) while other subagents write in parallel. Global ones are run by the
    orchestrator.
 8. It does not modify Spec-Kit files.
+9. If it is running out of step budget, it **closes clean**: it persists what it
+   has and returns `BLOCKED` with the contract, instead of running out of steps.
 
 ## Why the contract matters
 

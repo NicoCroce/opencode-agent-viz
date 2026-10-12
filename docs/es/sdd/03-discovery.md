@@ -154,7 +154,7 @@ conflictos y un resumen (≤12 líneas).
   alternativas; los conflictos entre áreas se resuelven a la vista.
 - **Contexto ligero:** el orquestador ve resúmenes y documentos de una página,
   no informes completos.
-- **Coste acotado:** los researchers son de solo lectura (≤25 pasos) y el writer
+- **Coste acotado:** los researchers son de solo lectura (≤40 pasos) y el writer
   no investiga; el paralelismo hace que cueste el rol más lento, no la suma.
 - **Escalable y graduable:** 2–3 roles en nivel 1, hasta 5 en nivel 2; la ruta
   rápida solo paga investigación si hay 4+ unidades con archivos inciertos.

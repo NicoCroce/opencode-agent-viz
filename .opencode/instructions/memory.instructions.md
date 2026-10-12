@@ -20,7 +20,7 @@ Pasa **punteros, no contenido**. Los informes largos viven en Engram; el orquest
 |---|---|
 | `sddorch` (orquestador) | `north`, `state`, `decision/<slug>`, `run`, `harness-signal/*` |
 | `sddorch-researcher-code` / `-market` | solo su `findings/<rol>` |
-| `sddorch-writer` | solo `prd`, `rfc` y `recon-discarded` |
+| `sddorch-writer` | solo `prd`, `rfc` y `recon-discarded` (más los archivos `.opencode/runs/<run>/prd.md` y `rfc.md`) |
 | Resto de subagentes | nada |
 
 Esta restricción no la hacen cumplir los permisos (el permiso de Engram es por herramienta, no por clave): se cumple por instrucción. Cada escritura va a **su propia clave**, nunca a una compartida, para que dos agentes en paralelo no se pisen.
@@ -36,33 +36,34 @@ Usa siempre `project: opencode-agent-viz`.
 | `sddorch/<run>/units` | `decision` | ruta rápida: unidades de cambio (descripción, `writes`, criterio, dependencias, estado) |
 | `sddorch/<run>/findings/<rol>` | `discovery` | informe completo de un researcher |
 | `sddorch/<run>/decision/<slug>` | `decision` | una decisión: qué, por qué, alternativas |
-| `sddorch/<run>/prd` | `decision` | PRD (entrada de `specify`) |
-| `sddorch/<run>/rfc` | `decision` | RFC (entrada de `plan`) |
+| `sddorch/<run>/prd` | `decision` | **puntero**: ruta `.opencode/runs/<run>/prd.md` + resumen de 3 líneas (el texto vive en el archivo) |
+| `sddorch/<run>/rfc` | `decision` | **puntero**: ruta `.opencode/runs/<run>/rfc.md` + resumen de 3 líneas |
 | `sddorch/<run>/recon-discarded` | `discovery` | lo descartado y el motivo |
 | `sddorch/<run>/run` | `discovery` | duración por fase, reintentos, tareas fallidas |
 | `sddorch/harness-signal/<slug>` | `discovery` | tipo, disparador, workaround, evidencia, nº de repeticiones |
 
 ## Contenido de `state`
 
-Corto y estructurado:
+Corto (≤ 600 caracteres), estructurado, una línea por campo:
 
 ```
 mode: plan | auto
 route: fast | sdd-1 | sdd-2
 phase: <fase actual>
-done: [<fases terminadas>]
-wave: <i>/<n>
-tasks: done [T001..] · failed [T0xx] · blocked [T0yy]
+done: <fases terminadas, separadas por coma>
+wave: <i>/<n>            (las unidades viven en .opencode/runs/<feature>/schedule.json)
+tasks: failed [T0xx] · blocked [T0yy]      (las hechas están marcadas en tasks.md)
 branch: <rama>
 feature_directory: <ruta o "aún no existe">
+pending_question: <pregunta que se hizo al usuario y no se contestó, o "ninguna">
 updated: <fecha ISO>
 ```
 
-Guárdalo al terminar cada fase y cada tanda. No guardes diffs ni salidas de terminal.
+Guárdalo al terminar cada fase y cada tanda, y **antes de cada `question`** (con `pending_question`). No guardes diffs, salidas de terminal ni listas de tareas hechas.
 
 ## Reanudación y compactación
 
-- Al iniciar, busca `sddorch/*/state`. Si hay una fase sin terminar, ofrece reanudar. Contrasta con el repo (`tasks.md`, `git status`): Engram dice dónde ibas; los archivos son la verdad.
+- Al iniciar, busca `sddorch/*/state` (con `limit` bajo, no `mem_context` completo). Si hay una fase sin terminar, ofrece reanudar. Si el `state` trae `pending_question`, vuelve a preguntarla antes de nada. Contrasta con el repo (`tasks.md`, `git status`): Engram dice dónde ibas; los archivos son la verdad.
 - Tras una compactación de la conversación, relee `north`, `state` y las claves `decision/*` antes de seguir.
 - Guarda cada decisión **en el momento** en que se toma.
 

@@ -131,6 +131,21 @@ Crear `opencodeClient.ts` con:
 - Usar Zod para datos del usuario (filtros, parámetros).
 - Tipos del SDK ya son tipados por OpenCode; no revalidar.
 
+### 11. UI, hooks y dominios (reglas esenciales)
+
+Referencia extendida con ejemplos: `.opencode/instructions/app.instructions.md` (no se carga automáticamente; consultarla solo si hace falta un ejemplo).
+
+- **Imports:** wrappers desde el barrel `@app/Application/Components` (`Button`, `Input`…). Importar de `ui/` solo si el wrapper no expone el primitivo. Verificar el barrel antes de crear un componente nuevo; nunca duplicar uno existente.
+- **Layout:** `Container` es flex column por defecto; usar `space` antes de añadir clases. Toda `*.page.tsx` va envuelta en `Page` (`title` por prop; `size="small"` para formularios, `full` por defecto). Las páginas viven en `Domains/[Domain]/Pages/`, sin bloques grandes de código.
+- **Mutations:** `toast.success` / `toast.error` viven en el hook, no en el componente. `<Button type="submit">` con `isLoading={isPending}`; "Cancelar" usa `disabled={isPending}`.
+- **Formularios:** React Hook Form + Zod (`zodResolver`).
+- **Búsquedas:** todo input que dispare una query pasa por `useDebounce` (400 ms por defecto; 200 ms si es búsqueda local).
+- **Skeletons y piezas repetidas:** los skeletons de dominio van en `Components/` del dominio, sobre `ui/skeleton`. Un fragmento que aparece en 2+ archivos o infla una página se extrae a su propio archivo en `Components/`. No crear componentes genéricos dentro de un dominio.
+- **Campos derivados para la UI** (p. ej. `enrichment`, `effort`): opcionales en el tipo del modelo (`campo?: T | null`). Los comparadores de reconciliación (`sameNodeData`) deben cubrirlos, o el valor no se re-renderiza.
+- **Rutas:** `[Domain].routes.ts` solo con constantes (sin JSX); `[Domain].router.tsx` exporta el array de `<Route key=…>`.
+- **Dominio nuevo:** registrar `[Domain]Router` en `AllRoutes` de `src/Infrastructure/Routes.tsx` y actualizar `src/Domains/index.ts` si aplica.
+- **Estilo:** camelCase para métodos y variables; preferir `??` antes que ternarios para valores por defecto.
+
 ## Query Keys
 
 Archivo `Domains/queryKeys.ts`:
