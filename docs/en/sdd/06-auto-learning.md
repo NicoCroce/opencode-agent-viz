@@ -103,6 +103,57 @@ Fine points:
 - **Low noise.** Because signals are filtered by repetition and impact, the
   user does not receive an endless list of suggestions.
 
+## Tuning the step budget
+
+Each agent's frontmatter (`.opencode/agents/<agent>.md`) defines `steps`: the
+step ceiling it can use before being cut off. It is not a minor configuration
+detail: a short ceiling leaves work half-done and forces sessions to be resumed.
+
+When a subagent exhausts `steps` **before finishing** —unable to save its report
+to Engram, unable to close its tasks, or with commits still pending— it reports
+it as an `agent` signal. The orchestrator accumulates it and, at the end,
+proposes one of two ways out:
+
+1. **Raise the budget** for the agent in its frontmatter.
+2. **Split the work** into smaller units (same ceiling, less work per unit).
+
+A real case from this repository (the `step-limits` signal: ≥6 repetitions and
+several failures): researchers used up 25 steps without managing to write to
+Engram, the implementer used up 40 on large tasks, and release was left with
+pending commits. Values applied:
+
+| Agent | Before | After |
+|---|---|---|
+| `sddorch-researcher-code` / `-market` | 25 | 40 |
+| `sddorch-writer` | 20 | 30 |
+| `sddorch-implementer` | 40 | 60 |
+| `sddorch-release` | 25 | 50 |
+| `sddorch-reviewer` | 25 | 40 |
+| `sddorch-tester` | 40 | 60 |
+
+`reviewer` and `tester` were raised **for consistency** with the rest of the
+split (there was no evidence of them running out): a budget that falls short at
+the constitution gate or in the tests ends up costing another resume.
+
+`release` ended up **one notch above** the rest, not because of workload but
+because of **mixed state**: being cut halfway through the commits leaves a
+half-done history (the real failure was 7/12 commits), and that is worse than
+never having started.
+
+### The other half: closing before the cut
+
+Raising the ceiling reduces the chance of a cut, but does not remove it. The
+contract (`sddorch-contract.md`) covers the rest: when a subagent sees it is
+running short, it **persists what it has and closes with `BLOCKED`** including
+what was done and what remains, instead of running out of steps. That way a cut
+stops being a silent loss —the report that was never saved, the empty final
+answer— and becomes a notice the orchestrator can read, report, and act on.
+
+`steps` is a **ceiling, not a spend**: raising it does not make a run that
+finishes on its own more expensive, because the agent hands control back when
+done. What *is* expensive —in time and in context— is **resuming** a
+half-finished session.
+
 ## Signal → artifact examples
 
 | Observed signal | Proposed artifact |
@@ -113,6 +164,7 @@ Fine points:
 | An analysis is always done the same way before implementing | `sddorch-researcher-code` subagent |
 | A discipline profile for discovery was missing | `.opencode/roles/<role>.md` file |
 | The PR format has to be remembered | `pr-detail` skill |
+| A subagent exhausts its step budget before finishing | Raise the agent's `steps` (`.opencode/agents/<agent>.md`) or split the task into units |
 
 > In practice, many of the skills and subagents in this project were born from
 > this very loop: they are the result of detecting friction and turning it into

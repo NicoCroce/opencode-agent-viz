@@ -48,6 +48,7 @@ Full guide in [Product → Overview](docs/en/product/01-overview.md) and
 | [Skills catalog](docs/en/sdd/08-skills.md) | Project and third-party skills: purpose, origin, and licenses |
 | [Discovery roles](docs/en/sdd/09-roles.md) | The six disciplines: purpose, agent, and skills |
 | [FAQ](docs/en/sdd/10-faq.md) | Frequent questions about the model |
+| [Context optimization](docs/en/sdd/11-context-optimization.md) | Stages A and B: what changed in SddOrch, why, reduction tables and how to measure it |
 
 **Spanish mirror:** [docs/es/](docs/es/) — [product](docs/es/product/01-overview.md) · [sdd](docs/es/sdd/01-overview.md).
 
@@ -57,7 +58,7 @@ Full guide in [Product → Overview](docs/en/product/01-overview.md) and
 |---|---|
 | [AGENTS.md](AGENTS.md) | Project conventions and development flow |
 | [.opencode/README.md](.opencode/README.md) | Index of the harness configuration (agents, skills, scripts) |
-| [app.instructions.md](.opencode/instructions/app.instructions.md) | Frontend-by-domain conventions (applies to `src/Domains/**`) |
+| [app.instructions.md](.opencode/instructions/app.instructions.md) | Extended reference with examples for the frontend conventions (not auto-loaded; the essentials live in `AGENTS.md`) |
 | [memory.instructions.md](.opencode/instructions/memory.instructions.md) | SddOrch memory rules in Engram |
 | [sddorch-contract.md](.opencode/instructions/sddorch-contract.md) | Subagent response contract |
 | Agents: [sddorch](.opencode/agents/sddorch.md) · [researcher-code](.opencode/agents/sddorch-researcher-code.md) · [researcher-market](.opencode/agents/sddorch-researcher-market.md) · [writer](.opencode/agents/sddorch-writer.md) · [implementer](.opencode/agents/sddorch-implementer.md) · [reviewer](.opencode/agents/sddorch-reviewer.md) · [tester](.opencode/agents/sddorch-tester.md) · [release](.opencode/agents/sddorch-release.md) | Definition of each agent and its permissions |

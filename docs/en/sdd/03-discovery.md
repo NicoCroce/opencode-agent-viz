@@ -155,7 +155,7 @@ summary (≤12 lines) to the orchestrator.
   alternatives; conflicts between areas are resolved in the open.
 - **Light context:** the orchestrator sees summaries and one-page documents, not
   full reports.
-- **Bounded cost:** researchers are read-only (≤25 steps) and the writer does not
+- **Bounded cost:** researchers are read-only (≤40 steps) and the writer does not
   investigate; parallelism makes it cost as much as the slowest role, not the
   sum.
 - **Scalable and gradual:** 2–3 roles at level 1, up to 5 at level 2; the fast

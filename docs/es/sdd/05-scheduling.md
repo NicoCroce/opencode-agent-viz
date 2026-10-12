@@ -9,6 +9,14 @@ mismo archivo a la vez, el resultado es impredecible.
 `schedule` es la fase que convierte `tasks.md` en **tandas** de ejecución
 paralela segura, donde ningún subagente pisa el trabajo de otro.
 
+> **Implementación actual:** el cálculo lo hace el script
+> `.opencode/scripts/bash/schedule.mjs`, no el orquestador «a mano». Las reglas
+> de abajo describen el principio; el script aplica una variante más fina (una
+> tarea `[P]` solo espera a conflictos de archivo y dependencias explícitas, y
+> las cadenas cortas se fusionan en unidades de hasta 3 tareas o 4 archivos).
+> Detalle, límites y resultados de la prueba en
+> [Optimización del contexto](11-optimizacion-contexto.md#b3-schedule-por-script).
+
 ## Cómo se calcula una tanda
 
 De cada tarea pendiente (`- [ ]`) en `tasks.md` se extraen:

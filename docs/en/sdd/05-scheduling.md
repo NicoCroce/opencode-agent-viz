@@ -9,6 +9,14 @@ once, the result is unpredictable.
 `schedule` is the phase that turns `tasks.md` into **waves** of safe parallel
 execution, where no subagent steps on another's work.
 
+> **Current implementation:** the computation is done by the script
+> `.opencode/scripts/bash/schedule.mjs`, not by the orchestrator "by hand". The
+> rules below describe the principle; the script applies a finer variant (a
+> `[P]` task only waits for file conflicts and explicit dependencies, and short
+> chains are merged into units of up to 3 tasks or 4 files). Details, limits
+> and test results in
+> [Context optimization](11-context-optimization.md#b3-schedule-by-script).
+
 ## How a wave is computed
 
 From each pending task (`- [ ]`) in `tasks.md`, the planner extracts:
