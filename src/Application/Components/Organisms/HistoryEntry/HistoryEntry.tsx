@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import type { THistoryEntry } from '@app/Domains/History/History.entity';
 import {
   HISTORY_KIND_LABEL,
@@ -38,12 +38,12 @@ interface HistoryEntryProps {
  * Composición raíz: cabecera (`KIND_LABEL`/franja) + despacho a
  * `HistoryEntryBody`, que resuelve el cuerpo por `kind`.
  */
-export const HistoryEntry = ({
+export const HistoryEntry = memo(function HistoryEntry({
   entry,
   showReasoning = true,
   sessionId = null,
   renderCompactionContext,
-}: HistoryEntryProps) => {
+}: HistoryEntryProps) {
   if (entry.kind === 'reasoning' && !showReasoning) {
     return null;
   }
@@ -62,4 +62,4 @@ export const HistoryEntry = ({
       />
     </article>
   );
-};
+});

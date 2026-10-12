@@ -11,6 +11,8 @@ import {
   INSPECTOR_STEP,
 } from '@app/Application/Helpers/panelWidth';
 import { queryKeys } from '@app/Domains/queryKeys';
+import type { TAttentionItem } from '@app/Domains/Chat';
+import { useSessionAttention } from '@app/Domains/Chat/Hooks/useSessionAttention';
 import { useRootSessions } from '@app/Domains/Sessions';
 import { INSPECTOR_PANEL_WIDTH_KEY } from '../Hooks/useInspectorPanel';
 import { WorkspacePage } from '../WorkspacePage';
@@ -65,8 +67,33 @@ vi.mock('@app/Domains/Graph', async () => {
   );
 
   return {
-    AgentGraph: () =>
-      React.createElement('div', { 'data-testid': 'agent-graph' }),
+    // Marcador identificable que refleja la selección explícita y permite
+    // ejercerla desde el spec (T062): el botón invoca `onSelectNode` y el
+    // contenedor expone `selectedNodeId` para poder afirmar que `Escape` no la
+    // limpia cuando el foco está en el composer.
+    AgentGraph: (props: {
+      selectedNodeId?: string | null;
+      onSelectNode?: (id: string) => void;
+      attentionNodeIds?: ReadonlySet<string>;
+    }) =>
+      React.createElement(
+        'div',
+        {
+          'data-testid': 'agent-graph',
+          'data-selected': props.selectedNodeId ?? '',
+          // Realce de atención (T072): el Set derivado en `WorkspacePage` viaja
+          // hasta el grafo; se expone para verificar el cableado (FR-009).
+          'data-attention': [...(props.attentionNodeIds ?? [])].sort().join(','),
+        },
+        React.createElement(
+          'button',
+          {
+            type: 'button',
+            onClick: () => props.onSelectNode?.('ses_root'),
+          },
+          'Seleccionar nodo',
+        ),
+      ),
     GraphSkeleton: () =>
       React.createElement('div', { 'data-testid': 'graph-skeleton' }),
     SessionSummaryBar: () => null,
@@ -79,13 +106,22 @@ vi.mock('@app/Domains/Graph', async () => {
   };
 });
 
-vi.mock('@app/Domains/Sessions', () => ({
-  SessionList: () => null,
-  SessionListSkeleton: () => null,
-  sessionDetailPath: (id: string) => `/sessions/${id}`,
-  useGetSessionStatus: () => ({ data: {} }),
-  useRootSessions: vi.fn(),
-}));
+vi.mock('@app/Domains/Sessions', async () => {
+  const React = await import('react');
+  return {
+    // T073: el rail (real) pasa `attentionByRoot` al listado; se expone para
+    // verificar el cableado sin montar las tarjetas (FR-009).
+    SessionList: (props: { attentionByRoot?: Record<string, number> }) =>
+      React.createElement('div', {
+        'data-testid': 'session-list',
+        'data-attention': JSON.stringify(props.attentionByRoot ?? {}),
+      }),
+    SessionListSkeleton: () => null,
+    sessionDetailPath: (id: string) => `/sessions/${id}`,
+    useGetSessionStatus: () => ({ data: {} }),
+    useRootSessions: vi.fn(),
+  };
+});
 
 vi.mock('@app/Domains/Inspector', async () => {
   const React = await import('react');
@@ -139,6 +175,65 @@ vi.mock('@app/Domains/History', () => ({
     close: vi.fn(),
     navigateTo: vi.fn(),
   }),
+}));
+
+/**
+ * `@app/Domains/Chat` (T026/T062): se sustituye el orquestador real por un
+ * marcador que expone la sesión recibida, para verificar el cableado del slot
+ * `chat` en `InspectorPane`/`WorkspaceLayout` sin montar el compositor ni la
+ * fachada de escritura. Incluye un `textarea` (composer) para poder enfocar el
+ * panel y ejercer la coordinación de `Escape` (T062). El `ChatPanel` real se
+ * cubre en su propio spec.
+ */
+vi.mock('@app/Domains/Chat', async (importOriginal) => {
+  const React = await import('react');
+  const actual = await importOriginal<typeof import('@app/Domains/Chat')>();
+  return {
+    ChatPanel: (props: {
+      sessionId: string;
+      directory?: string | null;
+      selectionSeed?: { agent?: string | null; model?: unknown };
+    }) =>
+      React.createElement(
+        'div',
+        {
+          'data-testid': 'chat-panel',
+          'data-session-id': props.sessionId,
+          // T077: el directorio que scopea el catálogo del selector (FR-008).
+          'data-directory': props.directory ?? '',
+          // T078: la semilla de selección derivada del nodo abierto (FR-008).
+          'data-selection': JSON.stringify(props.selectionSeed ?? {}),
+        },
+        React.createElement('textarea', { 'aria-label': 'Mensaje' }),
+      ),
+    // T053/T075: se conserva el badge real para verificar su montaje tanto en el
+    // trigger de escritorio como en el tab móvil (FR-009).
+    ChatAttentionBadge: actual.ChatAttentionBadge,
+  };
+});
+
+/**
+ * Señales de atención (T055): la derivación (`useSessionAttention`) y el aviso
+ * efímero (`useAttentionNotifications`) son hooks del dominio Chat; se sustituyen
+ * por dobles para controlar la atención derivada y capturar el manejador de
+ * navegación a la request origen (FR-010) sin montar `sonner`.
+ *
+ * El espía se declara con `vi.hoisted` y firma explícita: al ser `vi.mock` de un
+ * factory, la referencia importada degrada el tipo a `any`; con el espía tipado
+ * las llamadas se leen sin `no-unsafe-*`.
+ */
+const attentionNotifications = vi.hoisted(() =>
+  vi.fn<
+    (items: TAttentionItem[], onNavigate?: (item: TAttentionItem) => void) => void
+  >(),
+);
+
+vi.mock('@app/Domains/Chat/Hooks/useSessionAttention', () => ({
+  useSessionAttention: vi.fn(() => []),
+}));
+
+vi.mock('@app/Domains/Chat/Hooks/useAttentionNotifications', () => ({
+  useAttentionNotifications: attentionNotifications,
 }));
 
 /**
@@ -230,6 +325,8 @@ beforeEach(() => {
     isError: false,
     error: null,
   });
+  vi.mocked(useSessionAttention).mockReturnValue([]);
+  attentionNotifications.mockClear();
 
   service.listSessions.mockReset();
   service.listAgents.mockResolvedValue([]);
@@ -508,5 +605,349 @@ describe('WorkspacePage — fullscreen del panel de detalle (T051, P6, FR-013..F
       (_, index) => window.localStorage.key(index),
     );
     expect(keys).toEqual([INSPECTOR_PANEL_WIDTH_KEY]);
+  });
+});
+
+describe('WorkspacePage — cableado del panel de chat (T026, FR-008/FR-014)', () => {
+  beforeEach(() => {
+    service.listSessions.mockResolvedValue([sessionInfo]);
+  });
+
+  it('escritorio: pasa el ChatPanel con la sesión abierta al slot de la pestaña Chat', async () => {
+    const client = createClient();
+    seedStructureCache(client);
+    setDevice(client, false);
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+
+    // El tablist interno Detalle|Chat existe en escritorio (FR-008).
+    expect(
+      screen.getByRole('tablist', { name: 'Vistas del panel de detalle' }),
+    ).toBeInTheDocument();
+    // El contenido del chat es perezoso: no se monta hasta activar la pestaña.
+    expect(screen.queryByTestId('chat-panel')).not.toBeInTheDocument();
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Chat' }), {
+      button: 0,
+    });
+
+    const chat = await screen.findByTestId('chat-panel');
+    expect(chat).toHaveAttribute('data-session-id', SESSION_ID);
+  });
+
+  it('escritorio: pasa el directorio y la semilla de selección del nodo al ChatPanel (T077/T078, FR-008)', async () => {
+    const client = createClient();
+    seedStructureCache(client);
+    setDevice(client, false);
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Chat' }), {
+      button: 0,
+    });
+
+    const chat = await screen.findByTestId('chat-panel');
+    // T077: el directorio de la sesión scopea el catálogo del selector.
+    expect(chat).toHaveAttribute('data-directory', DIRECTORY);
+    // T078: la semilla se deriva del nodo abierto (`data.sessionId === id`).
+    expect(chat).toHaveAttribute(
+      'data-selection',
+      JSON.stringify({ agent: 'develop', model: null }),
+    );
+  });
+
+  it('móvil: no monta el tablist interno Detalle|Chat (sin tabbars anidadas)', async () => {
+    const client = createClient();
+    seedStructureCache(client);
+    setDevice(client, true);
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'inspector' }));
+
+    expect(screen.getByTestId('inspector-panel')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('tablist', { name: 'Vistas del panel de detalle' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('móvil: monta el ChatPanel como tab de primer nivel (T062, FR-013)', async () => {
+    const client = createClient();
+    seedStructureCache(client);
+    setDevice(client, true);
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+
+    // El contenido del tab es perezoso: sin cablear la prop `chat` de
+    // `WorkspaceLayout` el destino quedaría vacío.
+    expect(screen.queryByTestId('chat-panel')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'chat' }));
+
+    const chat = await screen.findByTestId('chat-panel');
+    expect(chat).toHaveAttribute('data-session-id', SESSION_ID);
+  });
+});
+
+describe('WorkspacePage — señales de atención y navegación a la request (T055, FR-010, A7)', () => {
+  beforeEach(() => {
+    service.listSessions.mockResolvedValue([sessionInfo]);
+  });
+
+  const attentionItem: TAttentionItem = {
+    id: 'perm_child',
+    kind: 'permission',
+    sessionId: SESSION_ID,
+    nodeId: SESSION_ID,
+    title: 'bash',
+    at: 1_000,
+  };
+
+  it('cablea las señales con la atención derivada del subárbol y su manejador', async () => {
+    const client = createClient();
+    seedStructureCache(client);
+    setDevice(client, false);
+    vi.mocked(useSessionAttention).mockReturnValue([attentionItem]);
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+
+    // `Array.prototype.at` no está en `lib` ES2020: se indexa por longitud.
+    const calls = attentionNotifications.mock.calls;
+    const lastCall = calls[calls.length - 1];
+    expect(lastCall?.[0]).toEqual([attentionItem]);
+    expect(typeof lastCall?.[1]).toBe('function');
+  });
+
+  it('deriva los nodos con atención y los pasa al grafo para su realce (T072, FR-009)', async () => {
+    const client = createClient();
+    seedStructureCache(client);
+    setDevice(client, false);
+    // Un ítem sin nodo en el subárbol (`nodeId: null`) no debe realzar nada.
+    vi.mocked(useSessionAttention).mockReturnValue([
+      attentionItem,
+      { ...attentionItem, id: 'perm_outside', nodeId: null },
+    ]);
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+
+    expect(screen.getByTestId('agent-graph')).toHaveAttribute(
+      'data-attention',
+      SESSION_ID,
+    );
+  });
+
+  it('sin atención no realza ningún nodo del grafo (T072, FR-009)', async () => {
+    const client = createClient();
+    seedStructureCache(client);
+    setDevice(client, false);
+    vi.mocked(useSessionAttention).mockReturnValue([]);
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+
+    expect(screen.getByTestId('agent-graph')).toHaveAttribute(
+      'data-attention',
+      '',
+    );
+  });
+
+  it('actuar sobre una señal enfoca la request origen y abre la pestaña Chat (FR-010, A7)', async () => {
+    const client = createClient();
+    seedStructureCache(client);
+    setDevice(client, false);
+    vi.mocked(useSessionAttention).mockReturnValue([attentionItem]);
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+
+    // El badge real (T075) añade su etiqueta al nombre accesible del trigger:
+    // se localiza el tab Chat por prefijo, no por igualdad exacta.
+    expect(screen.getByRole('tab', { name: /^Chat/ })).toHaveAttribute(
+      'aria-selected',
+      'false',
+    );
+
+    const calls = attentionNotifications.mock.calls;
+    const handler = calls[calls.length - 1]?.[1];
+    act(() => handler?.(attentionItem));
+
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: /^Chat/ })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      ),
+    );
+  });
+
+  it('deriva la atención por raíz y la pasa al rail (T073, FR-009)', async () => {
+    const client = createClient();
+    seedStructureCache(client);
+    setDevice(client, false);
+    client.setQueryData(queryKeys.permissions.list(), [
+      { id: 'perm_root', sessionID: SESSION_ID, action: 'bash', resources: [] },
+    ]);
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+
+    // El rail recibe el conteo por sesión raíz, no solo el del subárbol abierto.
+    expect(screen.getByTestId('session-list')).toHaveAttribute(
+      'data-attention',
+      JSON.stringify({ [SESSION_ID]: 1 }),
+    );
+  });
+
+  it('monta el badge de atención en el tab móvil Chat (T075, FR-009)', async () => {
+    const client = createClient();
+    seedStructureCache(client);
+    setDevice(client, true);
+    vi.mocked(useSessionAttention).mockReturnValue([attentionItem]);
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+
+    expect(screen.getByTestId('chat-attention-badge')).toBeInTheDocument();
+    expect(
+      screen.getByRole('img', { name: '1 pendiente por atender' }),
+    ).toBeInTheDocument();
+  });
+});
+
+/**
+ * Coordinación de `Escape` (T062, chat-panel-contract §5): el `Escape` del
+ * composer (foco dentro del panel de chat) cancela solo su estado inline y **no**
+ * se propaga al handler de la página; fuera del composer rige la prioridad
+ * "cerrar fullscreen" > "limpiar selección".
+ */
+describe('WorkspacePage — Escape del composer (T062, chat-panel-contract §5)', () => {
+  beforeEach(() => {
+    service.listSessions.mockResolvedValue([sessionInfo]);
+  });
+
+  /** Renderiza escritorio y abre la pestaña Chat; devuelve el composer. */
+  const renderDesktopChat = async (): Promise<HTMLTextAreaElement> => {
+    const client = createClient();
+    seedStructureCache(client);
+    setDevice(client, false);
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Chat' }), {
+      button: 0,
+    });
+
+    return screen.findByRole('textbox', { name: 'Mensaje' });
+  };
+
+  it('con el foco en el composer no limpia la selección; fuera de él sí', async () => {
+    const composer = await renderDesktopChat();
+
+    // La selección explícita de un nodo habilita el listener de `Escape`.
+    fireEvent.click(screen.getByRole('button', { name: 'Seleccionar nodo' }));
+
+    expect(screen.getByTestId('agent-graph')).toHaveAttribute(
+      'data-selected',
+      SESSION_ID,
+    );
+
+    act(() => composer.focus());
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    // El `Escape` del composer no se propaga: la selección sigue intacta.
+    expect(screen.getByTestId('agent-graph')).toHaveAttribute(
+      'data-selected',
+      SESSION_ID,
+    );
+
+    // Fuera del composer, `Escape` recupera la prioridad de la página.
+    act(() => composer.blur());
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    expect(screen.getByTestId('agent-graph')).toHaveAttribute(
+      'data-selected',
+      '',
+    );
+  });
+
+  it('con el foco en el composer no cierra el fullscreen; fuera de él sí', async () => {
+    const client = createClient();
+    seedStructureCache(client);
+    setDevice(client, false);
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+
+    // El control de fullscreen vive en la pestaña Detalle: se activa antes de
+    // abrir el chat (Radix desmonta el contenido inactivo).
+    fireEvent.click(screen.getByRole('button', { name: 'Pantalla completa' }));
+    expect(screen.getByTestId('inspector-column')).toHaveAttribute(
+      'data-fullscreen',
+      'true',
+    );
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Chat' }), {
+      button: 0,
+    });
+    const composer = await screen.findByRole('textbox', { name: 'Mensaje' });
+
+    act(() => composer.focus());
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    expect(screen.getByTestId('inspector-column')).toHaveAttribute(
+      'data-fullscreen',
+      'true',
+    );
+
+    act(() => composer.blur());
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('inspector-column')).not.toHaveAttribute(
+        'data-fullscreen',
+      ),
+    );
   });
 });

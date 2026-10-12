@@ -3,6 +3,10 @@ import {
   EmptyScreenError,
   Skeleton,
 } from '@app/Application/Components';
+import type {
+  TChatFormAnswer,
+  TPermissionDecision,
+} from '@app/Application/Components/Molecules/ChatPendingRequest';
 import type { TPermissionEntry, TQuestionEntry } from '../Inspector.entity';
 import { PermissionRow } from './PermissionRow';
 import { QuestionRow } from './QuestionRow';
@@ -18,6 +22,24 @@ interface QuestionsSectionProps {
   isError: boolean;
   /** Alguna de las consultas está en curso (Principio VI). */
   isLoading: boolean;
+  /**
+   * Modo accionable opt-in (FR-005). Por defecto `false`: la sección conserva
+   * el comportamiento de solo lectura. Con `true` cada fila reusa la molecule
+   * `ChatPendingRequest` a través de los callbacks de respuesta.
+   */
+  actionable?: boolean;
+  /** Notifica la decisión de un permiso, con el permiso que la originó (FR-005). */
+  onReplyPermission?: (
+    permission: TPermissionEntry,
+    decision: TPermissionDecision,
+  ) => void;
+  /** Notifica la respuesta de una pregunta, con la pregunta que la originó (FR-005). */
+  onReplyForm?: (
+    question: TQuestionEntry,
+    answer: TChatFormAnswer,
+  ) => void;
+  /** Mutation en vuelo: bloquea los controles accionables (FR-004). */
+  isPending?: boolean;
 }
 
 /**
@@ -31,7 +53,9 @@ interface QuestionsSectionProps {
  *
  * Presentación pura: recibe los datos y los estados de pantalla desde
  * `useInspectorData` y renderiza error → loading → vacío → datos. Cada fila
- * delega en `PermissionRow`/`QuestionRow`.
+ * delega en `PermissionRow`/`QuestionRow`, que en **modo accionable opt-in**
+ * (FR-005) reusan la molecule `ChatPendingRequest` sin importar componentes de
+ * `Domains/Chat`.
  */
 export const QuestionsSection = ({
   permissions,
@@ -39,6 +63,10 @@ export const QuestionsSection = ({
   queuedTurns,
   isError,
   isLoading,
+  actionable = false,
+  onReplyPermission,
+  onReplyForm,
+  isPending = false,
 }: QuestionsSectionProps) => {
   const isEmpty =
     permissions.length === 0 && questions.length === 0 && queuedTurns === 0;
@@ -71,7 +99,18 @@ export const QuestionsSection = ({
               </span>
               <Container space="none">
                 {permissions.map((permission) => (
-                  <PermissionRow key={permission.id} permission={permission} />
+                  <PermissionRow
+                    key={permission.id}
+                    permission={permission}
+                    actionable={actionable}
+                    onReplyPermission={
+                      onReplyPermission
+                        ? (decision) =>
+                            onReplyPermission(permission, decision)
+                        : undefined
+                    }
+                    isPending={isPending}
+                  />
                 ))}
               </Container>
             </Container>
@@ -84,7 +123,17 @@ export const QuestionsSection = ({
               </span>
               <Container space="none">
                 {questions.map((question) => (
-                  <QuestionRow key={question.id} question={question} />
+                  <QuestionRow
+                    key={question.id}
+                    question={question}
+                    actionable={actionable}
+                    onReplyForm={
+                      onReplyForm
+                        ? (answer) => onReplyForm(question, answer)
+                        : undefined
+                    }
+                    isPending={isPending}
+                  />
                 ))}
               </Container>
             </Container>

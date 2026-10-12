@@ -82,6 +82,7 @@ const nodeFocus = (overrides: Partial<TNodeFocus> = {}): TNodeFocus => ({
   lineageNodeIds: new Set<string>(),
   lineageEdgeIds: new Set<string>(),
   hoveredNodeId: null,
+  attentionNodeIds: new Set<string>(),
   ...overrides,
 });
 
@@ -582,6 +583,71 @@ describe('AgentNode — animación "pensando" del rail (T023, A1/A2/A3)', () => 
 
     expect(rail).toHaveClass('rail-scan');
     expect(rail).toHaveClass('bg-status-running');
+  });
+});
+
+describe('AgentNode — realce de atención por contexto (T047, A6, FR-009)', () => {
+  /** Marca textual del pendiente: etiqueta no-color, no solo un cambio de color. */
+  const ATTENTION_LABEL = 'Pendiente de respuesta';
+
+  const getAttentionMarker = (): HTMLElement =>
+    screen.getByRole('img', { name: ATTENTION_LABEL });
+
+  it('defines EMPTY_NODE_FOCUS without attention ids', () => {
+    expect(EMPTY_NODE_FOCUS.attentionNodeIds?.size ?? 0).toBe(0);
+  });
+
+  it('does not highlight a node without attention', () => {
+    renderAgentNodeWithFocus(nodeFocus());
+    expect(screen.queryByText('Pendiente')).not.toBeInTheDocument();
+  });
+
+  it('highlights only the affected node, never another id', () => {
+    renderAgentNodeWithFocus(
+      nodeFocus({ attentionNodeIds: new Set(['other']) }),
+    );
+    expect(screen.queryByText('Pendiente')).not.toBeInTheDocument();
+  });
+
+  it('marks the affected node with a textual, non-color signal', () => {
+    renderAgentNodeWithFocus(
+      nodeFocus({ attentionNodeIds: new Set(['root']) }),
+    );
+
+    const marker = getAttentionMarker();
+    expect(marker).toBeInTheDocument();
+    // La señal no puede ser solo color: el texto es la marca accesible.
+    expect(marker).toHaveTextContent('Pendiente');
+    expect(marker).toHaveAccessibleName(ATTENTION_LABEL);
+  });
+
+  it('renders the highlight as an out-of-flow overlay (no relayout)', () => {
+    const { container } = renderAgentNodeWithFocus(
+      nodeFocus({ attentionNodeIds: new Set(['root']) }),
+    );
+
+    // Overlay absoluto: no añade altura de flujo ni cambia la caja del card.
+    expect(getAttentionMarker()).toHaveClass('absolute');
+    expect(getCard(container).style.height).toBe('');
+    expect(getCard(container).style.width).toBe('');
+  });
+
+  it('derives the highlight from context, never from data (FR-016/Principio VII)', () => {
+    const snapshot = structuredClone(data);
+
+    const affected = renderAgentNodeWithFocus(
+      nodeFocus({ attentionNodeIds: new Set(['root']) }),
+    );
+    expect(screen.getByText('Pendiente')).toBeInTheDocument();
+    affected.unmount();
+
+    // Con el mismo `data` pero sin el id en el contexto, el realce desaparece:
+    // viaja por contexto y no altera la identidad de render del nodo.
+    renderAgentNodeWithFocus(
+      nodeFocus({ attentionNodeIds: new Set(['other']) }),
+    );
+    expect(screen.queryByText('Pendiente')).not.toBeInTheDocument();
+    expect(data).toEqual(snapshot);
   });
 });
 

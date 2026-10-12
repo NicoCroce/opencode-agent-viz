@@ -10,6 +10,7 @@ import { AgentNodeHeader } from './AgentNodeHeader';
 import { AgentNodeModelLine } from './AgentNodeModelLine';
 import { NodeResizeHandles } from './NodeResizeHandles';
 import { NodeStatusRail } from './NodeStatusRail';
+import { useNodeAttention } from './NodeFocusContext';
 import { useNodeFocusOpacity } from './useNodeFocusOpacity';
 
 type AgentFlowNode = Node<TGraphNodeData, 'agent'>;
@@ -23,6 +24,8 @@ type AgentFlowNode = Node<TGraphNodeData, 'agent'>;
 const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) => {
   // Resaltado de foco por contexto (contrato de render §1.2/§2).
   const focusOpacity = useNodeFocusOpacity(id);
+  // Realce de atención: solo el nodo afectado, leído del contexto (FR-009/A6).
+  const hasAttention = useNodeAttention(id);
 
   // Activo mientras corre, reintenta, compacta o espera permiso/respuesta
   // (FR-015/FR-017); un estado terminal ya no está activo.
@@ -34,13 +37,30 @@ const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) =>
       style={focusOpacity === undefined ? undefined : { opacity: focusOpacity }}
       className={cn(
         'group relative h-full w-full min-w-0 rounded-flat border bg-surface-2',
-        selected ? 'border-accent' : 'border-border',
+        // El pendiente gana el borde (no-color: trazo discontinuo + etiqueta
+        // textual), luego la selección, luego el borde en reposo.
+        hasAttention
+          ? 'border-dashed border-status-waiting'
+          : selected
+            ? 'border-accent'
+            : 'border-border',
         // Color de tiradores: `--border` en reposo y `--accent` en hover/selected.
         selected
           ? '[--xy-resize-background-color:hsl(var(--accent))]'
           : '[--xy-resize-background-color:hsl(var(--border))] group-hover:[--xy-resize-background-color:hsl(var(--accent))]',
       )}
     >
+      {hasAttention ? (
+        <span
+          role="img"
+          aria-label="Pendiente de respuesta"
+          data-testid="node-attention"
+          title="Pendiente de respuesta"
+          className="absolute -right-1 -top-1 z-10 rounded-flat border border-status-waiting bg-surface-1 px-1 py-0.5 font-mono text-[9px] font-medium uppercase leading-none tracking-[0.08em] text-status-waiting"
+        >
+          Pendiente
+        </span>
+      ) : null}
       <NodeResizeHandles nodeId={id} selected={selected} />
       <NodeStatusRail
         status={data.status}

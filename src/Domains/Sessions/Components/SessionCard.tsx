@@ -1,3 +1,5 @@
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faBell } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@app/Application/lib/utils';
 import { StatusDot } from '@app/Application/Components';
 import { formatDateTimeRange } from '@app/Application/Helpers';
@@ -14,14 +16,49 @@ interface SessionCardProps {
    * AGENTS §8.3).
    */
   nodeStatus?: ReturnType<typeof useSessionNodeStatus>;
+  /**
+   * Nº de pendientes del subárbol de esta sesión raíz (FR-009, US5). Opt-in:
+   * con `0` (por defecto) la tarjeta no muestra badge, de modo que el uso
+   * actual no cambia.
+   */
+  attentionCount?: number;
   selected: boolean;
   onSelect: (id: string) => void;
 }
+
+/** Etiqueta textual del badge; el color por sí solo no comunica (a11y). */
+const attentionLabel = (count: number): string =>
+  count === 1 ? '1 pendiente por atender' : `${count} pendientes por atender`;
+
+/**
+ * Badge de pendiente (FR-009, A1/A4). Presentación pura: `role="img"` con
+ * `aria-label` textual (no depende del color), icono como marca **no-color** y
+ * el par `bg-status-waiting` + `text-surface-0` (contraste ≥3:1 sobre la
+ * superficie oscura).
+ */
+const AttentionBadge = ({ count }: { count: number }) => {
+  const label = attentionLabel(count);
+
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      title={label}
+      className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-flat bg-status-waiting px-1.5 py-0.5 font-mono text-[11px] font-medium text-surface-0"
+    >
+      <FontAwesomeIcon icon={faBell} className="size-3" aria-hidden />
+      <span aria-hidden className="tabular-nums">
+        {count}
+      </span>
+    </span>
+  );
+};
 
 export const SessionCard = ({
   item,
   status,
   nodeStatus,
+  attentionCount = 0,
   selected,
   onSelect,
 }: SessionCardProps) => {
@@ -51,6 +88,7 @@ export const SessionCard = ({
         <span className="truncate text-sm font-medium text-foreground">
           {session.title}
         </span>
+        {attentionCount > 0 ? <AttentionBadge count={attentionCount} /> : null}
       </span>
       <span className="truncate font-mono text-[11px] tabular-nums text-muted-foreground">
         {timeRange}

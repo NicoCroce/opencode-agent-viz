@@ -15,6 +15,14 @@ interface WorkspaceLayoutProps {
   sessions: ReactNode;
   graph: ReactNode;
   inspector: ReactNode;
+  /**
+   * Panel del chat (FR-013). En móvil es un destino de **primer nivel** dentro
+   * de `WorkspaceMobileTabs`; en escritorio el chat vive como pestaña interna
+   * (`Detalle | Chat`) dentro del nodo `inspector` (FR-008). Es el **mismo** nodo
+   * `ChatPanel` que alimenta `useChatController` en `WorkspacePage`, de modo que
+   * ambas presentaciones comparten una sola fuente de lógica (FR-014).
+   */
+  chat?: ReactNode;
   history: ReactNode;
   /** Ancho actual del panel de detalle en px (US5/FR-010..FR-012). */
   inspectorWidth: number;
@@ -45,6 +53,11 @@ interface WorkspaceLayoutProps {
  * Con `isFullscreen`, la **misma** columna del inspector pasa a ser un overlay
  * `absolute inset-0` con fondo `--surface-0` que cubre el área de trabajo; no se
  * duplica el render y el separador no se monta (US6/FR-014).
+ *
+ * En móvil el chat es un **destino de primer nivel** (`WorkspaceMobileTabs`), no
+ * una pestaña anidada: el tablist interno `Detalle | Chat` solo se monta en la
+ * presentación de escritorio (dentro del nodo `inspector`, gobernado por
+ * `showDetailTabs`) y aquí no se añade ningún tablist adicional (FR-013/FR-014).
  */
 export const WorkspaceLayout = ({
   isMobile,
@@ -53,6 +66,7 @@ export const WorkspaceLayout = ({
   sessions,
   graph,
   inspector,
+  chat = null,
   history,
   inspectorWidth,
   isResizing,
@@ -69,6 +83,7 @@ export const WorkspaceLayout = ({
           sessions={sessions}
           graph={graph}
           inspector={inspector}
+          chat={chat}
         />
         {history}
       </>

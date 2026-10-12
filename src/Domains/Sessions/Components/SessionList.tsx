@@ -17,6 +17,12 @@ interface SessionListProps {
    * lateral del espacio de trabajo permanezca sin cambios (FR-018).
    */
   showCount?: boolean;
+  /**
+   * Pendientes por sesión raíz (`sessionID` → nº de `TAttentionItem` de su
+   * subárbol, FR-009/US5). Presentación pura: cada `SessionCard` recibe su
+   * conteo; una raíz ausente del mapa no muestra badge.
+   */
+  attentionByRoot?: Record<string, number>;
 }
 
 export const SessionList = ({
@@ -26,6 +32,7 @@ export const SessionList = ({
   onSelect,
   className,
   showCount = false,
+  attentionByRoot,
 }: SessionListProps) => (
   <Container space="medium" className={className}>
     {groups.map((group) => {
@@ -58,6 +65,7 @@ export const SessionList = ({
                 key={item.session.id}
                 item={item}
                 status={statuses?.[item.session.id]}
+                attentionCount={attentionByRoot?.[item.session.id] ?? 0}
                 selected={item.session.id === selectedId}
                 onSelect={onSelect}
               />
