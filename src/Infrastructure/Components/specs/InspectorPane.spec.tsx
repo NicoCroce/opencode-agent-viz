@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   fireEvent,
@@ -6,6 +7,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {
   INSPECTOR_DEFAULT_WIDTH,
   INSPECTOR_MAX_WIDTH,
@@ -30,7 +32,24 @@ import { InspectorPane, InspectorResizeHandle } from '../InspectorPane';
  * Se sustituyen los barrels pesados que `InspectorPane` importa a nivel de
  * módulo para renderizar solo las piezas bajo prueba.
  */
-vi.mock('@app/Domains/Inspector', () => ({ InspectorPanel: () => null }));
+vi.mock('@app/Domains/Inspector', () => ({
+  /**
+   * Stub de `InspectorPanel`: solo se necesita el control "Ir al agente padre"
+   * (FR-014) para verificar que `InspectorPane` reenvía la navegación y
+   * devuelve el foco al panel. Sin `onNavigateToNode` no monta nada, como el
+   * panel real.
+   */
+  InspectorPanel: ({
+    onNavigateToNode,
+  }: {
+    onNavigateToNode?: (nodeId: string) => void;
+  }) =>
+    onNavigateToNode ? (
+      <button type="button" onClick={() => onNavigateToNode('agent-parent')}>
+        Ir al agente padre
+      </button>
+    ) : null,
+}));
 vi.mock('@app/Domains/Graph', () => ({}));
 /**
  * `@app/Domains/Chat`: se conserva el `ChatAttentionBadge` real (T053) para
@@ -344,5 +363,96 @@ describe('InspectorPane — pantalla completa en la cabecera (U6)', () => {
     expect(
       screen.queryByRole('button', { name: /pantalla completa/i }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('InspectorPane — foco al navegar al agente padre (FR-014, a11y)', () => {
+  /**
+   * Harness: la selección vive en estado y se cambia **por la navegación** al
+   * padre, como en `WorkspacePage`. Al cambiar el nodo, el control de origen
+   * (`Ir al agente padre`) se desmonta; el foco debe volver al contenedor del
+   * panel en lugar de caer al `body`.
+   */
+  const NavigationHarness = () => {
+    const [inspectedNodeId, setInspectedNodeId] = useState('agent-child');
+    return (
+      <InspectorPane
+        graph={emptyGraph}
+        parallelGroups={[]}
+        inspectedNodeId={inspectedNodeId}
+        showReasoning={false}
+        onToggleReasoning={vi.fn()}
+        onOpenHistory={vi.fn()}
+        onSelectNode={setInspectedNodeId}
+      />
+    );
+  };
+
+  /**
+   * Harness: la selección se cambia **desde el grafo** (fuera del panel), sin
+   * pasar por `onSelectNode`; el foco no debe moverse.
+   */
+  const GraphSelectionHarness = () => {
+    const [inspectedNodeId, setInspectedNodeId] = useState('agent-child');
+    return (
+      <>
+        <button type="button" onClick={() => setInspectedNodeId('agent-other')}>
+          Seleccionar otro nodo
+        </button>
+        <InspectorPane
+          graph={emptyGraph}
+          parallelGroups={[]}
+          inspectedNodeId={inspectedNodeId}
+          showReasoning={false}
+          onToggleReasoning={vi.fn()}
+          onOpenHistory={vi.fn()}
+          onSelectNode={setInspectedNodeId}
+        />
+      </>
+    );
+  };
+
+  it('expone el contenedor del panel como destino de foco programático', () => {
+    renderPane();
+
+    expect(screen.getByTestId('inspector-pane')).toHaveAttribute('tabindex', '0');
+  });
+
+  it('reenvía la navegación al handler con el id del agente padre', async () => {
+    const onSelectNode = vi.fn();
+    renderPane({ onSelectNode });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /ir al agente padre/i }),
+    );
+
+    expect(onSelectNode).toHaveBeenCalledWith('agent-parent');
+  });
+
+  it('mueve el foco al panel cuando la selección cambia por la navegación', async () => {
+    render(<NavigationHarness />);
+
+    const navigate = screen.getByRole('button', {
+      name: /ir al agente padre/i,
+    });
+    navigate.focus();
+    expect(navigate).toHaveFocus();
+
+    await userEvent.click(navigate);
+
+    expect(screen.getByTestId('inspector-pane')).toHaveFocus();
+  });
+
+  it('no roba el foco en selecciones hechas desde el grafo', async () => {
+    render(<GraphSelectionHarness />);
+
+    const external = screen.getByRole('button', {
+      name: 'Seleccionar otro nodo',
+    });
+    await userEvent.click(external);
+
+    // El nodo cambió, pero el foco sigue en el control que lo disparó.
+    expect(screen.getByTestId('inspector-pane')).not.toHaveFocus();
+    expect(external).toHaveFocus();
   });
 });

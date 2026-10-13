@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type {
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
@@ -39,7 +39,9 @@ interface InspectorPaneProps {
   /**
    * Selecciona otro nodo del grafo por su id de sesión (FR-014). Se reenvía a
    * `InspectorPanel` para que el apartado "Aporte al padre" navegue al agente
-   * que invocó al nodo inspeccionado.
+   * que invocó al nodo inspeccionado. Cuando la selección cambia **por esta
+   * navegación**, el foco vuelve al contenedor del panel (el control de origen
+   * se desmonta); las selecciones desde el grafo no lo alteran.
    */
   onSelectNode?: (id: string) => void;
   /**
@@ -130,6 +132,31 @@ export const InspectorPane = ({
   const tab = activeTab ?? detailTabs.tab;
   const setTab = onTabChange ?? detailTabs.setTab;
 
+  // FR-014 (a11y): al activar "Ir al agente padre" el nodo seleccionado cambia y
+  // el control que tenía el foco se desmonta, dejando el foco en `body`. El
+  // contenedor del panel es un destino de foco (`tabIndex={0}`), así que se
+  // recuerda el nodo destino y se devuelve el foco ahí tras el cambio. Las
+  // selecciones hechas desde el grafo no tocan `navigateTargetRef`, de modo que
+  // el foco no se roba (click/teclado en el grafo).
+  const paneRef = useRef<HTMLDivElement>(null);
+  const navigateTargetRef = useRef<string | null>(null);
+
+  const handleNavigateToNode = useCallback(
+    (id: string) => {
+      if (!onSelectNode) return;
+      navigateTargetRef.current = id;
+      onSelectNode(id);
+    },
+    [onSelectNode],
+  );
+
+  useEffect(() => {
+    const target = navigateTargetRef.current;
+    if (target === null || target !== inspectedNodeId) return;
+    navigateTargetRef.current = null;
+    paneRef.current?.focus();
+  }, [inspectedNodeId]);
+
   const handleOpenHistory = useCallback(() => {
     if (!node) return;
     onOpenHistory(node.data.sessionId);
@@ -151,14 +178,20 @@ export const InspectorPane = ({
       showReasoning={showReasoning}
       onToggleReasoning={onToggleReasoning}
       onOpenHistory={handleOpenHistory}
-      onNavigateToNode={onSelectNode}
+      onNavigateToNode={onSelectNode ? handleNavigateToNode : undefined}
     />
   );
 
   return (
     <Container
       block
-      className={`h-full min-h-0 ${isResizing ? 'select-none' : ''}`}
+      ref={paneRef}
+      tabIndex={0}
+      aria-label="Panel de detalle"
+      data-testid="inspector-pane"
+      className={`h-full min-h-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${
+        isResizing ? 'select-none' : ''
+      }`}
       data-resizing={isResizing || undefined}
     >
       {showDetailTabs ? (
