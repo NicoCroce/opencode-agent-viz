@@ -86,6 +86,31 @@ Some subagents use their own sections:
   Max 12 lines.
 - `sddorch-reviewer` → `## Review` with `APPROVED | REJECTED`.
 
+### Debugging a Vitest hang
+
+When a spec does not fail but simply **never returns** (100 % CPU), there is no
+supported way to break with a debugger: `--cpu-prof` is rejected inside
+`NODE_OPTIONS` and `--inspect` only exposes the `tinypool` fork. This recipe
+works, always on a tightly scoped spec:
+
+```bash
+pnpm vitest run <spec> --pool=forks --poolOptions.forks.singleFork --inspect
+```
+
+Then connect over CDP to the inspector port:
+
+1. `Debugger.pause` to break the spin and read the real stack.
+2. `Debugger.setBreakpointByUrl` on `scheduleUpdateOnFiber` (React) to see what
+   triggers the render, or on `QueryCache.notify` to see which notification
+   closes the cycle.
+3. Temporary instrumentation with `process.stderr.write('MARK-…')` to pin down
+   the last point reached; **remove it before finishing** (a spec with `MARK-*`
+   is not acceptable).
+
+In a render loop the stack usually ends in a TanStack Query cache subscription
+(`useCachedQueryData`/`useQuery`) that also wakes up on
+`observerOptionsUpdated`, not just on data changes.
+
 ## Scope rules (apply to every subagent)
 
 1. It does **only** what the prompt asks.
