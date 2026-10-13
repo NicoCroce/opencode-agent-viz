@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { FormInfo, PermissionRequest } from '@opencode/client';
 import type { TGraphModel } from '@app/Domains/Graph/Graph.entity';
@@ -63,9 +63,13 @@ const filterSubtree = (graph: TGraphModel, rootId: string): TGraphModel => {
   };
 };
 
+/** Lista vacía estable: `getQueryData` sin dato no debe producir otra referencia. */
+const EMPTY_FORMS: FormInfo[] = [];
+
 /** Formularios crudos cacheados de una sesión (`sessions.forms(id)`). */
 const formsOf = (queryClient: QueryClient, sessionId: string): FormInfo[] =>
-  queryClient.getQueryData<FormInfo[]>(queryKeys.sessions.forms(sessionId)) ?? [];
+  queryClient.getQueryData<FormInfo[]>(queryKeys.sessions.forms(sessionId)) ??
+  EMPTY_FORMS;
 
 /**
  * Índice reactivo `sessionId → FormInfo[]` de los formularios cacheados del
@@ -73,12 +77,18 @@ const formsOf = (queryClient: QueryClient, sessionId: string): FormInfo[] =>
  * escribe sin tocar el modelo del grafo) y cambia de identidad solo cuando esa
  * caché cambia, de modo que el ítem de pregunta se re-enriquece al llegar el
  * formulario.
+ *
+ * El índice es **referencialmente estable** (R2): `read()` conserva en un `useRef`
+ * la última referencia y la devuelve tal cual si ninguna lista `FormInfo[]` por
+ * sesión cambió, de modo que `setForms` no provoca render cuando el dato es el
+ * mismo. Solo se construye un objeto nuevo si al menos una lista cambió.
  */
 const useCachedForms = (sessionIds: string[]): Record<string, FormInfo[]> => {
   const queryClient = useQueryClient();
   const serialized = JSON.stringify(sessionIds);
 
-  const read = useCallback((): Record<string, FormInfo[]> => {
+  /** Snapshot puro de la caché: no memoiza identidad (valor inicial/lectura base). */
+  const snapshot = useCallback((): Record<string, FormInfo[]> => {
     const result: Record<string, FormInfo[]> = {};
     for (const id of JSON.parse(serialized) as string[]) {
       result[id] = formsOf(queryClient, id);
@@ -86,22 +96,58 @@ const useCachedForms = (sessionIds: string[]): Record<string, FormInfo[]> => {
     return result;
   }, [queryClient, serialized]);
 
-  const [forms, setForms] = useState(read);
+  const [forms, setForms] = useState(snapshot);
+  const lastIndexRef = useRef(forms);
+
+  /**
+   * `read()` **referencialmente estable** (R2): devuelve la última referencia
+   * producida tal cual cuando ninguna lista `FormInfo[]` por sesión cambió (así
+   * `setForms` no provoca render) y solo construye un objeto nuevo si al menos
+   * una lista cambió. Se invoca desde el efecto/notificaciones, nunca en render.
+   */
+  const read = useCallback((): Record<string, FormInfo[]> => {
+    const ids = JSON.parse(serialized) as string[];
+    const previous = lastIndexRef.current;
+
+    if (
+      Object.keys(previous).length === ids.length &&
+      ids.every((id) => previous[id] === formsOf(queryClient, id))
+    ) {
+      return previous;
+    }
+
+    const next = snapshot();
+    lastIndexRef.current = next;
+    return next;
+  }, [queryClient, serialized, snapshot]);
 
   useEffect(() => {
     const ids = new Set(JSON.parse(serialized) as string[]);
     const sync = () => setForms(read());
     sync();
 
-    // El parámetro se tipa estructuralmente: solo se necesita la `queryKey` del
-    // evento, y así la suscripción no depende de la unión de eventos de la caché.
-    type TQueryCacheEvent = { query: { queryKey: readonly unknown[] } };
+    // El parámetro se tipa estructuralmente: solo se necesitan el `type` y la
+    // `queryKey` del evento, y así la suscripción no depende de la unión de
+    // eventos de la caché.
+    type TQueryCacheEvent = {
+      type?: string;
+      query: { queryKey: readonly unknown[] };
+    };
 
     return queryClient
       .getQueryCache()
       .subscribe((event: TQueryCacheEvent) => {
+        // Solo eventos portadores de dato (R3): los estructurales del observador
+        // (`observerOptionsUpdated`, `observerResultsUpdated`, `observer*`) no
+        // cambian el dato y no deben disparar `sync()`.
+        if (event.type !== 'updated') return;
+
         const key = event.query.queryKey;
+        // Clave **exacta** `['sessions','forms',id]` (R1): no reaccionar a
+        // `sessions.questions(id)` = `[...forms(id),'questions']`, cuyo prefijo
+        // coincide con el de la clave de formularios crudos.
         if (
+          key.length === 3 &&
           key[0] === 'sessions' &&
           key[1] === 'forms' &&
           ids.has(key[2] as string)
