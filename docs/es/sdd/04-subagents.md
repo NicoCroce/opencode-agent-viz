@@ -104,6 +104,10 @@ Algunos subagentes usan secciones propias:
 8. No modifica archivos de Spec-Kit.
 9. Si se está quedando sin presupuesto de pasos, **cierra limpio**: persiste lo
    que tenga y devuelve `BLOCKED` con el contrato, en vez de quedarse sin pasos.
+   El **último mensaje es siempre el bloque del contrato**, aunque el trabajo no
+   haya terminado: una respuesta final vacía o sin bloque deja el resultado como
+   `UNVERIFIED` y el orquestador lo verifica a mano (`scope-check.sh check` + las
+   specs acotadas de la unidad) antes de decidir si lo relanza una vez.
 
 ## Por qué el contrato importa
 
