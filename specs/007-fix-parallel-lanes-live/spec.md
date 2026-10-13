@@ -68,7 +68,9 @@ Como persona que observa, quiero que las filas no cambien de un instante a otro 
 
 - **Sesiones creadas después de abrir la vista**: subagentes que arrancan con posterioridad al montaje de la pantalla deben agruparse igual que si ya existieran al abrir.
 - **Sesiones sin marca de fin de actividad**: una sesión en curso sin dato de última actividad no debe interpretarse como de duración cero ni perderse del agrupamiento.
-- **Hermanos creados con milisegundos de diferencia**: no alcanza con "casi al mismo tiempo"; debe usarse el solape real de actividad.
+- **Hermanos creados con milisegundos de diferencia**: no alcanza con "casi al mismo tiempo"; manda el **paso del padre** (misma invocación) y, en su ausencia, el solape real de actividad. *(Actualización 011.)*
+- **Hija reutilizada en dos pasos del padre**: la sesión es un único nodo, pero aporta una invocación por paso; cada paso es su propio lote y ninguno se fusiona con el otro. *(Actualización 011.)*
+- **Hijo sin invocación registrada**: si el padre ya tiene mensajes pero el hijo no aparece en ningún paso, ocupa su propia fila y no recibe badge (la invocación gana; evita prometer paralelismo sin evidencia). *(Actualización 011.)*
 - **Duración real muy corta**: subagentes que terminan casi instantáneamente pero corrieron juntos deben agruparse si su actividad se solapó.
 - **Sesión que termina durante la observación en vivo**: al pasar de activa a terminada debe conservar un fin real de actividad, de modo que el agrupamiento final coincida con el de la vista reabierta.
 - **Reconexión del stream**: tras reconectar, la disposición no debe degradarse respecto de antes de la desconexión.
@@ -79,16 +81,16 @@ Como persona que observa, quiero que las filas no cambien de un instante a otro 
 
 ### Functional Requirements
 
-- **FR-001**: El sistema MUST agrupar en una misma fila a los agentes hermanos (mismo padre) cuyos intervalos de actividad se solapan.
+- **FR-001**: El sistema MUST agrupar en una misma fila a las **invocaciones** (llamadas de subagente/tarea del padre) cuyos intervalos de actividad se solapan; dos o más invocaciones lanzadas en el mismo paso del padre forman un lote paralelo. *(Actualización 011: la unidad pasa de **sesión** a **invocación**; una sesión reutilizada en varios pasos aporta varias invocaciones. El respaldo estructural por solape de sesión se conserva cuando no hay datos de invocación.)*
 - **FR-002**: El sistema MUST evaluar el solape usando la actividad real: mientras un agente está en estado activo (running / retrying / compacting / esperas), su intervalo se considera abierto hasta el instante presente observado, no hasta una marca de tiempo desactualizada. Las sesiones terminadas MUST usar su fin real de actividad.
 - **FR-003**: El sistema MUST recalcular el agrupamiento y la disposición cuando cambie el conjunto de agentes en curso, aunque la estructura de quién invoca a quién no cambie.
 - **FR-004**: El sistema MUST producir el mismo agrupamiento y la misma disposición para un mismo estado de sesiones, con independencia de si la vista se acaba de abrir o lleva tiempo abierta (paridad en vivo vs. refresco).
-- **FR-005**: Los agentes cuyos intervalos de actividad no se solapan MUST permanecer en filas distintas, preservando el orden temporal (antes arriba).
+- **FR-005**: Las invocaciones cuyos intervalos de actividad no se solapan MUST permanecer en filas distintas, preservando el orden temporal (antes arriba). *(Actualización 011: aplica a la unidad invocación; dos pasos secuenciales de un mismo padre no pueden fusionarse en una fila.)*
 - **FR-006**: El sistema MUST mantener el orden determinista de columnas dentro de una fila (por instante de inicio; desempate estable por identificador).
 - **FR-007**: Los cambios de contenido o estado no estructurales MUST NOT alterar la fila ni el orden de los agentes ya ubicados.
 - **FR-008**: El cálculo de agrupamiento y niveles MUST seguir siendo una función pura y testeable, sin dependencia de React.
 - **FR-009**: El sistema MUST mantener actualizada la marca de última actividad de cada sesión con la actividad/estado observados en vivo, de modo que las sesiones que terminan conserven un fin de actividad real.
-- **FR-010**: El indicador/badge de paralelismo de cada agente MUST derivarse de la misma lógica de intervalos que la disposición de filas, para evitar inconsistencias entre "se ve paralelo" y "se ubica en fila".
+- **FR-010**: El indicador/badge de paralelismo de cada agente MUST derivarse de la misma unidad de agrupamiento que la disposición de filas (por **invocación**, con respaldo por sesión), para evitar inconsistencias entre "se ve paralelo" y "se ubica en fila". La paridad exigida es **fila ↔ badge**; la **barra temporal del nodo** mantiene el intervalo de la sesión y su diferencia con la ventana de la invocación queda documentada (no se unifica). *(Actualización 011.)*
 - **FR-011**: La inferencia de "actividad abierta" MUST NOT basarse en intervalos vacíos ni en datos faltantes: solo en el estado activo explícito del agente.
 
 ### Key Entities *(include if data involved)*
@@ -110,7 +112,7 @@ Como persona que observa, quiero que las filas no cambien de un instante a otro 
 
 ## Assumptions
 
-- La semántica de "paralelo" se define por solape temporal de actividad de hermanos; no se agregan heurísticas de intención.
+- La semántica de "paralelo" se define por solape temporal de **invocaciones** (llamadas `subagent`/`task` del padre); el solape de intervalos de sesión queda como respaldo estructural. No se agregan heurísticas de intención. *(Actualización 011.)*
 - El grafo sigue siendo de solo lectura; no se cambia la fuente de datos ni se envían acciones al servidor.
 - Se mantienen las convenciones de arquitectura vigentes (lógica de layout pura y testeable, datos vía hooks).
 - El problema es de presentación (agrupamiento/disposición), no de pérdida de datos: la información de tiempos ya existe, solo no se refresca/interpreta en vivo.

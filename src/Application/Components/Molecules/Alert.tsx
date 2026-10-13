@@ -47,6 +47,19 @@ interface AlertProps extends VariantProps<typeof alertVariants> {
   title?: string;
   className?: string;
   showIcon?: boolean;
+  /**
+   * Rol ARIA del contenedor. Opcional: sin valor se conserva el `role="alert"`
+   * que aplica `ui/alert` (avisos que interrumpen); un aviso meramente
+   * informativo pasa `role="status"`.
+   */
+  role?: 'alert' | 'status';
+  /**
+   * `aria-live` del contenedor. Opcional: sin valor no se emite el atributo,
+   * así los demás consumidores conservan el comportamiento de `ui/alert`.
+   */
+  ariaLive?: 'off' | 'polite' | 'assertive';
+  /** `data-testid` del contenedor, para el `getByTestId` del consumidor. */
+  'data-testid'?: string;
 }
 
 export const Alert = ({
@@ -55,17 +68,30 @@ export const Alert = ({
   title,
   className,
   showIcon = true,
+  role,
+  ariaLive,
+  'data-testid': dataTestId,
 }: AlertProps) => {
   const icon = ALERT_VARIANT_ICON[variant || 'info'];
 
   return (
     <UIAlert
+      data-testid={dataTestId}
       variant={variant === 'error' ? 'destructive' : 'default'}
       className={cn(alertVariants({ variant }), className)}
+      {...(role ? { role } : {})}
+      {...(ariaLive ? { 'aria-live': ariaLive } : {})}
     >
       <Container row space="small" align="center">
         {showIcon && (
-          <FontAwesomeIcon icon={icon} className={iconVariants({ variant })} />
+          // Decorativo: duplica el significado del `variant`/`title`, así que no
+          // debe anunciarse dentro de una región `aria-live` (el aviso de
+          // truncamiento) ni de un `role="alert"`.
+          <FontAwesomeIcon
+            icon={icon}
+            className={iconVariants({ variant })}
+            aria-hidden="true"
+          />
         )}
         <div>
           {title && <h5 className="mb-1 font-medium text-sm">{title}</h5>}

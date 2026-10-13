@@ -13,15 +13,15 @@ Convención de nombres: `T` para tipos de vista (ver `AGENTS.md` y `Graph.entity
 ## 1. Entidades de dominio (ya existen; se extienden)
 
 ### 1.1 Sesión (raíz)
-- **Fuente**: `SessionInfo` (`@opencode/client`), ya cacheada en `queryKeys.sessions.list(directory)`.
+- **Fuente**: `SessionInfo` (`@opencode/client`), cacheada en `queryKeys.sessions.roots(directory)` para el listado de raíces y en `queryKeys.sessions.children(parentID)` para el subárbol. *(Actualización 011: antes `queryKeys.sessions.list(directory)`.)*
 - **Rol**: unidad que el usuario selecciona; origen del subárbol.
 - **Campos relevantes**: `id`, `parentID`, `time.created`, `time.updated`, `time.idle`, `agent`, `title`, `location.directory`.
-- **Cambios**: ninguno. La optimización **reutiliza** esta entidad ya cacheada para construir la estructura sin red adicional.
+- **Cambios**: ninguno. La optimización **reutiliza** esta entidad ya cacheada para construir la estructura y **no** abre consultas de **contenido** en la fase estructural. *(Actualización 011: el subárbol se descubre con el cargador —`sessions.roots` + `sessions.children`—, no filtrando una lista plana; hay red estructural acotada y declarada, ver §2.5.)*
 
 ### 1.2 Subárbol de agentes
-- **Tipo**: `SessionInfo[]` (salida de `filterSubtree`).
-- **Regla**: BFS desde el id raíz siguiendo `parentID`; deduplicado por `seen`.
-- **Cambio**: construcción con índice `byId: Map<string, SessionInfo>` en lugar de `sessions.find` dentro del bucle (R4) → de O(n²) a O(n).
+- **Tipo**: `SessionInfo[]` (campo `sessions` de `TSubtreeLoadResult`, salida de `loadSubtree`; §2.5).
+- **Regla**: BFS **por nivel** desde la raíz del subárbol siguiendo `parentID`, con una consulta por nodo visitado (`queryKeys.sessions.children(parentID)`), guarda anti-ciclo y deduplicado por `seen`.
+- **Cambio**: construcción con índice `byId: Map<string, SessionInfo>` en lugar de `sessions.find` dentro del bucle (R4) → de O(n²) a O(n). `filterSubtree` se conserva como función pura (API del barrel).
 
 ### 1.3 Nodo de agente (`TGraphNodeData`) — **extendido**
 Campos existentes (sin cambios de significado): `sessionId`, `title`, `createdAt`, `updatedAt`, `agentName`, `directory`, `model`, `status`, `retry`, `interruptReason`, `metrics`, `isRoot`, `currentTool`, `parallel`.
@@ -98,13 +98,26 @@ Salida pura de `orderSubtreeForLoad` / `chunkLoadPlan`.
 
 **Privacidad/paridad**: la medición no altera el render ni envía datos al server.
 
+### 2.5 Resultado del cargador de subárbol (`TSubtreeLoadResult`)
+Salida del cargador bajo demanda `loadSubtree` (contrato de subárbol §1), cacheada por `queryKeys.graph.for(directory, sessionId)`. Sustituye a `filterSubtree(sessions.list, id)` como **origen estructural** (FR-013).
+
+| Campo | Tipo | Regla |
+|-------|------|-------|
+| `sessions` | `SessionInfo[]` | raíz + descendientes alcanzables, deduplicados por `seen` |
+| `truncated` | `boolean` | `true` ⟺ se superó el presupuesto global de nodos (`SUBTREE_MAX_NODES`), nunca un tope por padre |
+| `loadedCount` | `number` | nº de sesiones cargadas (instrumentación) |
+| `reason?` | `string` | motivo del corte cuando `truncated` (presupuesto/ciclo) |
+| `notFound?` | `boolean` | `true` cuando la sesión abierta no existe (FR-005); `sessions` vacío, distinto de error y de "sin agentes" |
+
+**Relación**: `useGraphStructure` lo consume y expone `truncated`/`reason`/`loadedCount`/`notFound` de forma **aditiva** en el resultado de `useGraphModel` (sin cambiar la forma pública en uso).
+
 ---
 
 ## 3. Relaciones
 
 ```text
-SessionInfo (raíz, cacheada)
-  └── filtroSubtree (BFS + índice) ──► SessionInfo[] (subárbol)
+SessionInfo (raíz, cacheada en sessions.roots / sessions.children)
+  └── loadSubtree (BFS por nivel, 1 request por nodo) ──► TSubtreeLoadResult.sessions (subárbol)
         ├── useGraphStructure ──► TGraphModel (estructura, EMPTY_METRICS, enrichment='pending')
         │      ├── topologySignature ──► memo del layout (deriveExecutionLevels/layoutExecution)   [sin cambios]
         │      └── reconcileGraphModel ──► identidad estable de nodos/aristas                       [nuevo]
@@ -132,6 +145,6 @@ SessionInfo (raíz, cacheada)
 ## 5. Qué NO cambia (fronteras del modelo)
 
 - `TNodeStatus`, `TTokenUsage`, `TNodeMetrics`, `TExecutionSignal`, `TParallelGroup`, `TNodeSizeOverride`: **sin cambios de forma**.
-- Claves de consulta (`queryKeys.ts`): **sin cambios**.
+- Claves de consulta (`queryKeys.ts`): **forma actualizada por `011-fix-session-roots-subtree`**; se añaden `sessions.roots(directory)` (`[...sessions.all, directory, 'roots']`) y `sessions.children(parentID)`, y el subárbol del grafo **deja de leerse** de `sessions.list(directory)` (el origen estructural pasa a ser el subárbol de la sesión abierta bajo demanda). Las claves de contenido (`messages`, `permissions.for`, `log`, `execution`, `forms`, `inbox`) **no cambian de forma**.
 - Tipos crudos del SDK: **sin cambios**; no se redefinen (Principio IV).
 - Modelo de datos del servidor: fuera de alcance (spec).

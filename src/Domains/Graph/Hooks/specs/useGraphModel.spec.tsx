@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { SessionStatus } from '@opencode/client';
+import type { SessionInfo, SessionStatus } from '@opencode/client';
 import type { ReactNode } from 'react';
 import { queryKeys } from '../../../queryKeys';
+import type { TSubtreeLoadResult } from '../../lib/loadPlan/subtree';
 import {
   DEFAULT_DIRECTORY,
   assistantMessage,
@@ -14,31 +15,33 @@ import {
 import { useGraphModel, type UseGraphModelResult } from '../useGraphModel';
 
 /**
- * Spec de contrato del modelo por fases (criterios L7..L8 del
- * `contracts/graph-loading-contract.md`):
+ * Spec de contrato del modelo por fases (L7..L8 del
+ * `contracts/graph-loading-contract.md`) **reapuntado al origen estructural del
+ * subárbol** (FR-013, 011):
  *
+ * - El grafo ya no sale de la ventana global (`sessions.list` + `filterSubtree`),
+ *   sino del subárbol bajo la key de grafo (`graph.for(directory, sessionId)`):
+ *   raíces (`listRootSessions`) + hijos por padre (`listChildSessions`) y
+ *   `session.get` para subir cuando la raíz quedó fuera de la ventana (S2).
  * - L8: `useGraphModel` conserva **exactamente** la firma y la forma pública de
- *   `UseGraphModelResult` (verificado en runtime y por compilación `tsc`).
+ *   `UseGraphModelResult` (verificado en runtime y por compilación `tsc`); las
+ *   claves **aditivas** (`notFound`, `truncated`) no la rompen y se toleran
+ *   mientras su unit las publique (T024/T026/T029).
  * - L7: la revisita de una sesión ya visitada no repite la carga; todos los ids
  *   `ready` entran en `skippedIds` (sin recarga de contenido, SC-003/SC-008).
+ * - T024 (US3): `isLoading`/`isError` combinados (directorio pendiente +
+ *   estructura) y "sesión inexistente" sin esqueleto terminal ni error.
  *
  * El observable de "sin recarga" son las llamadas a los loaders de contenido:
  * con el caché de la primera visita intacto, una revisita no debe volver a
- * invocarlos. Este spec se escribe contra el contrato congelado y es la red de
- * seguridad del refactor de `useGraphModel` (T019).
+ * invocarlos.
  */
 
-const {
-  listSessions,
-  listAgents,
-  getSessionMessages,
-  getSessionPermissions,
-  getSessionLog,
-  listSessionForms,
-  getSessionForm,
-  listSessionInbox,
-} = vi.hoisted(() => ({
+const service = vi.hoisted(() => ({
   listSessions: vi.fn(),
+  listRootSessions: vi.fn(),
+  listChildSessions: vi.fn(),
+  getSession: vi.fn(),
   listAgents: vi.fn(),
   getSessionMessages: vi.fn(),
   getSessionPermissions: vi.fn(),
@@ -49,23 +52,30 @@ const {
 }));
 
 vi.mock('@app/Infrastructure/Services/opencodeClient', () => ({
-  opencodeService: {
-    listSessions,
-    listAgents,
-    getSessionMessages,
-    getSessionPermissions,
-    getSessionLog,
-    listSessionForms,
-    getSessionForm,
-    listSessionInbox,
-  },
+  opencodeService: service,
 }));
+
+const {
+  listSessions,
+  listRootSessions,
+  listChildSessions,
+  getSession,
+  listAgents,
+  getSessionMessages,
+  getSessionPermissions,
+  getSessionLog,
+  listSessionForms,
+  getSessionForm,
+  listSessionInbox,
+} = service;
 
 const ROOT_ID = 'ses-root';
 const CHILD_IDS = ['ses-child-a', 'ses-child-b'] as const;
 const SUBTREE_IDS = [ROOT_ID, ...CHILD_IDS];
+/** Sesión enlazada que no existe: ni en raíces ni resoluble con `session.get`. */
+const MISSING_ID = 'ses-missing';
 
-/** Claves públicas exactas de `UseGraphModelResult` (contrato §1, L8). */
+/** Claves públicas base de `UseGraphModelResult` (contrato §1, L8). */
 const PUBLIC_RESULT_KEYS: ReadonlyArray<keyof UseGraphModelResult> = [
   'graph',
   'parallelGroups',
@@ -76,6 +86,13 @@ const PUBLIC_RESULT_KEYS: ReadonlyArray<keyof UseGraphModelResult> = [
   'isError',
   'error',
 ];
+
+/**
+ * Claves **aditivas** que la feature añade sin romper la forma pública (R6):
+ * `notFound` (T026) y `truncated` (T029). El spec las tolera ausentes —su rojo
+ * lo vigilan sus propias unidades— pero exige que, si existen, sean booleanas.
+ */
+const ADDITIVE_RESULT_KEYS = ['notFound', 'truncated'] as const;
 
 /**
  * Loaders que consume el enriquecimiento. En la revisita de una sesión ya
@@ -93,6 +110,79 @@ const CONTENT_LOADERS = [
 const contentCallCounts = (): number[] =>
   CONTENT_LOADERS.map((loader) => loader.mock.calls.length);
 
+/* -------------------------------------------------------------------- */
+/* Origen estructural: el subárbol (FR-013), no la ventana global.      */
+/* -------------------------------------------------------------------- */
+
+let subtreeRoots: SessionInfo[] = [];
+let sessionsById: Record<string, SessionInfo> = {};
+let childrenByParent: Record<string, string[]> = {};
+
+/**
+ * Siembra el **subárbol** del origen nuevo: las raíces del proyecto, la sesión
+ * por id y los hijos directos por padre. Es lo que consumen el BFS del cargador
+ * (`listRootSessions`/`listChildSessions`) y el respaldo (`getSession`).
+ */
+const seedSubtree = (tree: readonly SessionInfo[]): void => {
+  subtreeRoots = tree.filter((item) => item.parentID === undefined);
+  sessionsById = Object.fromEntries(tree.map((item) => [item.id, item]));
+  childrenByParent = {};
+  for (const item of tree) {
+    if (item.parentID === undefined) continue;
+    childrenByParent[item.parentID] = [
+      ...(childrenByParent[item.parentID] ?? []),
+      item.id,
+    ];
+  }
+};
+
+/** Resultado del cargador (`TSubtreeLoadResult`) tal como lo cachea la fase. */
+const subtreeResult = (tree: readonly SessionInfo[]): TSubtreeLoadResult => ({
+  sessions: [...tree],
+  truncated: false,
+  loadedCount: tree.length,
+  notFound: false,
+});
+
+const installSubtreeService = (): void => {
+  // La ventana global sigue disponible, pero **nunca** es el origen (FR-013).
+  listSessions.mockResolvedValue([]);
+  listRootSessions.mockImplementation(() =>
+    Promise.resolve({ sessions: subtreeRoots, truncated: false }),
+  );
+  listChildSessions.mockImplementation((parentID: string) =>
+    Promise.resolve(
+      (childrenByParent[parentID] ?? []).map((id) => sessionsById[id]),
+    ),
+  );
+  getSession.mockImplementation((id: string) => {
+    const found = sessionsById[id];
+    // El servicio propaga el rechazo del SDK; "no encontrada" se decide aguas
+    // arriba (contrato de subárbol §4).
+    return found
+      ? Promise.resolve(found)
+      : Promise.reject(new Error(`sesión ${id} inexistente`));
+  });
+};
+
+const installContentLoaders = (): void => {
+  getSessionMessages.mockResolvedValue([assistantMessage()]);
+  getSessionPermissions.mockResolvedValue([]);
+  getSessionLog.mockResolvedValue([]);
+  listSessionForms.mockResolvedValue([]);
+  getSessionForm.mockResolvedValue(undefined);
+  listSessionInbox.mockResolvedValue([]);
+};
+
+/** Estado limpio + subárbol sembrado; cada grupo lo completa según su caso. */
+const prepareGraphMocks = (tree: readonly SessionInfo[]): void => {
+  vi.resetAllMocks();
+  seedSubtree(tree);
+  installSubtreeService();
+  installContentLoaders();
+  listAgents.mockResolvedValue([]);
+};
+
 const buildSubtree = () => [
   session(ROOT_ID),
   session(CHILD_IDS[0], { parentID: ROOT_ID }),
@@ -108,25 +198,31 @@ const createRevisitClient = () =>
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   });
 
-const renderGraph = (queryClient: QueryClient, sessionId: string = ROOT_ID) => {
+interface GraphRenderProps {
+  sessionId: string | null;
+  directory: string | null;
+}
+
+const renderGraphWith = (
+  queryClient: QueryClient,
+  initialProps: GraphRenderProps,
+) => {
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
-  return renderHook(() => useGraphModel(sessionId, DEFAULT_DIRECTORY), {
-    wrapper,
-  });
+  return renderHook(
+    ({ sessionId, directory }: GraphRenderProps) =>
+      useGraphModel(sessionId, directory),
+    { wrapper, initialProps },
+  );
 };
+
+const renderGraph = (queryClient: QueryClient, sessionId: string = ROOT_ID) =>
+  renderGraphWith(queryClient, { sessionId, directory: DEFAULT_DIRECTORY });
 
 describe('useGraphModel — contrato de carga (L7..L8)', () => {
   beforeEach(() => {
-    listSessions.mockResolvedValue(buildSubtree());
-    listAgents.mockResolvedValue([]);
-    getSessionMessages.mockResolvedValue([assistantMessage()]);
-    getSessionPermissions.mockResolvedValue([]);
-    getSessionLog.mockResolvedValue([]);
-    listSessionForms.mockResolvedValue([]);
-    getSessionForm.mockResolvedValue(undefined);
-    listSessionInbox.mockResolvedValue([]);
+    prepareGraphMocks(buildSubtree());
   });
 
   afterEach(() => {
@@ -134,16 +230,43 @@ describe('useGraphModel — contrato de carga (L7..L8)', () => {
   });
 
   it('conserva la forma pública de UseGraphModelResult (L8)', async () => {
-    const { result } = renderGraph(createRevisitClient());
+    const queryClient = createRevisitClient();
+    const { result } = renderGraph(queryClient);
 
     await waitFor(() =>
       expect(result.current.graph.nodes).toHaveLength(SUBTREE_IDS.length),
     );
 
+    // El origen es el subárbol bajo la key de grafo; la ventana global ya no
+    // participa (FR-013).
+    expect(listSessions).not.toHaveBeenCalled();
+    expect(listRootSessions).toHaveBeenCalledWith(DEFAULT_DIRECTORY);
+    expect(listChildSessions).toHaveBeenCalledWith(ROOT_ID);
+    expect(
+      queryClient.getQueryData(
+        queryKeys.graph.for(DEFAULT_DIRECTORY, ROOT_ID),
+      ),
+    ).toBeDefined();
+
     // Compilación: el retorno sigue siendo asignable a la interfaz pública (tsc).
     const shape: UseGraphModelResult = result.current;
 
-    expect(Object.keys(shape).sort()).toEqual([...PUBLIC_RESULT_KEYS].sort());
+    // Las 8 claves base están; solo se toleran las aditivas de la feature.
+    const keys = Object.keys(shape);
+    expect(keys).toEqual(expect.arrayContaining([...PUBLIC_RESULT_KEYS]));
+    const extra = keys.filter(
+      (key) => !(PUBLIC_RESULT_KEYS as readonly string[]).includes(key),
+    );
+    expect(
+      extra.every((key) =>
+        (ADDITIVE_RESULT_KEYS as readonly string[]).includes(key),
+      ),
+    ).toBe(true);
+    for (const key of ADDITIVE_RESULT_KEYS) {
+      const value = (shape as unknown as Record<string, unknown>)[key];
+      if (value !== undefined) expect(typeof value).toBe('boolean');
+    }
+
     expect(Array.isArray(shape.graph.nodes)).toBe(true);
     expect(Array.isArray(shape.graph.edges)).toBe(true);
     expect(Array.isArray(shape.parallelGroups)).toBe(true);
@@ -238,6 +361,60 @@ describe('useGraphModel — contrato de carga (L7..L8)', () => {
 });
 
 /* -------------------------------------------------------------------- */
+/* T024 (US3) — estados combinados (directorio + estructura) y sesión    */
+/* inexistente.                                                         */
+/* -------------------------------------------------------------------- */
+
+describe('useGraphModel — estados de carga y sesión inexistente (T024, US3)', () => {
+  beforeEach(() => {
+    prepareGraphMocks(buildSubtree());
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('acota el esqueleto por el directorio: sin directorio aún no pide el subárbol (FR-004)', async () => {
+    const queryClient = createRevisitClient();
+    const { result, rerender } = renderGraphWith(queryClient, {
+      sessionId: ROOT_ID,
+      directory: null,
+    });
+
+    // Sin directorio no hay subárbol que cargar: esqueleto **acotado**, sin
+    // consultar raíces (la resolución del directorio termina o falla).
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.isError).toBe(false);
+    expect(listRootSessions).not.toHaveBeenCalled();
+
+    rerender({ sessionId: ROOT_ID, directory: DEFAULT_DIRECTORY });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitFor(() =>
+      expect(result.current.graph.nodes).toHaveLength(SUBTREE_IDS.length),
+    );
+    expect(result.current.isError).toBe(false);
+  });
+
+  it('no queda en esqueleto terminal ni en error cuando la sesión no existe (FR-005)', async () => {
+    const queryClient = createRevisitClient();
+    const { result } = renderGraphWith(queryClient, {
+      sessionId: MISSING_ID,
+      directory: DEFAULT_DIRECTORY,
+    });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    // El respaldo `session.get` es el que decide: no es una raíz listada.
+    expect(getSession).toHaveBeenCalledWith(MISSING_ID);
+    // "No encontrada" es distinto de error y de "sin agentes".
+    expect(result.current.isError).toBe(false);
+    expect(result.current.error).toBeNull();
+    expect(result.current.graph.nodes).toHaveLength(0);
+  });
+});
+
+/* -------------------------------------------------------------------- */
 /* E5/A5 — filas paralelas en vivo y paridad en vivo/refresco (T024).    */
 /* -------------------------------------------------------------------- */
 
@@ -302,14 +479,8 @@ const seedLaneContent = () => {
 
 describe('useGraphModel — filas paralelas en vivo y paridad (E5/A5)', () => {
   beforeEach(() => {
-    listSessions.mockResolvedValue(buildLaneSubtree());
-    listAgents.mockResolvedValue([]);
+    prepareGraphMocks(buildLaneSubtree());
     getSessionMessages.mockReset();
-    getSessionPermissions.mockResolvedValue([]);
-    getSessionLog.mockResolvedValue([]);
-    listSessionForms.mockResolvedValue([]);
-    getSessionForm.mockResolvedValue(undefined);
-    listSessionInbox.mockResolvedValue([]);
     seedLaneContent();
   });
 
@@ -399,15 +570,18 @@ describe('useGraphModel — filas paralelas en vivo y paridad (E5/A5)', () => {
       new Set(LANE_IDS.map((id) => liveSnapshot.levelByNode[id])).size,
     ).toBe(1);
 
-    // Llega el estado completo: las sesiones reportan su fin real y terminan.
+    // Llega el estado completo: el subárbol reporta el fin real de cada sesión y
+    // los estados terminan. La estructura se refresca en la **key de grafo**
+    // (origen nuevo, FR-013), no en la ventana global.
+    const completed = buildLaneSubtree(LANE_FINISH);
     act(() => {
       queryClient.setQueryData(
         queryKeys.sessions.status(),
         laneStatuses(idleStatus),
       );
       queryClient.setQueryData(
-        queryKeys.sessions.list(DEFAULT_DIRECTORY),
-        buildLaneSubtree(LANE_FINISH),
+        queryKeys.graph.for(DEFAULT_DIRECTORY, LANE_ROOT),
+        subtreeResult(completed),
       );
     });
 
@@ -422,7 +596,9 @@ describe('useGraphModel — filas paralelas en vivo y paridad (E5/A5)', () => {
     // El agrupamiento final coincide con el observado en vivo (US1 esc. 3).
     expect(laneSnapshot(live.result.current)).toEqual(liveSnapshot);
 
-    // Reabrir la vista con el estado completo no cambia la disposición.
+    // Reabrir la vista con el estado completo no cambia la disposición: el
+    // subárbol cacheado bajo la key de grafo es el mismo conjunto terminado.
+    seedSubtree(completed);
     live.unmount();
     const reopened = renderGraph(queryClient, LANE_ROOT);
     await waitFor(() =>
@@ -487,16 +663,10 @@ const effortNode = (result: UseGraphModelResult, id: string) => {
 describe('useGraphModel — esfuerzo por nodo e identidad estable (S11, T021)', () => {
   beforeEach(() => {
     installEffortClock();
-    listSessions.mockReset().mockResolvedValue([
+    prepareGraphMocks([
       session(EFFORT_ROOT),
       session(EFFORT_CHILD, { parentID: EFFORT_ROOT }),
     ]);
-    listAgents.mockReset().mockResolvedValue([]);
-    getSessionPermissions.mockReset().mockResolvedValue([]);
-    getSessionLog.mockReset().mockResolvedValue([]);
-    listSessionForms.mockReset().mockResolvedValue([]);
-    getSessionForm.mockReset().mockResolvedValue(undefined);
-    listSessionInbox.mockReset().mockResolvedValue([]);
     // La raíz queda activa (sin `time.completed`, duración viva); el hijo queda
     // terminado (`time.completed`, duración fija).
     getSessionMessages.mockReset().mockImplementation((id: string) =>
@@ -596,13 +766,7 @@ const allLatestReady = (result: UseGraphModelResult): boolean =>
  */
 describe('useGraphModel — latestActiveNodeId (T031, US3)', () => {
   beforeEach(() => {
-    listSessions.mockReset().mockResolvedValue(buildLatestSubtree());
-    listAgents.mockReset().mockResolvedValue([]);
-    getSessionPermissions.mockReset().mockResolvedValue([]);
-    getSessionLog.mockReset().mockResolvedValue([]);
-    listSessionForms.mockReset().mockResolvedValue([]);
-    getSessionForm.mockReset().mockResolvedValue(undefined);
-    listSessionInbox.mockReset().mockResolvedValue([]);
+    prepareGraphMocks(buildLatestSubtree());
     // `metrics.startedAt` = mínimo `time.created` de los assistant: el hijo
     // "early" empieza en 100 y el "late" en 300 (FR-005).
     getSessionMessages.mockReset().mockImplementation((id: string) =>

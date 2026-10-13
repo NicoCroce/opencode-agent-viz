@@ -17,6 +17,7 @@ import {
   sessionDetailPath,
   useGetSessionStatus,
   useRootSessions,
+  useSessionDirectory,
 } from '@app/Domains/Sessions';
 import { useSessionContext, useSessionForms } from '@app/Domains/Inspector';
 import {
@@ -134,13 +135,26 @@ export const WorkspacePage = () => {
 
   const { groups, items, isLoading: sessionsLoading } = useRootSessions();
   const statusQuery = useGetSessionStatus();
-  const directory = useMemo(
-    () =>
-      items.find((item) => item.session.id === id)?.session.location.directory ??
-      null,
-    [items, id],
-  );
-  const graph = useGraphModel(id ?? null, directory);
+  // El listado de raíces puede truncar y la sesión abierta puede no estar en
+  // `items`: el `directory` se resuelve con `useSessionDirectory` (cadena
+  // `items` → `session.get` → `null`, contrato `session-roots` §5/R3), que
+  // expone su propia carga/error. Sin esto la vista de grafo quedaba en
+  // esqueleto terminal cuando la raíz abierta caía fuera de la ventana (FR-003).
+  //
+  // Su estado de resolución se propaga **entero** al modelo (contrato de
+  // subárbol §4): descartarlo dejaba un `?id=` inexistente en esqueleto terminal
+  // (`isLoading` forzado por `directory` nulo), sin alcanzar nunca "no
+  // encontrada" (FR-004/FR-005/SC-002). Con él, la estructura distingue
+  // "aún resolviendo" (carga acotada) de "no resuelto" (`notFound`).
+  const {
+    directory,
+    isLoading: directoryLoading,
+    isError: directoryError,
+  } = useSessionDirectory(id ?? null, items);
+  const graph = useGraphModel(id ?? null, directory, {
+    isLoading: directoryLoading,
+    isError: directoryError,
+  });
   // El modo "seguir" se ancla al nodo activo más reciente (FR-005), no al
   // primero en orden de nodo; `activeNodeId` se conserva para otros usos.
   const follow = useFollowMode(graph.latestActiveNodeId);

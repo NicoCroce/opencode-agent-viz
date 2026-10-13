@@ -5,6 +5,7 @@ import {
   EmptyState,
   Page,
 } from '@app/Application/Components';
+import { GraphTruncationBanner } from '@app/Application/Components/Molecules';
 import { SessionFilterBar, SessionList, SessionListSkeleton } from '../Components';
 import { useRootSessions, useSessionFilters } from '../Hooks';
 import { useGetSessionStatus } from '../Sessions.service';
@@ -12,7 +13,8 @@ import { sessionDetailPath } from '../Sessions.routes';
 
 export const SessionListPage = () => {
   const navigate = useNavigate();
-  const { groups, items, isLoading, isError, error } = useRootSessions();
+  const { groups, items, truncated, isLoading, isError, error } =
+    useRootSessions();
   const statusQuery = useGetSessionStatus();
   // Única suscripción a los datos: los `groups` ya calculados alimentan al hook
   // de filtros, que solo deriva estado de vista (nunca vuelve a consultar).
@@ -49,6 +51,9 @@ export const SessionListPage = () => {
         hasActiveFilters={hasActiveFilters}
         onClear={clearFilters}
       />
+      {/* Aviso de corte del listado (R5): informativo y no bloqueante, entre la
+          barra de filtros y el listado. */}
+      {truncated ? <GraphTruncationBanner /> : null}
       {isEmptyResult && hasActiveFilters ? (
         <EmptyScreenFilter
           onClick={clearFilters}

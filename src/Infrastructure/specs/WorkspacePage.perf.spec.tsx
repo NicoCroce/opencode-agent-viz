@@ -10,6 +10,7 @@ import {
   perfMeasure,
 } from '@app/Application/Helpers/perf';
 import type { TGraphModel } from '@app/Domains/Graph/Graph.entity';
+import type { TSubtreeLoadResult } from '@app/Domains/Graph/lib/loadPlan/subtree';
 import {
   assistantMessage,
   busyStatus,
@@ -39,13 +40,13 @@ const graphHooks = vi.hoisted(() => ({
  * `graph.session.open` y `graph.session.revisit` se distinguen por la presencia
  * de la **estructura** del subárbol en el caché de consultas.
  *
- * La detección de "estructura en caché" vive en `WorkspacePage` (T021). Para
- * ejercitarla de forma fiel se usa el **modelo real** (`useGraphModel` sobre
- * `sessions.list`/`status`/`agents.list`) y se controla el caché: la estructura
- * está cacheada cuando esas claves ya están sembradas (revisita) y no lo está
- * cuando el caché arranca vacío (apertura fría). Así el test es válido tanto si
- * la página detecta el caché leyendo `queryClient.getQueryData(...)` como si lo
- * infiere de `graph.isLoading`.
+ * La detección de "estructura en caché" vive en `useSessionOpenPerf` y lee la
+ * **key nueva del subárbol** (`graph.for(directory, sessionId)`, contrato de
+ * subárbol §3/§4). Para ejercitarla de forma fiel se usa el **modelo real**
+ * (`useGraphModel`, cuyo origen estructural es el subárbol: `listRootSessions`
+ * + `listChildSessions`) y se controla el caché: la estructura está cacheada
+ * cuando esa key ya está sembrada (revisita) y no lo está cuando el caché
+ * arranca vacío (apertura fría).
  *
  * Solo se sustituyen las dependencias pesadas de presentación (React Flow, el
  * inspector y el histórico) y el acceso al SDK (`opencodeService`). Las marcas
@@ -101,13 +102,20 @@ vi.mock('@app/Domains/Graph', async () => {
   };
 });
 
-vi.mock('@app/Domains/Sessions', () => ({
-  SessionList: () => null,
-  SessionListSkeleton: () => null,
-  sessionDetailPath: (id: string) => `/sessions/${id}`,
-  useGetSessionStatus: () => ({ data: {} }),
-  useRootSessions: vi.fn(),
-}));
+vi.mock('@app/Domains/Sessions', async (importOriginal) => {
+  // El `directory` de la sesión abierta se resuelve con el hook **real** de la
+  // cadena `items` → `session.get` → `null` (contrato de raíces §5): la página
+  // dejó de deducirlo del listado global y depende de `useSessionDirectory`.
+  const actual = await importOriginal<typeof import('@app/Domains/Sessions')>();
+  return {
+    SessionList: () => null,
+    SessionListSkeleton: () => null,
+    sessionDetailPath: (id: string) => `/sessions/${id}`,
+    useGetSessionStatus: () => ({ data: {} }),
+    useRootSessions: vi.fn(),
+    useSessionDirectory: actual.useSessionDirectory,
+  };
+});
 
 vi.mock('@app/Domains/Inspector', () => ({
   InspectorPanel: () => null,
@@ -129,21 +137,34 @@ vi.mock('@app/Domains/History', () => ({
   }),
 }));
 
-/** SDK fuera de la ecuación: la estructura sale del caché, no de la red. */
+/**
+ * SDK bajo control del test. Se declara con `vi.hoisted` para poder reponer sus
+ * implementaciones en cada caso: el `setup` global restaura los mocks tras cada
+ * test y las implementaciones de fábrica se pierden. La estructura ya no sale de
+ * la ventana global (`listSessions`); sale del subárbol (`listRootSessions` +
+ * `listChildSessions`) y del respaldo `getSession` (contrato de subárbol §1).
+ */
+const service = vi.hoisted(() => ({
+  listProjects: vi.fn(),
+  // Ventana cruda de `/session`: se conserva solo para comprobar que el grafo
+  // **no** la usa (payload 200 → 38 raíces, R6).
+  listSessions: vi.fn(),
+  listRootSessions: vi.fn(),
+  listChildSessions: vi.fn(),
+  getSession: vi.fn(),
+  listAgents: vi.fn(),
+  getSessionMessages: vi.fn(),
+  getSessionPermissions: vi.fn(),
+  getSessionLog: vi.fn(),
+  listSessionForms: vi.fn(),
+  getSessionForm: vi.fn(),
+  listSessionInbox: vi.fn(),
+  getActiveSessions: vi.fn(),
+  subscribeEvents: vi.fn(),
+}));
+
 vi.mock('@app/Infrastructure/Services/opencodeClient', () => ({
-  opencodeService: {
-    listProjects: vi.fn(() => Promise.resolve([])),
-    listSessions: vi.fn(),
-    listAgents: vi.fn(() => Promise.resolve([])),
-    getSessionMessages: vi.fn(() => Promise.resolve([])),
-    getSessionPermissions: vi.fn(() => Promise.resolve([])),
-    getSessionLog: vi.fn(() => Promise.resolve([])),
-    listSessionForms: vi.fn(() => Promise.resolve([])),
-    getSessionForm: vi.fn(() => Promise.resolve({})),
-    listSessionInbox: vi.fn(() => Promise.resolve([])),
-    getActiveSessions: vi.fn(() => Promise.resolve({})),
-    subscribeEvents: vi.fn(),
-  },
+  opencodeService: service,
 }));
 
 const SESSION_ID = 'ses_root';
@@ -172,11 +193,56 @@ const createClient = () =>
     },
   });
 
-/** Siembra el caché con las claves que definen la "estructura" del subárbol. */
+/**
+ * Siembra el caché con la **estructura del subárbol** en su key nueva
+ * (`graph.for(directory, sessionId)`): es la clave de la que `useGraphStructure`
+ * deriva el modelo y la que lee `useSessionOpenPerf` para distinguir apertura de
+ * revisita (contrato de subárbol §3/§4). La key vieja del listado global
+ * (`sessions.list`) ya no alimenta el grafo, así que sembrarla dejaría la
+ * métrica fija y el grafo vacío.
+ */
+const subtreeResult = (
+  sessions: SessionInfo[],
+  overrides: Partial<TSubtreeLoadResult> = {},
+): TSubtreeLoadResult => ({
+  sessions,
+  truncated: false,
+  loadedCount: sessions.length,
+  notFound: false,
+  ...overrides,
+});
+
 const seedStructureCache = (client: QueryClient): void => {
-  client.setQueryData(queryKeys.sessions.list(DIRECTORY), [sessionInfo]);
+  client.setQueryData(
+    queryKeys.graph.for(DIRECTORY, SESSION_ID),
+    subtreeResult([sessionInfo]),
+  );
   client.setQueryData(queryKeys.agents.list(DIRECTORY), []);
   client.setQueryData(queryKeys.sessions.status(), {});
+};
+
+/**
+ * Repone el SDK bajo control del test (el `setup` global restaura los mocks tras
+ * cada caso, así que las implementaciones de fábrica no sobreviven). Los valores
+ * por defecto describen un proyecto con una única raíz y sin hijas.
+ */
+const resetService = (): void => {
+  service.listProjects.mockResolvedValue([]);
+  service.listSessions.mockResolvedValue([]);
+  service.listRootSessions.mockResolvedValue({
+    sessions: [sessionInfo],
+    truncated: false,
+  });
+  service.listChildSessions.mockResolvedValue([]);
+  service.getSession.mockResolvedValue(sessionInfo);
+  service.listAgents.mockResolvedValue([]);
+  service.getSessionMessages.mockResolvedValue([]);
+  service.getSessionPermissions.mockResolvedValue([]);
+  service.getSessionLog.mockResolvedValue([]);
+  service.listSessionForms.mockResolvedValue([]);
+  service.getSessionForm.mockResolvedValue({});
+  service.listSessionInbox.mockResolvedValue([]);
+  service.getActiveSessions.mockResolvedValue({});
 };
 
 const renderWorkspace = (client: QueryClient, sessionId: string = SESSION_ID) =>
@@ -201,22 +267,19 @@ const measuredNames = () =>
 beforeEach(async () => {
   const { useNow } = await import('@app/Domains/Graph/Hooks/useNow');
   graphHooks.useNow.mockImplementation(useNow);
+  resetService();
 });
 
 describe('WorkspacePage — instrumentación de apertura/revisita (P4)', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.mocked(useRootSessions).mockReturnValue({
       items: [{ session: sessionInfo, agentName: 'develop' }],
       groups: [],
+      truncated: false,
       isLoading: false,
       isError: false,
       error: null,
     });
-
-    const { opencodeService } = await import(
-      '@app/Infrastructure/Services/opencodeClient'
-    );
-    vi.mocked(opencodeService.listSessions).mockResolvedValue([sessionInfo]);
   });
 
   it('registra graph.session.open cuando la estructura NO está en caché', async () => {
@@ -241,24 +304,49 @@ describe('WorkspacePage — instrumentación de apertura/revisita (P4)', () => {
     expect(measuredNames()).not.toContain(PERF_METRIC.sessionOpen);
     expect(perfMark).toHaveBeenCalled();
   });
+
+  it('el grafo se alimenta del subárbol nuevo y no de la ventana global de 200 (R6, FR-013)', async () => {
+    const client = createClient();
+    // Payload del listado medido (2026-10-12): `limit=200` sin filtrar devolvía
+    // ~184 hijas y 15-16 raíces; con `parentID: null` devuelve las 38 raíces
+    // (−81 %). El grafo debe leer el subárbol de la sesión abierta, no la ventana.
+    const roots = [
+      sessionInfo,
+      ...Array.from({ length: 37 }, (_, index) => session(`root-${index}`)),
+    ];
+    service.listRootSessions.mockResolvedValue({
+      sessions: roots,
+      truncated: false,
+    });
+    service.listSessions.mockResolvedValue(
+      Array.from({ length: 200 }, (_, index) => session(`window-${index}`)),
+    );
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(measuredNames()).toContain(PERF_METRIC.sessionOpen),
+    );
+    // El origen estructural es el subárbol (`listRootSessions` + hijas por
+    // padre)…
+    expect(service.listRootSessions).toHaveBeenCalledWith(DIRECTORY);
+    // …y la ventana cruda de 200 deja de alimentar el grafo (payload 200→38).
+    expect(service.listSessions).not.toHaveBeenCalled();
+  });
 });
 
 describe('WorkspacePage — tick del resumen condicionado a nodos activos (T041, FR-006/FR-024, SC-005)', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     graphHooks.useNow.mockClear();
 
     vi.mocked(useRootSessions).mockReturnValue({
       items: [{ session: sessionInfo, agentName: 'develop' }],
       groups: [],
+      truncated: false,
       isLoading: false,
       isError: false,
       error: null,
     });
-
-    const { opencodeService } = await import(
-      '@app/Infrastructure/Services/opencodeClient'
-    );
-    vi.mocked(opencodeService.listSessions).mockResolvedValue([sessionInfo]);
   });
 
   /** Opciones con las que la página evaluó el tick del resumen. */
@@ -375,6 +463,7 @@ describe('WorkspacePage — identidad de nodo estable con ~150 nodos (T053, SC-0
         },
       ],
       groups: [],
+      truncated: false,
       isLoading: false,
       isError: false,
       error: null,
@@ -387,9 +476,18 @@ describe('WorkspacePage — identidad de nodo estable con ~150 nodos (T053, SC-0
 
   it('el tick de 1 s solo reconstruye el nodo activo; los ~149 inactivos conservan identidad', async () => {
     const client = createClient();
+    // Origen estructural nuevo: el subárbol de la sesión abierta en su key
+    // (`graph.for`), no la ventana global (`sessions.list`).
+    const sessions = buildPerfSessions();
     client.setQueryData(
-      queryKeys.sessions.list(DIRECTORY),
-      buildPerfSessions(),
+      queryKeys.graph.for(DIRECTORY, PERF_ROOT_ID),
+      subtreeResult(sessions),
+    );
+    // La profundidad 1 del subárbol también en caché: la consulta de hijas de la
+    // raíz (frescura en vivo) no sale a red.
+    client.setQueryData(
+      queryKeys.sessions.children(PERF_ROOT_ID),
+      sessions.filter((session) => session.parentID === PERF_ROOT_ID),
     );
     client.setQueryData(queryKeys.agents.list(DIRECTORY), []);
     client.setQueryData(queryKeys.sessions.status(), buildPerfStatuses());

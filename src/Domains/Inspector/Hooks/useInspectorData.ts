@@ -12,6 +12,7 @@ import type {
   TToolHistoryEntry,
 } from '../Inspector.entity';
 import { deriveResources } from '../lib/deriveResources';
+import { deriveSkills } from '../lib/deriveSkills';
 import {
   useGetInstructions,
   useGetMcpServers,
@@ -65,14 +66,20 @@ export const useInspectorData = (node: TGraphNode | null): InspectorData => {
     forms.questions,
   );
 
+  const skills = useMemo(
+    () => deriveSkills(messagesQuery.messages),
+    [messagesQuery.messages],
+  );
+
   const resources: TResourceUsage = useMemo(
     () =>
       deriveResources({
         mcpServers: mcpQuery.data ?? [],
         instructions: instructionsQuery.data ?? [],
+        skills,
         tools: toolsUsed,
       }),
-    [mcpQuery.data, instructionsQuery.data, toolsUsed],
+    [mcpQuery.data, instructionsQuery.data, skills, toolsUsed],
   );
 
   return {

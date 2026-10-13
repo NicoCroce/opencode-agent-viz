@@ -1,5 +1,10 @@
 import type { TGraphModel, TGraphNode, TParallelGroup } from '../Graph.entity';
 import { executionInterval, nodeInterval } from './execution/nodeInterval';
+import {
+  deriveInvocationBatches,
+  type TInvocation,
+  type TInvocationBatch,
+} from './invocations';
 
 /**
  * `true` si los intervalos de **solape** de dos nodos hermanos se superponen.
@@ -99,10 +104,103 @@ export const deriveSiblingBatches = (
 };
 
 /**
+ * Lotes de invocación **o** invocaciones crudas: ambas se aceptan porque el
+ * borde (`useGraphStructure`) puede tener cualquiera de las dos formas a mano y
+ * la detección es inequívoca (solo el lote trae `sessionIds`).
+ */
+type TBatchInput = TInvocationBatch | TInvocation;
+
+const isInvocationBatch = (value: TBatchInput): value is TInvocationBatch =>
+  Array.isArray((value as TInvocationBatch).sessionIds);
+
+/**
+ * Convierte lotes por paso del padre en grupos de nodos (FR-007/FR-008): cada
+ * `sessionIds` se resuelve a los nodos del modelo (una sesión = un nodo, aunque
+ * participe en varios lotes) y el `parentId` desconocido se toma del modelo.
+ *
+ * Función pura, sin React (Principio V). El `id` del grupo es
+ * `parentId#stepId` (data-model §5), de modo que dos lotes del mismo padre con
+ * los mismos miembros siguen teniendo identidad propia; las ventanas son
+ * informativas y usan el intervalo de nodo (`nodeInterval`, como el respaldo).
+ */
+const groupsFromBatches = (
+  model: TGraphModel,
+  now: number,
+  batches: TBatchInput[],
+): TParallelGroup[] => {
+  const parentByChild = new Map<string, string>();
+  for (const edge of model.edges) parentByChild.set(edge.target, edge.source);
+
+  const nodeBySessionId = new Map<string, TGraphNode>();
+  for (const node of model.nodes) nodeBySessionId.set(node.data.sessionId, node);
+
+  const normalized: TInvocationBatch[] = batches.some(isInvocationBatch)
+    ? (batches as TInvocationBatch[])
+    : deriveInvocationBatches(batches as TInvocation[]);
+
+  const groups: TParallelGroup[] = [];
+
+  for (const batch of normalized) {
+    const members = batch.sessionIds
+      .map((sessionId) => nodeBySessionId.get(sessionId))
+      .filter((node): node is TGraphNode => node !== undefined);
+    if (members.length === 0) continue;
+
+    const sorted = [...members].sort(
+      (a, b) => nodeInterval(a, now)[0] - nodeInterval(b, now)[0] || a.id.localeCompare(b.id),
+    );
+    const parentId =
+      batch.parentId ??
+      sorted.map((node) => parentByChild.get(node.id)).find((id) => id !== undefined) ??
+      null;
+
+    groups.push({
+      id: `${parentId ?? 'root'}#${batch.stepId}`,
+      parentId,
+      nodeIds: sorted.map((node) => node.id),
+      startedAt: Math.min(...sorted.map((node) => nodeInterval(node, now)[0])),
+      endedAt: Math.max(...sorted.map((node) => nodeInterval(node, now)[1])),
+    });
+  }
+
+  return groups.sort(
+    (a, b) =>
+      a.startedAt - b.startedAt ||
+      (a.parentId ?? '').localeCompare(b.parentId ?? '') ||
+      a.nodeIds[0].localeCompare(b.nodeIds[0]),
+  );
+};
+
+/**
+ * API combinada de lotes por **invocación** con el solape de sesión como
+ * respaldo (contrato `invocation-lanes` §2/§4, FR-007, FR-012): con invocaciones
+ * o lotes del padre manda el agrupamiento por paso; sin ellos devuelve el
+ * respaldo estructural de `deriveSiblingBatches`, que no se toca.
+ *
+ * Devuelve **todos** los lotes, también los de un solo miembro: las filas
+ * (`deriveExecutionLevels`) necesitan cada paso como una tanda propia y el badge
+ * (`deriveParallelGroups`) filtra los de 2+. Función pura, sin React.
+ */
+export const deriveParallelBatches = (
+  model: TGraphModel,
+  now: number,
+  batches?: TBatchInput[],
+): TParallelGroup[] =>
+  batches && batches.length > 0
+    ? groupsFromBatches(model, now, batches)
+    : deriveSiblingBatches(model, now);
+
+/**
  * Solo los lotes con 2+ agentes: los que corrieron realmente en paralelo.
+ *
+ * Sin lotes (o con la lista vacía) cae al respaldo estructural por solape de
+ * sesión, sin regresión (FR-012); con lotes por invocación, la invocación gana
+ * (FR-008) y un nodo reutilizado puede aparecer en varios grupos.
  */
 export const deriveParallelGroups = (
   model: TGraphModel,
   now: number,
+  batches?: TBatchInput[],
 ): TParallelGroup[] =>
-  deriveSiblingBatches(model, now).filter((batch) => batch.nodeIds.length >= 2);
+  deriveParallelBatches(model, now, batches).filter((group) => group.nodeIds.length >= 2);
+

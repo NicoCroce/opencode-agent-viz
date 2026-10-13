@@ -36,6 +36,12 @@ import { useGraphModel, type UseGraphModelResult } from '../useGraphModel';
  * compartidas). Es tarea de TEST: no modifica `useGraphEnrichment.ts` ni
  * `eventReducer.ts`.
  *
+ * Origen estructural (FR-013, SC-008): el modelo del último caso ya no se
+ * siembra desde la ventana global `listSessions`, sino del **subárbol** de la
+ * sesión cacheado bajo `graph.for(directory, sessionId)`, cuyas dependencias
+ * son `listRootSessions` (raíces del proyecto), `listChildSessions` (hijas por
+ * padre) y `getSession` (respaldo por id).
+ *
  * Se usa un `QueryClient` con `gcTime: Infinity` (como el cliente de producción,
  * 24 h) en lugar de `renderWithProviders` (que usa `gcTime: 0`): con `gcTime: 0`
  * una clave sin observador —como `sessions.execution`, que el enriquecimiento
@@ -55,7 +61,13 @@ import { useGraphModel, type UseGraphModelResult } from '../useGraphModel';
  */
 
 const service = vi.hoisted(() => ({
-  listSessions: vi.fn(),
+  // Origen estructural del subárbol (FR-013, SC-008): raíces del proyecto,
+  // hijas por padre y sesión por id (respaldo). La ventana global
+  // `listSessions` ya no participa del grafo y no se simula aquí: si algo
+  // volviera a depender de ella, el spec fallaría en vez de pasar en falso.
+  listRootSessions: vi.fn(),
+  listChildSessions: vi.fn(),
+  getSession: vi.fn(),
   listAgents: vi.fn(),
   getSessionMessages: vi.fn(),
   getSessionPermissions: vi.fn(),
@@ -272,7 +284,12 @@ describe('useGraphEnrichment — frescura y claves compartidas (L9, FR-009)', ()
       clearTimeout(handle),
     );
 
-    service.listSessions.mockReset().mockResolvedValue([]);
+    service.listRootSessions.mockReset().mockResolvedValue({
+      sessions: [],
+      truncated: false,
+    });
+    service.listChildSessions.mockReset().mockResolvedValue([]);
+    service.getSession.mockReset().mockResolvedValue(session(ROOT));
     service.listAgents.mockReset().mockResolvedValue([]);
     service.getSessionMessages.mockReset().mockResolvedValue([]);
     service.getSessionPermissions.mockReset().mockResolvedValue([]);
@@ -399,7 +416,13 @@ describe('useGraphEnrichment — frescura y claves compartidas (L9, FR-009)', ()
     // El tick de 1 s vive en `useGraphModel`; con timers reales se comprueba que
     // el modelo se actualiza dentro del presupuesto de FR-009.
     vi.useRealTimers();
-    service.listSessions.mockResolvedValue([session(ROOT)]);
+    // Origen estructural del subárbol (FR-013, SC-008): la raíz sale de las
+    // raíces del proyecto y las hijas por padre; ya no de la ventana global.
+    service.listRootSessions.mockResolvedValue({
+      sessions: [session(ROOT)],
+      truncated: false,
+    });
+    service.listChildSessions.mockResolvedValue([]);
     service.listAgents.mockResolvedValue([]);
 
     const view = renderWithClient(
@@ -407,6 +430,15 @@ describe('useGraphEnrichment — frescura y claves compartidas (L9, FR-009)', ()
     );
 
     await waitFor(() => expect(latestModel?.graph.nodes).toHaveLength(1));
+    // El origen es el subárbol cacheado bajo `graph.for(directory, sessionId)`,
+    // alimentado por raíces (por directorio) e hijas (por padre).
+    expect(
+      view.queryClient.getQueryData(
+        queryKeys.graph.for(DEFAULT_DIRECTORY, ROOT),
+      ),
+    ).toBeDefined();
+    expect(service.listRootSessions).toHaveBeenCalledWith(DEFAULT_DIRECTORY);
+    expect(service.listChildSessions).toHaveBeenCalledWith(ROOT);
     await waitFor(() =>
       expect(latestModel?.graph.nodes[0].data.enrichment).toBe('ready'),
     );

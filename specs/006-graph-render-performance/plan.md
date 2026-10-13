@@ -12,7 +12,7 @@ El cambio de sesión se percibe lento porque, al seleccionar una sesión, `useGr
 
 La feature es de **rendimiento incremental**, sin migrar el render a canvas ni rediseñar la vista (spec, Out of Scope). El enfoque técnico se apoya en cinco palancas, todas dentro de la arquitectura por dominios actual y sin dependencias nuevas:
 
-1. **Modelo por fases (estructura → enriquecimiento)**: separar la construcción *estructural* del grafo (sesiones + estados + agentes, que ya están en caché global) de su *enriquecimiento* (métricas, señales, formularios, permisos) en dos hooks (`useGraphStructure`, `useGraphEnrichment(ids, structure)`). La estructura se pinta de inmediato con `EMPTY_METRICS`; las métricas se completan cuando llegan (FR-010, SC-007). En la fase de estructura solo son **definitivos** los estados derivables de `SessionStatus` (`running`, `retrying`, `created`); `compacting`, `waiting-permission`/`waiting-input` y los terminales (`succeeded`/`failed`/`interrupted`) requieren señales/log, formularios, permisos o `hasActivity` (mensajes) y quedan **provisionales** hasta que el nodo pasa a `enrichment: 'ready'` (ver data-model §2.2 y contrato de carga §1.1).
+1. **Modelo por fases (estructura → enriquecimiento)**: separar la construcción *estructural* del grafo (el **subárbol de la sesión abierta** —sesiones + estados + agentes—, cargado bajo demanda) de su *enriquecimiento* (métricas, señales, formularios, permisos) en dos hooks (`useGraphStructure`, `useGraphEnrichment(ids, structure)`). La estructura se pinta de inmediato con `EMPTY_METRICS`; las métricas se completan cuando llegan (FR-010, SC-007). En la fase de estructura solo son **definitivos** los estados derivables de `SessionStatus` (`running`, `retrying`, `created`); `compacting`, `waiting-permission`/`waiting-input` y los terminales (`succeeded`/`failed`/`interrupted`) requieren señales/log, formularios, permisos o `hasActivity` (mensajes) y quedan **provisionales** hasta que el nodo pasa a `enrichment: 'ready'` (ver data-model §2.2 y contrato de carga §1.1).
 2. **Carga progresiva, priorizada y cancelable**: el subárbol se carga por lotes ordenados por prioridad (raíz → ancestros del nodo activo → niveles BFS → resto), con cancelación al cambiar de sesión, en vez de lanzar N×7 consultas de golpe (FR-003, FR-004, SC-002, SC-003, SC-008).
 3. **Métricas separadas por coste temporal**: extraer de `deriveMetrics` la parte **independiente de `now`** (`deriveMetricBase`) y memoizarla por sesión; el tick de 1 s solo resuelve `durationMs`/`elapsed`. El tick además se **desactiva** en **ambos** consumidores (`useNow` de `useGraphModel` y el `useNow` del resumen de `WorkspacePage`, FR-024 de 003-execution-detail-views) cuando no hay ningún nodo activo (FR-006, SC-005).
 4. **Identidad estable de nodos/aristas**: reconciliar el modelo para reutilizar objetos `node`/`data`/`edge` sin cambios; mover el resaltado de hover y linaje a `data`/contexto para que hover y selección **no reconstruyan el array completo** que consume React Flow (FR-005, SC-004).
@@ -38,7 +38,7 @@ La paridad funcional (FR-007) es la invariante de no-regresión: al terminar la 
 
 **Constraints**: paridad funcional exacta (FR-007); estados de pantalla obligatorios error→carga→vacío→datos (FR-008, Principio VI); frescura de datos en vivo ≤ 1 s sin degradar (FR-009); **sin** migración a canvas/WebGL (spec, Out of Scope); sin cambios en lo que el server expone (Out of Scope); render DOM con `@xyflow/react` (Assumptions); tipos derivados del SDK con prefijo `T` (Principio IV); funciones puras y testeables (Principio V); event batching y sin re-layout por evento (Principio VII).
 
-**Scale/Scope**: subárbol típico de ~50 agentes; techo objetivo **hasta ~200 agentes** con fluidez; mensajes por sesión en el orden de miles (paginados); una sesión raíz activa a la vez; dominios tocados: `Domains/Graph` (núcleo), `Application/Helpers` (instrumentación) e `Infrastructure/WorkspacePage` (solo orquestación); `Domains/Sessions` y `Infrastructure/Services` se reutilizan sin cambios de contrato.
+**Scale/Scope**: subárbol típico de ~50 agentes; techo objetivo **hasta ~200 agentes** con fluidez; mensajes por sesión en el orden de miles (paginados); una sesión raíz activa a la vez; dominios tocados: `Domains/Graph` (núcleo), `Application/Helpers` (instrumentación) e `Infrastructure/WorkspacePage` (solo orquestación). *(Actualización 011: `Domains/Sessions` e `Infrastructure/Services` **sí** cambian de contrato—`session.list` con `parentID`, paginación por cursor y subárbol bajo demanda; ver `specs/011-fix-session-roots-subtree/contracts/`.)*
 
 ## Constitution Check
 
@@ -99,7 +99,7 @@ src/
 │                                             # del resumen (FR-024 de 003-execution-detail-views) a que existan nodos activos; conserva
 │                                             # el orden de estados
 └── Domains/
-    ├── queryKeys.ts                         # (sin cambios de forma) se reutilizan las claves actuales
+    ├── queryKeys.ts                         # (forma actualizada por 011) + sessions.roots(directory), sessions.children(parentID)
     │
     └── Graph/
         ├── Graph.entity.ts                  # (extender) TMetricBase, TEnrichmentState, estado de carga por nodo
@@ -117,7 +117,7 @@ src/
         │       └── buildGraph.spec.ts       # (extender) enrichment + paridad
         ├── Hooks/
         │   ├── useGraphModel.ts             # (refactor) compone estructura + enriquecimiento; API pública estable
-        │   ├── useGraphStructure.ts         # NUEVO: modelo solo-estructura (sesiones+estados+agentes)
+        │   ├── useGraphStructure.ts         # NUEVO: modelo solo-estructura (subárbol: sesiones+estados+agentes)
         │   ├── useGraphEnrichment.ts        # NUEVO: carga progresiva, priorizada y cancelable
         │   ├── useNow.ts                    # (extender) tick activo solo con nodos en curso
         │   └── specs/

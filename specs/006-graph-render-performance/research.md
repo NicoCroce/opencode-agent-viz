@@ -25,7 +25,7 @@ Estos cuatro puntos cubren, en orden, FR-001/003/008 (carga), FR-006/SC-005 (tic
 
 **Decision**: Partir `useGraphModel` en dos capas internas y mantener su **API pública estable** para no tocar `WorkspacePage` más de lo necesario:
 
-- **`useGraphStructure(sessionId, directory)`** — construye nodos y aristas solo con datos **ya cacheados globalmente**: la lista de sesiones de `useRootSessions` (misma clave `queryKeys.sessions.list(directory)`, ya cargada por el listado), el mapa de estados global (`queryKeys.sessions.status()`, sembrado por `EventStreamProvider`) y la lista de agentes (`queryKeys.agents.list(directory)`). No abre ninguna consulta nueva por sesión. Rellena `data.metrics` con `EMPTY_METRICS` y marca `data.enrichment = 'pending'`.
+- **`useGraphStructure(sessionId, directory)`** — construye nodos y aristas con el **subárbol de la sesión abierta** cargado bajo demanda (`Graph/lib/loadPlan/subtree.ts`) y su respaldo en `queryKeys.sessions.children(parentID)`, más el mapa de estados global (`queryKeys.sessions.status()`, sembrado por `EventStreamProvider`) y la lista de agentes (`queryKeys.agents.list(directory)`). No abre ninguna consulta de **contenido** por sesión. Rellena `data.metrics` con `EMPTY_METRICS` y marca `data.enrichment = 'pending'`. *(Actualización 011: antes derivaba el subárbol de la lista global `queryKeys.sessions.list(directory)`; ver `specs/011-fix-session-roots-subtree/contracts/subtree-structure-contract.md`.)*
 - **`useGraphEnrichment(ids, structure)`** — carga progresivamente mensajes/permisos/log/señales/formularios/inbox y **fusiona** métricas/estado final en los nodos ya existentes (`enrichment = 'ready'`). `structure` es el `TGraphModel` de la fase estructural (fuente de la topología y de los ids a enriquecer).
 
 `useGraphModel` orquesta ambas y devuelve la misma forma `UseGraphModelResult` que hoy.
@@ -129,7 +129,7 @@ Estos cuatro puntos cubren, en orden, FR-001/003/008 (carga), FR-006/SC-005 (tic
 
 ## R6. Reutilización de caché y claves de consulta (FR-004, SC-003, SC-008)
 
-**Decision**: **No cambiar** la forma de `queryKeys` ni la política `staleTime: Infinity`. El enriquecimiento escribe en las mismas claves actuales (`messages(id)`, `permissions.for(id)`, `sessions.log(id)`, `sessions.execution(id)`, `sessions.forms(id)`, `sessions.inbox(id)`), de modo que la carga progresiva y el `eventReducer` siguen compartiendo estado sin cambios. Un spec dedicado verifica que el enriquecimiento escribe en esas **mismas claves** que parchea `eventReducer` (frescura ≤ 1 s, FR-009).
+**Decision**: **No cambiar** la forma de las claves de **contenido** ni la política `staleTime: Infinity`. El enriquecimiento escribe en las mismas claves actuales (`messages(id)`, `permissions.for(id)`, `sessions.log(id)`, `sessions.execution(id)`, `sessions.forms(id)`, `sessions.inbox(id)`), de modo que la carga progresiva y el `eventReducer` siguen compartiendo estado sin cambios. Un spec dedicado verifica que el enriquecimiento escribe en esas **mismas claves** que parchea `eventReducer` (frescura ≤ 1 s, FR-009). *(Actualización 011: `queryKeys.ts` **sí** cambia de forma para la estructura—`sessions.roots(directory)` y `sessions.children(parentID)`; las claves de contenido listadas arriba no.)*
 
 **Rationale**:
 - El reducer en vivo ya parchea esas claves (eventReducer.ts); cambiar claves rompería la coherencia entre carga inicial y eventos, y con ella la paridad.
