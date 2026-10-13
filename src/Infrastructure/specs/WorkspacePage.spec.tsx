@@ -11,6 +11,7 @@ import {
   INSPECTOR_STEP,
 } from '@app/Application/Helpers/panelWidth';
 import { queryKeys } from '@app/Domains/queryKeys';
+import type { TSubtreeLoadResult } from '@app/Domains/Graph/lib/loadPlan/subtree';
 import type { TAttentionItem } from '@app/Domains/Chat';
 import { useSessionAttention } from '@app/Domains/Chat/Hooks/useSessionAttention';
 import { useRootSessions } from '@app/Domains/Sessions';
@@ -28,8 +29,9 @@ import { WorkspacePage } from '../WorkspacePage';
  *
  *   1. `isError`          → `EmptyScreenError`
  *   2. `isLoading`        → `GraphSkeleton`
- *   3. `nodes.length === 0` → `EmptyState` ("Sin agentes")
- *   4. resto              → `AgentGraph`
+ *   3. `notFound`         → `EmptyState` ("Sesión no encontrada")
+ *   4. `nodes.length === 0` → `EmptyState` ("Sin agentes")
+ *   5. resto              → `AgentGraph`
  *
  * El punto crítico del modelo por fases: `isLoading` refleja **solo** la fase
  * estructural. En cuanto la estructura está disponible (aunque el
@@ -38,8 +40,9 @@ import { WorkspacePage } from '../WorkspacePage';
  *
  * Solo se sustituyen las dependencias pesadas de presentación (React Flow, el
  * inspector y el histórico) y el acceso al SDK. Las consultas reales del grafo
- * (`sessions.list`/`status`/`agents.list`) siguen vivas para que la precedencia
- * se verifique sobre el modelo real, no sobre un doble.
+ * (`graph.for` → `sessions.roots` + `sessions.children`, `status` y
+ * `agents.list`) siguen vivas para que la precedencia se verifique sobre el
+ * modelo real, no sobre un doble.
  */
 
 /**
@@ -106,8 +109,20 @@ vi.mock('@app/Domains/Graph', async () => {
   };
 });
 
-vi.mock('@app/Domains/Sessions', async () => {
+vi.mock('@app/Domains/Sessions', async (importOriginal) => {
   const React = await import('react');
+  // T016/T018: el respaldo del `directory` (`items` → `session.get` → `null`)
+  // vive en `useSessionDirectory`, cuyo contrato propio lo cubre T014. Se
+  // conserva el hook **real** —vía `importOriginal`— para ejercer la cadena
+  // completa desde la página con el SDK bajo control del test. El cast es
+  // necesario porque el hook llega en una ola posterior (T018): hoy es
+  // `undefined` y la página aún no lo consume (T019), de modo que los casos del
+  // respaldo quedan RED por diseño.
+  const actual = await importOriginal<typeof import('@app/Domains/Sessions')>();
+  const sessionDirectory = (
+    actual as { useSessionDirectory?: unknown }
+  ).useSessionDirectory;
+
   return {
     // T073: el rail (real) pasa `attentionByRoot` al listado; se expone para
     // verificar el cableado sin montar las tarjetas (FR-009).
@@ -118,8 +133,12 @@ vi.mock('@app/Domains/Sessions', async () => {
       }),
     SessionListSkeleton: () => null,
     sessionDetailPath: (id: string) => `/sessions/${id}`,
+    // GraphPane navega al listado con la constante real (`/sessions`); el mock
+    // la expone para poder ejercer esa salida sin callejón (review 1, FR-005).
+    SESSIONS_LIST_ROUTE: '/sessions',
     useGetSessionStatus: () => ({ data: {} }),
     useRootSessions: vi.fn(),
+    useSessionDirectory: sessionDirectory,
   };
 });
 
@@ -237,13 +256,20 @@ vi.mock('@app/Domains/Chat/Hooks/useAttentionNotifications', () => ({
 }));
 
 /**
- * SDK bajo control del test: `listSessions` gobierna la fase estructural
- * (éxito → datos, vacío → vacío, rechazo → error, pendiente → carga) y los
- * loaders de contenido permiten completar el enriquecimiento sin red real.
+ * SDK bajo control del test: la fase estructural se gobierna por el cargador
+ * del **subárbol** (`listRootSessions` → raíces, `listChildSessions` → hijas por
+ * padre, `getSession` → respaldo del directorio/ancestros). Éxito → datos,
+ * vacío → vacío, rechazo → error, pendiente → carga; los loaders de contenido
+ * permiten completar el enriquecimiento sin red real.
  */
 const service = vi.hoisted(() => ({
   listProjects: vi.fn(),
   listSessions: vi.fn(),
+  // Respaldo del `directory` (T016/T018): `getSession` resuelve la sesión
+  // individual y `listRootSessions` alimenta el listado de raíces real del hook.
+  listRootSessions: vi.fn(),
+  listChildSessions: vi.fn(),
+  getSession: vi.fn(),
   listAgents: vi.fn(),
   getSessionMessages: vi.fn(),
   getSessionPermissions: vi.fn(),
@@ -292,6 +318,37 @@ const seedStructureCache = (client: QueryClient): void => {
   client.setQueryData(queryKeys.sessions.status(), {});
 };
 
+/** Resultado del cargador tal como lo cachea la fase estructural (`TSubtreeLoadResult`). */
+const subtreeResult = (
+  sessions: SessionInfo[],
+  overrides: Partial<TSubtreeLoadResult> = {},
+): TSubtreeLoadResult => ({
+  sessions,
+  truncated: false,
+  loadedCount: sessions.length,
+  notFound: false,
+  ...overrides,
+});
+
+/**
+ * Siembra el **origen estructural vigente** (contrato de subárbol §3, FR-013):
+ * el árbol de la sesión abierta se cachea bajo `graph.for(directory, sessionId)`
+ * —no bajo el listado global `sessions.list`, que ya no alimenta el grafo— y las
+ * otras dos consultas de la fase (`agents.list`, `status`) quedan resueltas para
+ * que el estado de pantalla dependa solo del subárbol.
+ */
+const seedSubtreeCache = (
+  client: QueryClient,
+  sessions: SessionInfo[],
+): void => {
+  client.setQueryData(
+    queryKeys.graph.for(DIRECTORY, SESSION_ID),
+    subtreeResult(sessions),
+  );
+  client.setQueryData(queryKeys.agents.list(DIRECTORY), []);
+  client.setQueryData(queryKeys.sessions.status(), {});
+};
+
 /**
  * Fija la presentación (desktop/móvil) sembrando el store global que consume
  * `useDevice` (`STORE_KEY.isMobile`). Sin sembrar, `useDevice` arranca en móvil.
@@ -306,6 +363,7 @@ const renderWorkspace = (client: QueryClient) =>
       <MemoryRouter initialEntries={[`/sessions/${SESSION_ID}`]}>
         <Routes>
           <Route path="/sessions/:id" element={<WorkspacePage />} />
+          <Route path="/sessions" element={<div data-testid="sessions-list" />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -321,6 +379,9 @@ beforeEach(() => {
   vi.mocked(useRootSessions).mockReturnValue({
     items: [{ session: sessionInfo, agentName: 'develop' }],
     groups: [],
+    // `useRootSessions` expone el corte del listado (data-model §7); sin él el
+    // resultado del doble no satisface `TRootSessionsResult`.
+    truncated: false,
     isLoading: false,
     isError: false,
     error: null,
@@ -329,6 +390,18 @@ beforeEach(() => {
   attentionNotifications.mockClear();
 
   service.listSessions.mockReset();
+  // Dependencias del respaldo del `directory` (T016/T018): sin proyectos ni
+  // raíces, la única salida del listado es la sesión individual. Se reinician
+  // antes de fijar los valores por defecto para que el historial de llamadas de
+  // cada caso sea limpio (`toHaveBeenCalledWith`).
+  service.listProjects.mockReset();
+  service.listProjects.mockResolvedValue([]);
+  service.listRootSessions.mockReset();
+  service.listRootSessions.mockResolvedValue({ sessions: [], truncated: false });
+  service.listChildSessions.mockReset();
+  service.listChildSessions.mockResolvedValue([]);
+  service.getSession.mockReset();
+  service.getSession.mockResolvedValue(sessionInfo);
   service.listAgents.mockResolvedValue([]);
   service.getSessionMessages.mockResolvedValue([]);
   service.getSessionPermissions.mockResolvedValue([]);
@@ -341,7 +414,9 @@ beforeEach(() => {
 describe('WorkspacePage — orden de estados error→carga→vacío→datos (T035, FR-008)', () => {
   it('1) error: con la estructura fallida muestra el error y ningún otro estado', async () => {
     const client = createClient();
-    service.listSessions.mockRejectedValue(new Error('fallo de red'));
+    // La carga del subárbol arranca por las raíces del proyecto: su rechazo es
+    // el error de la fase estructural (no hay datos en caché).
+    service.listRootSessions.mockRejectedValue(new Error('fallo de red'));
 
     renderWorkspace(client);
 
@@ -356,7 +431,7 @@ describe('WorkspacePage — orden de estados error→carga→vacío→datos (T03
   it('2) carga: mientras la estructura no está disponible muestra el esqueleto, no el vacío', async () => {
     const client = createClient();
     // Nunca resuelve: la fase estructural sigue en curso (`isLoading`).
-    service.listSessions.mockReturnValue(new Promise(() => {}));
+    service.listRootSessions.mockReturnValue(new Promise(() => {}));
 
     renderWorkspace(client);
 
@@ -371,7 +446,8 @@ describe('WorkspacePage — orden de estados error→carga→vacío→datos (T03
 
   it('3) vacío: con la estructura lista pero sin agentes muestra el estado vacío', async () => {
     const client = createClient();
-    service.listSessions.mockResolvedValue([]);
+    // Subárbol cargado y resuelto, pero sin ninguna sesión que pintar.
+    seedSubtreeCache(client, []);
 
     renderWorkspace(client);
 
@@ -385,7 +461,7 @@ describe('WorkspacePage — orden de estados error→carga→vacío→datos (T03
 
   it('4) datos: con la estructura y nodos disponibles muestra el grafo', async () => {
     const client = createClient();
-    service.listSessions.mockResolvedValue([sessionInfo]);
+    seedSubtreeCache(client, [sessionInfo]);
 
     renderWorkspace(client);
 
@@ -399,8 +475,10 @@ describe('WorkspacePage — orden de estados error→carga→vacío→datos (T03
 
   it('prioridad: el error gana a los datos si una recarga falla', async () => {
     const client = createClient();
-    seedStructureCache(client);
-    service.listSessions.mockRejectedValue(new Error('recarga fallida'));
+    seedSubtreeCache(client, [sessionInfo]);
+    // Solo se cachea el subárbol: al reejecutar su cargador, la consulta de
+    // raíces se pide a la red y falla.
+    service.listRootSessions.mockRejectedValue(new Error('recarga fallida'));
 
     renderWorkspace(client);
 
@@ -413,7 +491,7 @@ describe('WorkspacePage — orden de estados error→carga→vacío→datos (T03
     // debe resolver por la primera rama (error), no por la de datos.
     await act(async () => {
       await client.refetchQueries({
-        queryKey: queryKeys.sessions.list(DIRECTORY),
+        queryKey: queryKeys.graph.for(DIRECTORY, SESSION_ID),
       });
     });
 
@@ -425,8 +503,7 @@ describe('WorkspacePage — orden de estados error→carga→vacío→datos (T03
 
   it('modelo en dos fases: la estructura cacheada muestra datos aunque el enriquecimiento siga pending, y no vuelve a carga', async () => {
     const client = createClient();
-    seedStructureCache(client);
-    service.listSessions.mockResolvedValue([sessionInfo]);
+    seedSubtreeCache(client, [sessionInfo]);
 
     renderWorkspace(client);
 
@@ -949,5 +1026,135 @@ describe('WorkspacePage — Escape del composer (T062, chat-panel-contract §5)'
         'data-fullscreen',
       ),
     );
+  });
+});
+
+/**
+ * Respaldo del `directory` (T016, FR-003 · contrato `session-roots` §5/R4): una
+ * sesión que **no** está en el listado de raíces (`items`) no puede quedarse sin
+ * `directory`, porque eso convertía la vista de grafo en un **esqueleto
+ * terminal** (el bug de las raíces fuera de la ventana). La cadena es
+ * `items` → `session.get` → `null`, y el hook que la implementa
+ * (`useSessionDirectory`, T018) tiene su contrato propio cubierto por T014.
+ *
+ * Aquí se conserva el hook **real** con el SDK bajo control del test, de modo
+ * que el caso ejerce la cadena completa **desde la página**: sin la sesión en
+ * `items`, la página consulta la sesión individual, resuelve su `directory` y
+ * termina en datos.
+ */
+describe('WorkspacePage — respaldo del directorio de una sesión fuera del listado (T016, FR-003, R4)', () => {
+  /** Sesión abierta que **no** aparece en el listado de raíces (`items`). */
+  const setEmptyRootItems = (): void => {
+    vi.mocked(useRootSessions).mockReturnValue({
+      items: [],
+      groups: [],
+      truncated: false,
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+  };
+
+  it('resuelve el `directory` con la sesión individual y termina en datos, sin esqueleto terminal', async () => {
+    const client = createClient();
+    setDevice(client, false);
+    setEmptyRootItems();
+
+    renderWorkspace(client);
+
+    // El respaldo consulta la sesión individual (no hay `items` de donde sacar
+    // el `directory`) y la página no queda en carga: pinta datos.
+    await waitFor(() =>
+      expect(service.getSession).toHaveBeenCalledWith(SESSION_ID),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId('graph-skeleton')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sin agentes')).not.toBeInTheDocument();
+    expect(screen.queryByText('Error')).not.toBeInTheDocument();
+
+    // El `directory` resuelto scopea el catálogo del chat de la sesión abierta
+    // (FR-008): confirma que se resolvió de verdad y no solo que hay grafo.
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Chat' }), {
+      button: 0,
+    });
+    const chat = await screen.findByTestId('chat-panel');
+    expect(chat).toHaveAttribute('data-directory', DIRECTORY);
+  });
+
+  it('mientras el respaldo está pendiente la carga es acotada, no terminal', async () => {
+    const client = createClient();
+    setDevice(client, false);
+    setEmptyRootItems();
+
+    // El respaldo no resuelve hasta que el test lo decide: la carga puede ser
+    // acotada, pero nunca terminal (contrato de carga §8: loading → datos).
+    let resolveSession: ((session: SessionInfo) => void) | undefined;
+    service.getSession.mockReturnValue(
+      new Promise<SessionInfo>((resolve) => {
+        resolveSession = resolve;
+      }),
+    );
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('graph-skeleton')).toBeInTheDocument(),
+    );
+
+    await act(async () => {
+      resolveSession?.(sessionInfo);
+      // Deja drenar la resolución de la promesa y el commit de la query.
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId('graph-skeleton')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Extremo a extremo del hallazgo rojo del review 1 (FR-004/FR-005, SC-002): con
+ * un `?id=` **inexistente** el respaldo del `directory` falla (404) y la página
+ * debe salir de la carga hacia "no encontrada" con salida al listado, nunca
+ * quedarse en un esqueleto terminal sin salida. Ninguna unidad probaba antes
+ * esta costura (E1 WorkspacePage ↔ E2 useGraphStructure con sesión inexistente).
+ */
+describe('WorkspacePage — sesión inexistente sale de la carga (review 1, FR-005, SC-002)', () => {
+  it('un id inexistente no se queda cargando y ofrece el listado de sesiones', async () => {
+    const client = createClient();
+    setDevice(client, false);
+    // La sesión abierta no está en el listado de raíces y el respaldo del
+    // `directory` (`getSession`) falla: el `directory` no se resuelve y la
+    // sesión no existe (404).
+    vi.mocked(useRootSessions).mockReturnValue({
+      items: [],
+      groups: [],
+      truncated: false,
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    service.getSession.mockRejectedValue(new Error('404: session not found'));
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', { name: /no encontrada/i }),
+      ).toBeInTheDocument(),
+    );
+    // La carga fue acotada: no queda esqueleto persistente ni estado vacío.
+    expect(screen.queryByTestId('graph-skeleton')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sin agentes')).not.toBeInTheDocument();
+
+    // Ofrece salida: la acción navega al listado de sesiones (`/sessions`).
+    fireEvent.click(
+      screen.getByRole('button', { name: /listado|sesiones/i }),
+    );
+    expect(screen.getByTestId('sessions-list')).toBeInTheDocument();
   });
 });
