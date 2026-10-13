@@ -224,6 +224,24 @@ html {
   animation-delay: 0.3s;
 }
 
+/* Trazo de entrada de la sparkline de contexto (FR-016). El estado base es la
+   línea completa; sin animación —p. ej. con `prefers-reduced-motion`, que
+   neutraliza las animaciones globalmente— la línea queda estática y legible. */
+@keyframes growth-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.growth-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: growth-draw 600ms ease-out forwards;
+}
+
 :focus-visible {
   outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;

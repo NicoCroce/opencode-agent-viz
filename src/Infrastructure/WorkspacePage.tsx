@@ -435,6 +435,7 @@ export const WorkspacePage = () => {
       showReasoning={reasoning.visible}
       onToggleReasoning={reasoning.toggle}
       onOpenHistory={open}
+      onSelectNode={selectNode}
       isResizing={panel.isResizing}
       isFullscreen={panel.isFullscreen}
       onToggleFullscreen={panel.toggleFullscreen}
