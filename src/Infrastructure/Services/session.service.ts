@@ -12,11 +12,36 @@ import type {
 } from '@opencode/client';
 import { opencodeClient } from './client';
 import { collectAllMessages, MESSAGE_PAGE_SIZE } from './lib/messagePagination';
+import {
+  collectAllRootSessions,
+  SESSION_MAX_PAGES,
+  SESSION_PAGE_SIZE,
+  type TRootSessionsResult,
+} from './lib/sessionPagination';
 import { normalizeMessages, type TSessionMessage } from './message.entity';
 
 /** Lecturas scopeadas por sesión del SDK (FR-016). */
 export interface SessionReadService {
   listSessions: (directory?: string) => Promise<SessionInfo[]>;
+  /**
+   * Raíces listables del proyecto (`parentID: null`), paginadas por cursor
+   * (FR-001/FR-002). `truncated` avisa cuando se agotó el techo de páginas y el
+   * conjunto no está completo. `listSessions` se conserva hasta E2 (lo usa el
+   * grafo).
+   */
+  listRootSessions: (directory?: string) => Promise<TRootSessionsResult>;
+  /**
+   * Hijas directas de una sesión, paginadas por cursor (FR-013). Alimenta el BFS
+   * del subárbol (`loadSubtree`); el tope global de nodos/requests lo aplica el
+   * cargador, no esta lectura.
+   */
+  listChildSessions: (parentID: string) => Promise<SessionInfo[]>;
+  /**
+   * Sesión por id: resuelve el `directory` cuando la raíz quedó fuera de la
+   * ventana de `items` (FR-003). Una sesión inexistente rechaza (no devuelve
+   * `undefined`), así que el consumidor decide entre "no encontrada" y error.
+   */
+  getSession: (id: string) => Promise<SessionInfo>;
   /**
    * V2 eliminó `session.status`. `session.active()` devuelve solo las sesiones
    * en curso como `{ [sessionID]: { type: 'running' } }`; las que no aparecen
@@ -63,6 +88,31 @@ export const sessionReadService: SessionReadService = {
       limit: 200,
     });
     return data;
+  },
+  async listRootSessions(directory) {
+    // El bucle por cursor vive en `lib/sessionPagination.ts` (función pura,
+    // testeable en aislamiento); aquí solo se inyecta el singleton.
+    return collectAllRootSessions(opencodeClient, directory);
+  },
+  async listChildSessions(parentID) {
+    // Mismo patrón de cursor que las raíces/mensajes: V2 capa `limit` en 200 y
+    // rechaza `cursor` + `order`, así que `order` solo viaja en la 1ª página.
+    const sessions: SessionInfo[] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < SESSION_MAX_PAGES; page += 1) {
+      const { data, cursor: next } = await opencodeClient.session.list({
+        parentID,
+        limit: SESSION_PAGE_SIZE,
+        ...(cursor === undefined ? { order: 'desc' as const } : { cursor }),
+      });
+      sessions.push(...data);
+      if (!next.next) break;
+      cursor = next.next;
+    }
+    return sessions;
+  },
+  async getSession(id) {
+    return opencodeClient.session.get({ sessionID: id });
   },
   async getActiveSessions() {
     const active = await opencodeClient.session.active();

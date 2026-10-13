@@ -1,5 +1,5 @@
 export * from './useNow';
 export * from './useRootSessions';
-export * from './useSelectSession';
+export * from './useSessionDirectory';
 export * from './useSessionFilters';
 export * from './useSessionNodeStatus';

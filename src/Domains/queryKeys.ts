@@ -52,6 +52,24 @@ export const queryKeys = {
     context: (id: string) => [...queryKeys.sessions.all, 'context', id],
     // Log durable de la sesión (siembra de señales, `follow: false`).
     log: (id: string) => [...queryKeys.sessions.all, 'log', id],
+    // Raíces del proyecto: `session.list({ directory, parentID: null })`. Se
+    // scopea por `directory` (como `list`) porque el endpoint se filtra por él,
+    // y `staleTime: Infinity` NO impide que la invalidación por prefijo de
+    // `sessions.all` (8 tipos de evento) alcance esta clave.
+    roots: (directory: string) => [
+      ...queryKeys.sessions.all,
+      directory,
+      'roots',
+    ],
+    // Hijos directos de una sesión, cacheados por padre para el BFS de árbol.
+    children: (parentID: string) => [
+      ...queryKeys.sessions.all,
+      'children',
+      parentID,
+    ],
+    // Respaldo del `directory` de una sesión (`session.get`), indexado por id
+    // porque los eventos no siempre exponen el `directory`.
+    directory: (id: string) => [...queryKeys.sessions.all, 'directory', id],
   },
   // Buffer de streaming del chat interactivo. Clave **raíz**, deliberadamente
   // FUERA de `['sessions']`: así la invalidación por prefijo de `sessions.all`

@@ -23,14 +23,16 @@ import { buildSession } from '../../specs/fixtures';
  * estado vacío de filtros accionable (FR-011, SC-005).
  *
  * Bloques posteriores amplían el mismo fichero: el cableado del rango y la
- * recomposición en vivo (T020), la restauración/degradación desde la URL (T026)
- * y el ida-y-vuelta al detalle (T033).
+ * recomposición en vivo (T020), la restauración/degradación desde la URL (T026),
+ * el ida-y-vuelta al detalle (T033) y la regresión directa del defecto de origen
+ * —todas las raíces con volumen alto— (T009, `session-roots-contract.md` §6 R3).
  */
 
 vi.mock('@app/Infrastructure/Services/opencodeClient', () => ({
   opencodeService: {
     listProjects: vi.fn(),
     listSessions: vi.fn(),
+    listRootSessions: vi.fn(),
   },
 }));
 
@@ -41,6 +43,7 @@ const DAY_MS = 86_400_000;
 
 const listProjects = vi.mocked(opencodeService.listProjects);
 const listSessions = vi.mocked(opencodeService.listSessions);
+const listRootSessions = vi.mocked(opencodeService.listRootSessions);
 
 const buildProject = (canonical: string): Project => ({
   id: canonical,
@@ -54,10 +57,34 @@ const mockProjects = (...canonicals: string[]): void => {
   listProjects.mockResolvedValue(canonicals.map(buildProject));
 };
 
-/** Sesiones por directorio, tal como las devuelve el endpoint scopeado. */
+/** Ventana que el endpoint scopeado devuelve por request (límite de V2). */
+const LEGACY_WINDOW = 200;
+
+/**
+ * Sesiones por directorio: la lista cruda (raíces + hijas) que alberga el
+ * proyecto. De ahí se emulan las **dos** lecturas del servidor:
+ *
+ * - `listSessions` (legado): la ventana de las 200 sesiones más recientes, sin
+ *   distinguir raíces de hijas. Es el origen del defecto: las hijas de subagente
+ *   son la amplia mayoría y desplazan a las raíces antiguas fuera de la ventana.
+ * - `listRootSessions` (FR-001): las raíces del directorio (`parentID: null`),
+ *   paginadas por cursor, ya sin la ventana de 200.
+ */
 const mockSessions = (byDirectory: Record<string, SessionInfo[]>): void => {
   listSessions.mockImplementation((directory) =>
-    Promise.resolve(byDirectory[directory ?? ''] ?? []),
+    Promise.resolve(
+      [...(byDirectory[directory ?? ''] ?? [])]
+        .sort((a, b) => b.time.updated - a.time.updated)
+        .slice(0, LEGACY_WINDOW),
+    ),
+  );
+  listRootSessions.mockImplementation((directory) =>
+    Promise.resolve({
+      sessions: (byDirectory[directory ?? ''] ?? []).filter(
+        (s) => s.parentID === undefined,
+      ),
+      truncated: false,
+    }),
   );
 };
 
@@ -465,5 +492,65 @@ describe('SessionListPage — ida y vuelta al detalle (FR-026, SC-003, T033)', (
     ).toHaveTextContent('Últimas 24 horas');
     expect(screen.getByText('session a-recent')).toBeInTheDocument();
     expect(screen.queryByText('session b-recent')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Regresión directa del defecto de origen (US1 esc. 1 y 2, SC-001, R3 del
+ * contrato de raíces).
+ *
+ * Con un proyecto donde las hijas de subagente dominan la actividad reciente, la
+ * ventana de 200 sesiones del listado legado dejaba fuera a casi todas las
+ * raíces: el listado se componía de una ventana reciente, no de las raíces.
+ * Aquí se emula ese bosque (50 raíces y 210 hijas ≠ 260 sesiones) y se exige que
+ * el listado muestre **todas** las raíces y **ninguna** hija.
+ */
+describe('SessionListPage — todas las raíces con volumen alto (FR-001, SC-001, T009)', () => {
+  /** Raíces listables del proyecto: solo 3 tienen actividad reciente. */
+  const ROOT_COUNT = 50;
+  /** Hijas de subagente: mucho más numerosas y más recientes que casi todas las raíces. */
+  const CHILD_COUNT = 210;
+  const NOW = Date.now();
+
+  /**
+   * Bosque del proyecto: 50 raíces (3 recientes, 47 anteriores a todas las
+   * hijas) y 210 hijas. El total (260) supera la ventana de 200, de modo que la
+   * lectura legada solo alcanza 3 raíces y las otras 47 quedan inalcanzables.
+   */
+  const highVolumeProject = (): SessionInfo[] => {
+    const roots = Array.from({ length: ROOT_COUNT }, (_, index) =>
+      session(
+        `root-${index}`,
+        PROJ_A,
+        index < 3 ? NOW - (index + 1) : NOW - 10_000 - index,
+      ),
+    );
+    const children = Array.from({ length: CHILD_COUNT }, (_, index) =>
+      buildSession({
+        id: `child-${index}`,
+        directory: PROJ_A,
+        title: `session child-${index}`,
+        updated: NOW - 1_000 - index,
+        parentID: `root-${index % ROOT_COUNT}`,
+      }),
+    );
+    return [...roots, ...children];
+  };
+
+  it('lists every root and no child when children crowd the recent window', async () => {
+    mockProjects(PROJ_A);
+    mockSessions({ [PROJ_A]: highVolumeProject() });
+
+    renderWithProviders(<SessionListPage />, { initialEntries: ['/sessions'] });
+
+    // Una raíz antigua: la que la ventana de 200 desplazaba fuera del listado,
+    // y que ahora debe seguir siendo alcanzable (US1 esc. 2).
+    expect(await screen.findByText('session root-49')).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('button', { name: /session root-\d+/ }),
+    ).toHaveLength(ROOT_COUNT);
+    expect(
+      screen.queryByRole('button', { name: /session child-/ }),
+    ).not.toBeInTheDocument();
   });
 });
