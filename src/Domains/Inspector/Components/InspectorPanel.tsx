@@ -1,15 +1,21 @@
 import { CompactionContext, Container } from '@app/Application/Components';
+import { useAnomalyThreshold } from '@app/Application/Hooks';
 import type { TGraphNode } from '@app/Domains/Graph/Graph.entity';
 import { useControlledReasoning } from '../Hooks/useControlledReasoning';
+import { useContextMetrics } from '../Hooks/useContextMetrics';
 import { useInspectorData } from '../Hooks/useInspectorData';
 import { AdvancedSection } from './AdvancedSection';
 import { AnswersSection } from './AnswersSection';
+import { ContextSection } from './ContextSection';
 import { ErrorsSection } from './ErrorsSection';
 import { FileChanges } from './FileChanges';
 import { InspectorEmptyPrompt } from './InspectorEmptyPrompt';
 import { InspectorIdentity } from './InspectorIdentity';
+import { LatencySection } from './LatencySection';
 import { MetricsSection } from './MetricsSection';
 import { ModelSection } from './ModelSection';
+import { ParallelismSection } from './ParallelismSection';
+import { ParentImpactRow } from './ParentImpactRow';
 import { QuestionsSection } from './QuestionsSection';
 import { ResourceList } from './ResourceList';
 import { SubagentsSection } from './SubagentsSection';
@@ -37,6 +43,12 @@ interface InspectorPanelProps {
    * queda visible pero inerte.
    */
   onOpenHistory?: () => void;
+  /**
+   * Navega a otro nodo del grafo por su id de sesión (FR-014). Lo usa el
+   * apartado "Aporte al padre" para saltar al agente que invocó al nodo
+   * seleccionado. Sin handler, el control queda visible pero inerte.
+   */
+  onNavigateToNode?: (nodeId: string) => void;
 }
 
 /**
@@ -56,6 +68,7 @@ export const InspectorPanel = ({
   showReasoning,
   onToggleReasoning,
   onOpenHistory,
+  onNavigateToNode,
 }: InspectorPanelProps) => {
   // Modo no controlado por defecto (US1); US2 puede imponer la visibilidad
   // compartida con el overlay pasando `showReasoning`/`onToggleReasoning`.
@@ -73,7 +86,15 @@ export const InspectorPanel = ({
     permissions,
     inbox,
     context,
+    isError,
+    isLoading,
   } = useInspectorData(node);
+
+  const contextMetrics = useContextMetrics(node, invokedBy);
+
+  // Umbral de anomalía de latencia (FR-022): preferencia compartida con el
+  // grafo; el control vive en `LatencySection` y lo lee el enriquecimiento.
+  const { threshold, setThreshold } = useAnomalyThreshold();
 
   if (!node) {
     return <InspectorEmptyPrompt />;
@@ -98,6 +119,30 @@ export const InspectorPanel = ({
       {/* Métricas: duración, costo, invocaciones, tokens y aviso de loop (FR-004) */}
       <MetricsSection metrics={metrics} />
 
+      {/* Contexto: composición, ventana/caché y, más adelante, paralelismo y
+          aporte al padre (FR-015..FR-017). La latencia (respuestas y anomalías)
+          vive dentro del desplegable "Avanzado". */}
+      <ContextSection
+        context={contextMetrics.context}
+        tokens={metrics.tokens}
+        compactionEffect={contextMetrics.compactionEffect}
+        isError={isError}
+        isLoading={isLoading}
+      >
+        <ParallelismSection speedup={node.data.speedup ?? null} />
+        <ParentImpactRow
+          impact={contextMetrics.parentImpact}
+          parentTitle={
+            invokedBy
+              ? (invokedBy.data.title ?? invokedBy.data.agentName)
+              : null
+          }
+          onNavigate={onNavigateToNode}
+          isError={contextMetrics.isError}
+          isLoading={contextMetrics.isLoading}
+        />
+      </ContextSection>
+
       {/* Recursos configurados para el agente (FR-005) */}
       <ResourceList resources={resources} />
 
@@ -117,7 +162,8 @@ export const InspectorPanel = ({
       {/*
         Contenido técnico agrupado bajo el desplegable "Avanzado" (FR-010..FR-015),
         colapsado por defecto. Orden interno: Herramientas → Respuestas →
-        Preguntas y permisos → Errores (FR-011).
+        Preguntas y permisos → Errores → Latencia (FR-011; la latencia incluye
+        el listado de respuestas medidas y las anomalías, FR-018..FR-023).
       */}
       <AdvancedSection>
         <ToolHistory tools={tools} />
@@ -148,6 +194,17 @@ export const InspectorPanel = ({
         />
 
         <ErrorsSection errors={errors} />
+
+        {/*
+          Latencia: listado de respuestas medidas (TTFT y total) y anomalías
+          bidireccionales, con la referencia y el control de umbral (FR-018..FR-023).
+          Se coloca dentro de "Avanzado" para no saturar el panel principal.
+        */}
+        <LatencySection
+          latency={contextMetrics.context?.latency ?? null}
+          threshold={threshold}
+          onThresholdChange={setThreshold}
+        />
       </AdvancedSection>
     </Container>
   );

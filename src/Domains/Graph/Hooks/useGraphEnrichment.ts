@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { scheduleIdle } from '@app/Application/Helpers/scheduleIdle';
+import type { TSessionMessage } from '@app/Infrastructure/Services/opencodeClient';
 import { queryKeys } from '../../queryKeys';
 import { useGetSessionStatus } from '../../Sessions/Sessions.service';
 import type { TGraphModel } from '../Graph.entity';
@@ -8,6 +9,8 @@ import { buildEnrichmentPlan } from '../lib/buildEnrichmentPlan';
 import { enrichNodeData, readNodeEnrichmentInput } from '../lib/enrichNodeData';
 import { loadNodeContent } from '../lib/loadNodeContent';
 import { chunkLoadPlan } from '../lib/loadPriority';
+import { DEFAULT_ANOMALY_THRESHOLD } from '../lib/metrics/anomalyThreshold';
+import { deriveLatency, median } from '../lib/metrics/latency';
 
 /**
  * `useGraphEnrichment(ids, structure)` — segunda fase del modelo por fases
@@ -39,6 +42,7 @@ interface TEnrichmentProgress {
 export const useGraphEnrichment = (
   ids: string[],
   structure: TGraphModel,
+  threshold: number = DEFAULT_ANOMALY_THRESHOLD,
 ): TGraphModel => {
   const queryClient = useQueryClient();
   const statusQuery = useGetSessionStatus();
@@ -76,6 +80,33 @@ export const useGraphEnrichment = (
     () => buildEnrichmentPlan(structure, ids, readyIds),
     [structure, ids, readyIds],
   );
+
+  // Mediana de `totalMs` por agente (FR-020): referencia de respaldo para los
+  // nodos con menos de `MIN_SAMPLES` muestras propias. Se calcula sobre los
+  // nodos ya enriquecidos (sus mensajes están en caché) y se memoiza por
+  // identidad de la estructura/ready set; no se recalcula por tick.
+  const agentMedianByAgent = useMemo(() => {
+    const totalsByAgent = new Map<string, number[]>();
+    for (const node of structure.nodes) {
+      if (!readyIds.has(node.id)) continue;
+      const messages =
+        queryClient.getQueryData<TSessionMessage[]>(
+          queryKeys.sessions.messages(node.id),
+        ) ?? [];
+      const agent = node.data.agentName;
+      const totals = totalsByAgent.get(agent) ?? [];
+      for (const sample of deriveLatency(messages).samples) {
+        if (sample.totalMs !== null) totals.push(sample.totalMs);
+      }
+      totalsByAgent.set(agent, totals);
+    }
+
+    const medians: Record<string, number | null> = {};
+    for (const [agent, totals] of totalsByAgent) {
+      medians[agent] = median(totals);
+    }
+    return medians;
+  }, [structure.nodes, readyIds, queryClient]);
 
   // Un turno de idle por lote: carga el primer chunk pendiente, escribe la caché
   // y marca esos ids como procesados. Al reiniciarse el plan (cambia `plan`) el
@@ -121,10 +152,20 @@ export const useGraphEnrichment = (
               ...readNodeEnrichmentInput(queryClient, node.id),
               sessionStatus: statuses[node.id],
               now,
+              threshold,
+              agentMedianMs: agentMedianByAgent[node.data.agentName] ?? null,
             }),
           }
         : node,
     );
     return { nodes, edges: structure.edges };
-  }, [structure, readyIds, statusQuery.data, queryClient, now]);
+  }, [
+    structure,
+    readyIds,
+    statusQuery.data,
+    queryClient,
+    now,
+    threshold,
+    agentMedianByAgent,
+  ]);
 };

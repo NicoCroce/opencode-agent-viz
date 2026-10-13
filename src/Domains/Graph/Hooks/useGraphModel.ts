@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
+import { useAnomalyThreshold } from '@app/Application/Hooks';
 import type {
   TGraphModel,
   TGraphNode,
@@ -12,6 +13,7 @@ import {
 import { assembleStructuralGraph } from '../lib/assembleStructuralGraph';
 import { latestActiveNodeId } from '../lib/activeNode';
 import { deriveEffortByNode } from '../lib/effort/deriveEffort';
+import { deriveSpeedupByNode } from '../lib/metrics/speedup';
 import { sameNode } from '../lib/reconcile/comparators';
 import { isActiveStatus } from '../lib/nodeStatus';
 import { useGraphEnrichment } from './useGraphEnrichment';
@@ -60,6 +62,10 @@ export const useGraphModel = (
 ): UseGraphModelResult => {
   const structure = useGraphStructure(sessionId, directory);
 
+  // Umbral de anomalía de latencia (FR-022): preferencia compartida con el
+  // detalle; al cambiar, el enriquecimiento recalcula `context.latency`.
+  const { threshold } = useAnomalyThreshold();
+
   // Ids del subárbol estructural: la fase de enriquecimiento los consume junto
   // con la topología (`structure.graph`) para planificar la carga por lotes.
   const ids = useMemo(
@@ -67,7 +73,7 @@ export const useGraphModel = (
     [structure.graph.nodes],
   );
 
-  const enriched = useGraphEnrichment(ids, structure.graph);
+  const enriched = useGraphEnrichment(ids, structure.graph, threshold);
 
   // El tick se activa **solo** si hay al menos un nodo activo (FR-006, SC-005):
   // sin actividad, `now` no altera ninguna duración, así que no hay tick ni
@@ -161,21 +167,30 @@ export const useGraphModel = (
       layout.parallelGroups,
     );
 
-    // 3) Se adjunta `effort` conservando el objeto de nodo anterior cuando
-    //    `durationMs` y `effort` (y el resto de datos) no cambiaron; solo se
-    //    reconstruye el nodo que realmente cambió (identidad estable, SC-006).
+    // 2b) Aceleración por nodo (FR-009): solo los nodos que participan de un
+    //     grupo paralelo de 2+ agentes reciben entrada; se lee el reloj vivo para
+    //     los grupos aún provisionales, igual que el esfuerzo.
+    const speedupByNode = deriveSpeedupByNode(
+      { nodes: tickedNodes, edges: positioned.edges },
+      layout.parallelGroups,
+      now,
+    );
+
+    // 3) Se adjunta `effort` y `speedup` conservando el objeto de nodo anterior
+    //    cuando `durationMs`, `effort` y `speedup` (y el resto de datos) no
+    //    cambiaron; solo se reconstruye el nodo que realmente cambió (identidad
+    //    estable, SC-006).
     const previousById = previousNodesRef.current;
     // eslint-disable-next-line react-hooks/refs -- lectura puntual del mapa vigente al derivar
     const nodes = tickedNodes.map((node) => {
       const effort = effortByNode[node.id] ?? null;
+      const speedup = speedupByNode[node.id] ?? null;
       const previous = previousById.get(node.id);
-      if (
-        previous !== undefined &&
-        sameNode(previous, { ...node, data: { ...node.data, effort } })
-      ) {
+      const next = { ...node, data: { ...node.data, effort, speedup } };
+      if (previous !== undefined && sameNode(previous, next)) {
         return previous;
       }
-      return { ...node, data: { ...node.data, effort } };
+      return next;
     });
 
     return { nodes, edges: positioned.edges };

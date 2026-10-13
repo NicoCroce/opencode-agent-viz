@@ -411,4 +411,53 @@ describe('summarizeSession', () => {
     expect(result.metrics.cost).toBeNull();
     expect(result.metrics.tokens).toBeNull();
   });
+
+  it('derives sessionSpeedup from serial time over the union of intervals', () => {
+    const result = summary([
+      node('a', 'succeeded', {
+        durationMs: 3000,
+        startedAt: 1000,
+        endedAt: 4000,
+      }),
+      node('b', 'succeeded', {
+        durationMs: 7000,
+        startedAt: 2000,
+        endedAt: 9000,
+      }),
+    ]);
+
+    expect(result.sessionSpeedup).toEqual({
+      serialMs: 10000,
+      wallMs: 8000,
+      speedup: 1.25,
+    });
+  });
+
+  it('does not double count time shared by overlapping agents', () => {
+    const result = summary([
+      node('a', 'succeeded', {
+        durationMs: 5000,
+        startedAt: 1000,
+        endedAt: 6000,
+      }),
+      node('b', 'succeeded', {
+        durationMs: 5000,
+        startedAt: 2000,
+        endedAt: 7000,
+      }),
+    ]);
+
+    expect(result.sessionSpeedup?.wallMs).toBe(6000);
+    expect(result.sessionSpeedup?.speedup).toBeCloseTo(10000 / 6000, 5);
+  });
+
+  it('returns null sessionSpeedup without nodes', () => {
+    const result = summary([]);
+
+    expect(result.sessionSpeedup).toEqual({
+      serialMs: null,
+      wallMs: null,
+      speedup: null,
+    });
+  });
 });

@@ -4,11 +4,13 @@ import {
   formatDuration,
   formatTimeRange,
   formatTokens,
+  sumNullable,
 } from '@app/Application/Helpers';
 import { formatClock } from '@app/Application/Helpers/format/clock';
 import { UNAVAILABLE_LABEL } from '@app/Application/Helpers/format/constants';
 import { totalTokens } from '@app/Application/Helpers/totalTokens';
 import type {
+  TContextWindow,
   TCurrentTool,
   TGraphNodeData,
   TNodeMetrics,
@@ -17,6 +19,8 @@ import type {
 
 interface AgentNodeFooterProps {
   metrics: TNodeMetrics;
+  /** Ventana de contexto del nodo (FR-011); `null` hasta el enriquecimiento. */
+  contextWindow: TContextWindow | null;
   isRunning: boolean;
   status: TNodeStatus;
   currentTool: TCurrentTool | null;
@@ -30,11 +34,14 @@ interface AgentNodeFooterProps {
  * - **Contexto**: rango horario compacto (`HH:mm → HH:mm`) y, cuando aplica, la
  *   herramienta en curso (FR-018) en la misma línea.
  *
- * El reintento (FR-018) y la interrupción (FR-019) conservan su propia línea en
- * color de estado. Los valores ausentes caen a "no disponible" (edge case).
+ * La línea `contexto: X ↓ · Y ↑` (FR-011) muestra el flujo de entrada (ventana
+ * del nodo) y salida (`output + reasoning`) sin inventar valores: cada extremo
+ * ausente cae a "no disponible". El reintento (FR-018) y la interrupción
+ * (FR-019) conservan su propia línea en color de estado.
  */
 export const AgentNodeFooter = ({
   metrics,
+  contextWindow,
   isRunning,
   status,
   currentTool,
@@ -47,6 +54,15 @@ export const AgentNodeFooter = ({
     isRunning,
   });
   const tokens = totalTokens(metrics.tokens);
+
+  // Flujo de contexto in/out (FR-011): entrada = ventana; salida = output +
+  // reasoning. `null` en un extremo cuando no hay dato (nunca `0` inventado).
+  const inputTokens = contextWindow?.windowTokens ?? null;
+  const outputTokens = sumNullable([
+    metrics.tokens?.output ?? null,
+    metrics.tokens?.reasoning ?? null,
+  ]);
+  const hasContextFlow = inputTokens !== null || outputTokens !== null;
 
   // Reintento (FR-018): número de intento y, si el servidor lo reporta, el
   // momento del próximo. `next` ausente → "no disponible" (edge case).
@@ -102,6 +118,17 @@ export const AgentNodeFooter = ({
           </>
         ) : null}
       </Container>
+
+      {hasContextFlow ? (
+        <span
+          className="min-w-0 truncate font-mono text-[11px] tabular-nums text-muted-foreground"
+          title="Flujo de contexto: entrada ↓ y salida ↑"
+        >
+          {`contexto: ${formatTokens(inputTokens)} ↓ · ${formatTokens(
+            outputTokens,
+          )} ↑`}
+        </span>
+      ) : null}
 
       {retryLabel ? (
         <span

@@ -314,6 +314,121 @@ describe('AgentNode — paralelismo', () => {
   });
 });
 
+describe('AgentNode — aceleración por paralelismo (T024, FR-009)', () => {
+  it('renders the speedup badge next to the parallel indicator', () => {
+    renderAgentNode({
+      data: withData({
+        parallel: { groupId: 'g', size: 3 },
+        speedup: {
+          groupId: 'g',
+          size: 3,
+          serialMs: 240,
+          wallMs: 100,
+          speedup: 2.4,
+          efficiency: 0.8,
+          provisional: false,
+        },
+      }),
+    });
+
+    expect(screen.getByTestId('node-speedup')).toHaveTextContent('×2.4');
+  });
+
+  it('does not render the speedup badge when the node ran alone', () => {
+    renderAgentNode({ data: withData({ speedup: null }) });
+
+    expect(screen.queryByTestId('node-speedup')).not.toBeInTheDocument();
+  });
+});
+
+describe('AgentNode — flujo de contexto in/out (T030, FR-011)', () => {
+  it('pasa la ventana del nodo al pie', () => {
+    renderAgentNode({
+      data: withData({
+        context: {
+          breakdown: {
+            buckets: [],
+            chars: 0,
+            windowTokens: 1000,
+            hasTokens: true,
+          },
+          window: {
+            windowTokens: 1000,
+            cacheRead: 0,
+            cacheWrite: 0,
+            hitRate: null,
+            costPerKToken: null,
+          },
+          latency: null,
+          provisional: false,
+        },
+        metrics: withMetrics({
+          tokens: {
+            input: 900,
+            output: 100,
+            reasoning: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+          },
+        }),
+      }),
+    });
+
+    expect(screen.getByText('contexto: 1.0k ↓ · 100 ↑')).toBeInTheDocument();
+  });
+});
+
+describe('AgentNode — anomalía de latencia (T044, FR-023)', () => {
+  it('muestra la marca textual cuando la última respuesta es anómala', () => {
+    renderAgentNode({
+      data: withData({
+        context: {
+          breakdown: {
+            buckets: [],
+            chars: 0,
+            windowTokens: null,
+            hasTokens: false,
+          },
+          window: {
+            windowTokens: null,
+            cacheRead: null,
+            cacheWrite: null,
+            hitRate: null,
+            costPerKToken: null,
+          },
+          latency: {
+            samples: [{ stepId: 's1', startedAt: 0, ttftMs: 10, totalMs: 100 }],
+            medianMs: 100,
+            reference: 'node',
+            anomalies: [
+              {
+                stepId: 's1',
+                ratio: 3,
+                direction: 'slow',
+                referenceMs: 100,
+                reference: 'node',
+              },
+            ],
+          },
+          provisional: false,
+        },
+      }),
+    });
+
+    expect(
+      screen.getByTestId('node-latency-mark'),
+    ).toHaveAccessibleName('Respuesta lenta');
+  });
+
+  it('no muestra la marca cuando no hay anomalías', () => {
+    renderAgentNode({ data: withData({ context: null }) });
+
+    expect(
+      screen.queryByTestId('node-latency-mark'),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe('AgentNode — medidor de esfuerzo (T017, S9)', () => {
   const effort = (overrides: Partial<TNodeEffort> = {}): TNodeEffort => ({
     level: 3,

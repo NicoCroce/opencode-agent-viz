@@ -4,3 +4,4 @@ export * from './useEscapeKey';
 export * from './useGlobalStore';
 export * from './useURLParams';
 export * from './useReasoningVisibility';
+export * from './useAnomalyThreshold';

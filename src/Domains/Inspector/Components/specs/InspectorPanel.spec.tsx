@@ -218,6 +218,7 @@ describe('InspectorPanel', () => {
     expect(screen.queryByText('Respuestas')).not.toBeInTheDocument();
     expect(screen.queryByText('Preguntas y permisos')).not.toBeInTheDocument();
     expect(screen.queryByText('Errores')).not.toBeInTheDocument();
+    expect(screen.queryByText('Latencia')).not.toBeInTheDocument();
   });
 
   it('reveals Herramientas → Respuestas → Preguntas y permisos → Errores when expanded (FR-011)', async () => {
@@ -324,6 +325,62 @@ describe('InspectorPanel', () => {
     expect(
       screen.getByRole('button', { name: 'Ver histórico completo' }),
     ).toBeInTheDocument();
+  });
+
+  it('moves the latency listing and anomalies inside "Avanzado" (FR-018..FR-023)', async () => {
+    const user = userEvent.setup();
+    const withLatency: TGraphNode = {
+      ...node,
+      data: {
+        ...node.data,
+        context: {
+          breakdown: {
+            buckets: [],
+            chars: 0,
+            windowTokens: null,
+            hasTokens: false,
+          },
+          window: {
+            windowTokens: null,
+            cacheRead: null,
+            cacheWrite: null,
+            hitRate: null,
+            costPerKToken: null,
+          },
+          latency: {
+            samples: [
+              { stepId: 's1', startedAt: 1000, ttftMs: 120, totalMs: 800 },
+            ],
+            medianMs: 500,
+            reference: 'node',
+            anomalies: [
+              {
+                stepId: 's1',
+                ratio: 1.6,
+                direction: 'slow',
+                referenceMs: 500,
+                reference: 'node',
+              },
+            ],
+          },
+          provisional: false,
+        },
+      },
+    };
+
+    renderWithProviders(<InspectorPanel node={withLatency} />);
+
+    // Colapsado: ni el listado de respuestas medidas ni las anomalías se montan.
+    expect(screen.queryByText('Latencia')).not.toBeInTheDocument();
+    expect(screen.queryByText('Anomalías')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Avanzado' }));
+
+    const latency = screen.getByTestId('latency-section');
+    expect(latency).toHaveTextContent('Latencia');
+    expect(within(latency).getByText('Respuestas')).toBeInTheDocument();
+    expect(within(latency).getByText('Anomalías')).toBeInTheDocument();
+    expect(within(latency).getByText('Umbral de anomalía')).toBeInTheDocument();
   });
 
   // ---------------------------------------------------------------------------

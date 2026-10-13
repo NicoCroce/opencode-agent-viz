@@ -76,6 +76,16 @@ export interface TTaskEntry {
   endedAt?: number;
 }
 
+/**
+ * Aceleración global de la sesión (data-model §4.3; FR-008): suma de duraciones
+ * de todos los agentes frente al tiempo total activo (unión de intervalos).
+ */
+export interface TSessionSpeedup {
+  serialMs: number | null;
+  wallMs: number | null;
+  speedup: number | null;
+}
+
 export interface TSessionSummary {
   rootSessionId: string;
   metrics: TNodeMetrics;
@@ -94,6 +104,11 @@ export interface TSessionSummary {
   loopCount: number;
   agentInvocations: Record<string, number>;
   resourceUsage: TResourceUsage;
+  /**
+   * Aceleración global de la sesión (FR-008). Opcional para permitir que la
+   * feature se entregue de forma incremental; `summarizeSession` la puebla.
+   */
+  sessionSpeedup?: TSessionSpeedup | null;
   /**
    * Tiempo transcurrido de la sesión: `max(endedAt) - min(startedAt)`; si la
    * sesión sigue activa, `now - min(startedAt)`; `null` sin actividad (FR-026).

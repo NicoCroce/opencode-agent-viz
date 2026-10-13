@@ -37,6 +37,12 @@ interface InspectorPaneProps {
   onToggleReasoning: () => void;
   onOpenHistory: (sessionId: string) => void;
   /**
+   * Selecciona otro nodo del grafo por su id de sesión (FR-014). Se reenvía a
+   * `InspectorPanel` para que el apartado "Aporte al padre" navegue al agente
+   * que invocó al nodo inspeccionado.
+   */
+  onSelectNode?: (id: string) => void;
+  /**
    * Estado de arrastre del separador (US5). El ancho lo aplica la columna del
    * layout; aquí solo se refleja el arrastre para estabilizar el contenido
    * (evita selección de texto mientras se redimensiona).
@@ -104,6 +110,7 @@ export const InspectorPane = ({
   showReasoning,
   onToggleReasoning,
   onOpenHistory,
+  onSelectNode,
   isResizing = false,
   isFullscreen = false,
   onToggleFullscreen,
@@ -144,6 +151,7 @@ export const InspectorPane = ({
       showReasoning={showReasoning}
       onToggleReasoning={onToggleReasoning}
       onOpenHistory={handleOpenHistory}
+      onNavigateToNode={onSelectNode}
     />
   );
 

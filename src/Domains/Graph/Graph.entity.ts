@@ -119,6 +119,167 @@ export interface TNodeEffort {
  */
 export type TActivityMap = Record<string, number>;
 
+/**
+ * Categorías de contenido que componen el contexto de un agente (FR-001;
+ * `contracts/context-metrics-contract.md` §1). Cada una agrupa un tipo de parte
+ * de los mensajes; el total se reparte por peso de caracteres (research R2).
+ */
+export type TContextCategory =
+  | 'toolResult'
+  | 'toolInput'
+  | 'reasoning'
+  | 'assistantText'
+  | 'userText';
+
+/** Una categoría del desglose de contexto con su peso y su porción (FR-004). */
+export interface TContextBucket {
+  category: TContextCategory;
+  chars: number;
+  /** Tokens atribuidos; `null` cuando no hay ventana medible (FR-005). */
+  tokens: number | null;
+  /** Porcentaje sobre el total; los buckets suman 100% (FR-002, SC-002). */
+  pct: number;
+}
+
+/** Desglose del contexto de un agente en categorías (FR-001..FR-005). */
+export interface TContextBreakdown {
+  /** Ordenados por `chars` descendente. */
+  buckets: TContextBucket[];
+  chars: number;
+  /** Tokens del último paso (`input + cacheRead + cacheWrite`); research R1. */
+  windowTokens: number | null;
+  hasTokens: boolean;
+}
+
+/** Ventana de contexto y uso de caché de un agente (FR-016). */
+export interface TContextWindow {
+  windowTokens: number | null;
+  cacheRead: number | null;
+  cacheWrite: number | null;
+  /** `cacheRead / (cacheRead + input)`; `null` sin denominador. */
+  hitRate: number | null;
+  /** `cost / (windowTokens / 1000)`; `null` sin datos. */
+  costPerKToken: number | null;
+}
+
+/** Un paso de la evolución del contexto de un agente (FR-016). */
+export interface TContextGrowthPoint {
+  stepId: string;
+  startedAt: number;
+  /** Tokens de la ventana del paso (`input + cache.read + cache.write`). */
+  windowTokens: number;
+}
+
+/** Estado real de un episodio de compactación (FR-016). */
+export type TContextCompactionStatus = 'running' | 'completed' | 'failed';
+
+/** Motivo de un episodio de compactación (FR-016). */
+export type TContextCompactionReason = 'auto' | 'manual';
+
+/** Compactación observada en la sesión del agente (FR-016). */
+export interface TContextCompaction {
+  id: string;
+  /** `SessionMessageCompaction.time.created`. */
+  at: number;
+  status: TContextCompactionStatus;
+  reason: TContextCompactionReason;
+}
+
+/** Efecto de una compactación sobre la ventana de contexto (FR-016). */
+export interface TCompactionEffect {
+  /** Ventana del último paso medido antes de la compactación; `null` si no hay. */
+  before: number | null;
+  /** Ventana del primer paso medido después; `null` si no hay. */
+  after: number | null;
+}
+
+/** Una respuesta del agente medida en el tiempo (FR-018). */
+export interface TLatencySample {
+  stepId: string;
+  startedAt: number;
+  /** Tiempo hasta el primer token (`streamed − created`); `null` sin datos. */
+  ttftMs: number | null;
+  /** Latencia total (`completed − created`); `null` sin datos. */
+  totalMs: number | null;
+}
+
+/** Desviación de una respuesta respecto de su referencia (FR-021). */
+export interface TLatencyAnomaly {
+  stepId: string;
+  ratio: number;
+  /** `slow` = más lenta que la banda; `fast` = más rápida (rapidez anómala). */
+  direction: 'slow' | 'fast';
+  referenceMs: number;
+  reference: 'node' | 'agent';
+}
+
+/** Serie de latencia de un agente con su referencia y anomalías (FR-018..FR-023). */
+export interface TLatencyReport {
+  samples: TLatencySample[];
+  medianMs: number | null;
+  reference: 'node' | 'agent' | null;
+  anomalies: TLatencyAnomaly[];
+}
+
+/**
+ * Agregado de métricas de contexto de un nodo (data-model §3.1). Se puebla en
+ * el enriquecimiento (research R3); `latency` es opcional para que US1/US4
+ * puedan entregar sin ella (research R5/US5).
+ */
+export interface TNodeContextMetrics {
+  breakdown: TContextBreakdown;
+  window: TContextWindow;
+  /** Evolución del contexto por paso (FR-016); `[]` sin pasos medibles. */
+  growth?: TContextGrowthPoint[];
+  /** Compactaciones observadas en la sesión (FR-016); `[]` sin ninguna. */
+  compactions?: TContextCompaction[];
+  latency?: TLatencyReport | null;
+  /** `true` mientras el nodo está activo (los tiempos no están cerrados). */
+  provisional: boolean;
+}
+
+/** Aceleración de un grupo de agentes que corrieron en paralelo (FR-006/FR-007). */
+export interface TGroupSpeedup {
+  groupId: string;
+  size: number;
+  /** Tiempo teórico en serie (`Σ duración`); `null` si falta alguna duración. */
+  serialMs: number | null;
+  /** Tiempo real de pared del grupo (`endedAt − startedAt`). */
+  wallMs: number;
+  /** `serialMs / wallMs`; `null` si `wallMs ≤ 0`. */
+  speedup: number | null;
+  /** `speedup / size`; `null` si `speedup` es `null`. */
+  efficiency: number | null;
+  provisional: boolean;
+}
+
+/** Resumen de aceleración de un nodo para el badge y el detalle (FR-009). */
+export interface TNodeSpeedup {
+  groupId: string;
+  size: number;
+  /** Tiempo teórico en serie del grupo (`Σ duración`); `null` si falta alguna. */
+  serialMs: number | null;
+  /** Tiempo real de pared del grupo (`endedAt − startedAt`). */
+  wallMs: number;
+  speedup: number | null;
+  efficiency: number | null;
+  provisional: boolean;
+}
+
+/**
+ * Aporte del resultado de un nodo hijo al contexto de su agente padre
+ * (data-model §6.1; FR-012/FR-013). Se calcula **bajo demanda** en el hook del
+ * Inspector (research R5), no viaja en el modelo del grafo.
+ */
+export interface TParentImpact {
+  parentId: string;
+  /** Caracteres del resultado del hijo inyectados en el padre. */
+  addedChars: number;
+  addedTokens: number | null;
+  /** Porcentaje que representa sobre el contexto total del padre. */
+  pctOfParent: number | null;
+}
+
 export interface TGraphNodeData extends Record<string, unknown> {
   sessionId: string;
   /** Título de la tarea/sesión; reemplaza al agente en el nodo. */
@@ -163,6 +324,18 @@ export interface TGraphNodeData extends Record<string, unknown> {
    * forzar su inicialización en el modelo estructural.
    */
   effort?: TNodeEffort | null;
+  /**
+   * Métricas de contexto del agente (data-model §3.1; FR-001, FR-015): desglose,
+   * ventana/caché y, cuando US5 la puebla, latencia. `undefined` hasta que el
+   * enriquecimiento la deriva; entra en `sameNodeData` vía `sameContext`.
+   */
+  context?: TNodeContextMetrics | null;
+  /**
+   * Aceleración del grupo de paralelismo del nodo (data-model §4.2; FR-009).
+   * `undefined`/`null` cuando el nodo no corrió en paralelo con hermanos; entra
+   * en `sameNodeData` vía `sameSpeedup`.
+   */
+  speedup?: TNodeSpeedup | null;
   /**
    * Estado de carga del detalle (data-model §2.2). En la fase estructural vale
    * `'pending'`; pasa a `'ready'` cuando el enriquecimiento del nodo fusiona sus

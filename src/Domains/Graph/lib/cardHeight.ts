@@ -44,6 +44,18 @@ const estimatedLines = (
   );
 
 /**
+ * ¿El pie muestra la línea de flujo in/out del contexto (FR-011)? Entrada =
+ * ventana del nodo; salida = `output + reasoning`. Debe coincidir con la
+ * condición de `AgentNodeFooter` para que el alto reserve exactamente la fila
+ * que el pie pinta.
+ */
+export const hasContextFlow = (data: TGraphNodeData): boolean =>
+  (data.context?.window.windowTokens ?? null) !== null ||
+  (data.metrics.tokens !== null &&
+    (data.metrics.tokens.output !== null ||
+      data.metrics.tokens.reasoning !== null));
+
+/**
  * Alto del card de un agente **según su contenido**, sin medir el DOM: estima
  * las líneas del título (clampeado a 2), la línea de modelo (nombre + variante),
  * las del pie (consumo + contexto) y, cuando hay esfuerzo, su banda al pie.
@@ -69,10 +81,14 @@ export const cardHeight = (data: TGraphNodeData, width: number): number => {
     height += MODEL_GAP + modelLines * BODY_LINE;
   }
 
-  // El pie suma el consumo (vitals) y el contexto (hora + herramienta), más una
-  // línea propia cuando hay reintento (FR-018) o motivo de interrupción (FR-019).
+  // El pie suma el consumo (vitals) y el contexto (hora + herramienta), más la
+  // línea de flujo in/out (FR-011) cuando aplica, y una línea propia cuando hay
+  // reintento (FR-018) o motivo de interrupción (FR-019).
   const footerLines =
-    2 + (data.retry ? 1 : 0) + (data.status === 'interrupted' ? 1 : 0);
+    2 +
+    (hasContextFlow(data) ? 1 : 0) +
+    (data.retry ? 1 : 0) +
+    (data.status === 'interrupted' ? 1 : 0);
   height += FOOTER_PAD + footerLines * BODY_LINE + (footerLines - 1) * FOOTER_GAP;
 
   // La banda de esfuerzo se apila al pie, sobre su propio borde superior.
