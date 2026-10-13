@@ -86,6 +86,31 @@ Algunos subagentes usan secciones propias:
   Máx. 12 líneas.
 - `sddorch-reviewer` → `## Revisión` con `APPROVED | REJECTED`.
 
+### Depurar un cuelgue en Vitest
+
+Cuando un spec no falla sino que **no retorna** (CPU al 100 %), no hay ruta
+soportada para romper con un depurador: `--cpu-prof` se rechaza dentro de
+`NODE_OPTIONS` y `--inspect` solo expone el fork de `tinypool`. Receta que
+funciona, siempre sobre un spec acotado:
+
+```bash
+pnpm vitest run <spec> --pool=forks --poolOptions.forks.singleFork --inspect
+```
+
+Con eso, conéctate por CDP al puerto del inspector:
+
+1. `Debugger.pause` para romper el giro y leer la pila real.
+2. `Debugger.setBreakpointByUrl` sobre `scheduleUpdateOnFiber` (React) para ver
+   quién dispara el render, o sobre `QueryCache.notify` para ver qué notificación
+   cierra el ciclo.
+3. Instrumentación temporal con `process.stderr.write('MARK-…')` para acotar el
+   último punto alcanzado; **retírala antes de cerrar** (un spec con `MARK-*` no
+   se acepta).
+
+En un bucle de render la pila suele terminar en una suscripción a la caché de
+TanStack Query (`useCachedQueryData`/`useQuery`) que se despierta también con
+`observerOptionsUpdated`, no solo con cambios de dato.
+
 ## Reglas de alcance (aplican a todo subagente)
 
 1. Hace **solo** lo que pide el prompt; no amplía el alcance.

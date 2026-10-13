@@ -2,7 +2,7 @@
 description: Subagente de implementación de SddOrch. Ejecuta tareas concretas de tasks.md siguiendo `speckit.implement`, escribe solo en los archivos asignados y nunca usa git.
 mode: subagent
 color: "#22c55e"
-steps: 60
+steps: 80
 permissions:
   - action: "*"
     resource: "*"
