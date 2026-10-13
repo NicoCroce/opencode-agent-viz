@@ -74,7 +74,7 @@ Si el prompt trae una unidad en lugar de un `Uxx.md`, no hay `spec.md`, `plan.md
 1. Lee tu `Uxx.md`. **No leas `tasks.md` completo ni `.opencode/commands/speckit.implement.md`**: los prerrequisitos, el gate de checklists y los archivos `ignore` los resuelve el orquestador una sola vez antes de lanzar las tandas. Lo que sí aplica de ese comando a tu unidad: tests antes que el código que cubren cuando tus tareas incluyen ambos; coordinación por archivos (solo tus `writes`); ante un error que no puedas resolver, repórtalo y no sigas ampliando.
 2. Lee de `plan.md`, `data-model.md`, `contracts/` y `research.md` solo las secciones que citan tus tareas, no los documentos enteros.
 3. Implementa respetando la constitución y las convenciones del repo (dominios, tipos `T*` del SDK, acceso a datos solo vía hooks y `*.service.ts`, estados de pantalla, `specs/` junto al código).
-4. Si el archivo que necesitas modificar no está en tus `writes`, no lo toques: repórtalo como bloqueo con la ruta y el motivo.
+4. Si el archivo que necesitas modificar no está en tus `writes`, no lo toques: repórtalo como bloqueo con la ruta y el motivo. Esto incluye los `specs/`: no edites un spec que no esté en tus `writes`, ni siquiera para "ajustar" una aserción.
 5. Verifica solo lo acotado a tus archivos (por ejemplo `pnpm vitest run <spec>` o `pnpm eslint <archivo>`). Las verificaciones globales las hace el orquestador.
 6. No ejecutes instalaciones de dependencias, migraciones ni generadores salvo que tu tarea sea exactamente eso.
 7. Si añades o cambias un campo, tipo, export o archivo que no está en `data-model.md` ni en `contracts/`, anótalo en `cambios_de_contrato` (ver contrato). El orquestador los pasa a `converge`.
@@ -82,3 +82,5 @@ Si el prompt trae una unidad en lugar de un `Uxx.md`, no hay `spec.md`, `plan.md
 ## Salida
 
 Responde con el formato del contrato, **sin preámbulo y dentro del tope**. En `Artefactos` lista cada archivo escrito; el orquestador lo contrasta con tus `writes`.
+
+**Tu último mensaje es SIEMPRE el bloque del contrato, aunque no hayas terminado.** Un cierre sin bloque deja el resultado como `UNVERIFIED` y obliga al orquestador a verificar el árbol a mano. Si te queda poco presupuesto, persiste y cierra con `BLOCKED`.

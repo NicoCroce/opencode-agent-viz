@@ -104,6 +104,10 @@ Some subagents use their own sections:
 8. It does not modify Spec-Kit files.
 9. If it is running out of step budget, it **closes clean**: it persists what it
    has and returns `BLOCKED` with the contract, instead of running out of steps.
+   The **last message is always the contract block**, even if the work is not
+   finished: an empty final response or one without the block leaves the result
+   as `UNVERIFIED` and the orchestrator verifies it by hand (`scope-check.sh
+   check` + the unit's scoped specs) before deciding whether to relaunch it once.
 
 ## Why the contract matters
 
