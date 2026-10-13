@@ -4,7 +4,7 @@
 **Componente orquestador**: `src/Domains/Inspector/Components/InspectorPanel.tsx`
 
 Este contrato fija el comportamiento observable del panel de detalles. Es verificable
-con tests de Testing Library (orden del DOM, `aria-expanded`, contenido montado/desmontado).
+con tests de Testing Library (orden del DOM, contenido montado/desmontado).
 
 ---
 
@@ -20,8 +20,12 @@ Con un nodo seleccionado, el panel se compone **exactamente** en este orden de a
 4. Duración mediana por herramienta                                                [FR-006]
 5. Subagentes        (tareas + agentes en paralelo)                                [FR-007/008]
 6. Archivos                                                                        [FR-009]
-7. Avanzado          (disclosure, colapsado por defecto)                           [FR-010]
+7. Secciones técnicas (tablist al final; ya no hay desplegable "Avanzado")         [FR-010 → 014]
 ```
+
+> **Superseded (`014-inspector-detail-tabs`, FR-010).** El desplegable "Avanzado" (ítem 7) ya no
+> existe. Las secciones técnicas del detalle pasan a un **tablist** al final del detalle; contrato
+> vigente: `specs/014-inspector-detail-tabs/contracts/inspector-section-tabs-contract.md`.
 
 **Invariantes**:
 - La cabecera de identidad (0) nunca forma parte del bloque reordenado y permanece la primera (FR-002).
@@ -30,55 +34,24 @@ Con un nodo seleccionado, el panel se compone **exactamente** en este orden de a
 
 ---
 
-## 2. Desplegable "Avanzado" (FR-010, FR-011, FR-012, SC-002)
+## 2. Desplegable "Avanzado" — SUPERSEDED
 
-### 2.1 Comportamiento
-
-| Aspecto | Contrato |
-|---------|----------|
-| Estado inicial | **Colapsado** por defecto. |
-| Contenido colapsado | Las subsecciones **no se montan** (render condicional); no aparecen en el DOM. |
-| Acción | Un único control explícito (botón) alterna expandir/colapsar. |
-| Contenido expandido | Subsecciones en este orden: Herramientas → Respuestas → Preguntas y permisos → Errores. |
-| Colapsar | El contenido vuelve a desaparecer y el resto del panel no cambia de orden. |
-| Persistencia | El estado se conserva entre cambios de nodo mientras el panel siga montado; se reinicia al abrir la app. |
-
-### 2.2 Accesibilidad
-
-| Requisito | Contrato |
-|-----------|----------|
-| Nombre accesible del control | `Avanzado`. |
-| `aria-expanded` | `false` colapsado; `true` expandido. |
-| `aria-controls` | Referencia al `id` de la región de contenido. |
-| Región | `role="region"` con `aria-label="Avanzado"` (o encabezado asociado) y el `id` referenciado. |
-
-### 2.3 Subsecciones (orden interno fijo, FR-011)
-
-1. **Herramientas** — `ToolHistory` con las ejecuciones y su control "Ver N más". **No** incluye el bloque de mediana (FR-013).
-2. **Respuestas** — `AnswersSection` sin cambios: entradas conversacionales cronológicas, toggle de razonamiento y botón "Ver histórico completo" (FR-014).
-3. **Preguntas y permisos** — `QuestionsSection` sin cambios: permisos, preguntas y turnos en cola (FR-011).
-4. **Errores** — `ErrorsSection`; vacío → `"Sin errores."` (FR-015).
+> **Superseded (`014-inspector-detail-tabs`, FR-010).** El desplegable "Avanzado" ya no existe: su
+> comportamiento (§2.1), su accesibilidad por `aria-expanded`/`aria-controls`/`role="region"` (§2.2)
+> y sus subsecciones (§2.3) quedan sustituidos por el **tablist de secciones técnicas** del detalle.
+> Contrato vigente: `specs/014-inspector-detail-tabs/contracts/inspector-section-tabs-contract.md`.
 
 ---
 
 ## 3. Contratos de componentes nuevos
 
-### 3.1 `AdvancedSection`
+### 3.1 `AdvancedSection` — SUPERSEDED
 
-```ts
-interface AdvancedSectionProps {
-  /** Fuerza el estado inicial/servidor; por defecto no controlado (colapsado). */
-  defaultExpanded?: boolean;  // default: false
-  /** Modo controlado opcional (no usado por defecto en esta feature). */
-  expanded?: boolean;
-  onToggle?: () => void;
-  children: React.ReactNode;  // subsecciones, en el orden fijado por el llamador
-}
-```
-
-- **Puro/controlado opcional**: sin `expanded` gestiona su propio `useState(false)` (R3/R6).
-- No conoce datos del dominio; solo envuelve contenido.
-- Delega en los hijos sus propios estados de error/loading/vacío (no los intercepta).
+> **Superseded (`014-inspector-detail-tabs`, FR-010).** `AdvancedSection` se elimina: el desplegable
+> "Avanzado" y su contrato de props dejan de existir. Las secciones técnicas se montan ahora en un
+> **tablist**; contrato vigente:
+> `specs/014-inspector-detail-tabs/contracts/inspector-section-tabs-contract.md` §3. (`Disclosure` se
+> conserva como pieza compartida.)
 
 ### 3.2 `ToolStats`
 
@@ -154,4 +127,6 @@ Ninguna sección pierde su ciclo **error → loading → vacío → datos**:
 
 - Obtención de datos: `useInspectorData`, `Inspector.service.ts`, SDK, eventos SSE.
 - Tipos del dominio: `Inspector.entity.ts` no gana ni cambia tipos.
-- Cabecera de identidad y sección Archivos: solo cambian de posición, no de contenido.
+- Cabecera de identidad y sección Archivos: la cabecera conserva su contenido; **Archivos** pasa a una
+  **pestaña** del tablist (ya no comparte el scroll del resumen), sin cambios de contenido
+  (`014-inspector-detail-tabs`, FR-010).
