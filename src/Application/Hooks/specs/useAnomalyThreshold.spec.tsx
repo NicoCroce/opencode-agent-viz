@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
@@ -15,6 +15,10 @@ beforeEach(() => {
   queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 const wrapper = ({ children }: { children: ReactNode }) => (
@@ -55,5 +59,23 @@ describe('useAnomalyThreshold · FR-022', () => {
     act(() => first.result.current.setThreshold(0.6));
 
     await waitFor(() => expect(second.result.current.threshold).toBe(0.6));
+  });
+
+  it('lee localStorage una sola vez por montaje', () => {
+    localStorage.setItem(ANOMALY_THRESHOLD_STORAGE_KEY, '0.25');
+    const spy = vi.spyOn(Storage.prototype, 'getItem');
+
+    const { result, rerender } = renderHook(() => useAnomalyThreshold(), {
+      wrapper,
+    });
+    expect(result.current.threshold).toBe(0.25);
+
+    rerender();
+    rerender();
+
+    const reads = spy.mock.calls.filter(
+      ([key]) => key === ANOMALY_THRESHOLD_STORAGE_KEY,
+    );
+    expect(reads).toHaveLength(1);
   });
 });

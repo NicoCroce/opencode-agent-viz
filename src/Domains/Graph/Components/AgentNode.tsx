@@ -3,6 +3,7 @@ import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import { Container } from '@app/Application/Components';
 import { cn } from '@app/Application/lib/utils';
 import type { TGraphNodeData } from '../Graph.entity';
+import { hasContextFlow } from '../lib/cardHeight';
 import { isActiveStatus } from '../lib/nodeStatus';
 import { AgentNodeFooter } from './AgentNodeFooter';
 import { AgentNodeEffortBand } from './AgentNodeEffortBand';
@@ -86,6 +87,7 @@ const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) =>
         <AgentNodeFooter
           metrics={data.metrics}
           contextWindow={data.context?.window ?? null}
+          hasContextFlow={hasContextFlow(data)}
           isRunning={isRunning}
           status={data.status}
           currentTool={data.currentTool}

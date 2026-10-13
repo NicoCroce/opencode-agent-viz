@@ -101,6 +101,53 @@ describe('LatencySection · L9 (FR-019/FR-023)', () => {
     expect(onThresholdChange).toHaveBeenCalledWith(0.6);
   });
 
+  it('amplía el área interactiva del umbral a ≥24 px sin perder etiqueta ni foco (SC-007)', () => {
+    renderSection();
+
+    const slider = screen.getByRole('slider', {
+      name: 'Umbral de anomalía ±40%',
+    });
+
+    // 24 px de alto (objetivo táctil) conservando el control nativo.
+    expect(slider).toHaveClass('h-6');
+    // La etiqueta accesible no cambia y el control sigue enfocable por teclado.
+    expect(slider).toHaveAttribute('aria-label', 'Umbral de anomalía ±40%');
+    slider.focus();
+    expect(slider).toHaveFocus();
+  });
+
+  it('refuerza el contraste del borde de la anomalía lenta a ≥/80 (SC-007)', () => {
+    renderSection();
+
+    expect(
+      screen
+        .getAllByText('Lenta')
+        .some((node) => node.classList.contains('border-status-error/80')),
+    ).toBe(true);
+  });
+
+  it('refuerza el contraste del borde de la anomalía rápida a ≥/80 (SC-007)', () => {
+    renderSection({
+      latency: report({
+        anomalies: [
+          {
+            stepId: 's3',
+            ratio: 0.3,
+            direction: 'fast',
+            referenceMs: 2000,
+            reference: 'agent',
+          },
+        ],
+      }),
+    });
+
+    expect(
+      screen
+        .getAllByText('Rápida')
+        .some((node) => node.classList.contains('border-status-waiting/80')),
+    ).toBe(true);
+  });
+
   it('representa el estado vacío sin inventar valores', () => {
     renderSection({ latency: null });
 

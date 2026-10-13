@@ -45,9 +45,9 @@ const estimatedLines = (
 
 /**
  * ¿El pie muestra la línea de flujo in/out del contexto (FR-011)? Entrada =
- * ventana del nodo; salida = `output + reasoning`. Debe coincidir con la
- * condición de `AgentNodeFooter` para que el alto reserve exactamente la fila
- * que el pie pinta.
+ * ventana del nodo; salida = `output + reasoning`. Es la **fuente única** de la
+ * condición: `AgentNode` la resuelve y se la pasa a `AgentNodeFooter`, de modo
+ * que el alto reserva exactamente la fila que el pie pinta.
  */
 export const hasContextFlow = (data: TGraphNodeData): boolean =>
   (data.context?.window.windowTokens ?? null) !== null ||

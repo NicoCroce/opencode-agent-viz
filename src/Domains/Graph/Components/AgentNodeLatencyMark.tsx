@@ -51,8 +51,8 @@ export const AgentNodeLatencyMark = ({
       className={cn(
         'rounded-flat border px-1 font-mono text-[10px] leading-4',
         slow
-          ? 'border-status-error/60 text-status-error'
-          : 'border-status-waiting/60 text-status-waiting',
+          ? 'border-status-error/80 text-status-error'
+          : 'border-status-waiting/80 text-status-waiting',
       )}
     >
       {slow ? '▲ lenta' : '▼ rápida'}

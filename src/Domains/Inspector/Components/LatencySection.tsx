@@ -99,6 +99,11 @@ export const LatencySection = ({
             Umbral de anomalía
           </label>
           <Container row align="center" space="small">
+            {/*
+              `h-6` (24 px) amplía el área interactiva hasta el objetivo táctil
+              manteniendo la pista nativa (aspecto visual intacto) y la
+              operabilidad por teclado (SC-007).
+            */}
             <input
               id="anomaly-threshold"
               type="range"
@@ -110,7 +115,7 @@ export const LatencySection = ({
                 onThresholdChange(Number(event.target.value) / 100)
               }
               aria-label={`Umbral de anomalía ±${thresholdPct}%`}
-              className="h-1 w-full cursor-pointer accent-primary"
+              className="h-6 w-full cursor-pointer accent-primary"
             />
             <span className="shrink-0 font-mono text-[11px] tabular-nums text-foreground">
               {`±${formatPercent(thresholdPct, 0)}`}
@@ -152,8 +157,8 @@ export const LatencySection = ({
                       className={cn(
                         'rounded-flat border px-1 text-[10px]',
                         anomaly.direction === 'slow'
-                          ? 'border-status-error/60 text-status-error'
-                          : 'border-status-waiting/60 text-status-waiting',
+                          ? 'border-status-error/80 text-status-error'
+                          : 'border-status-waiting/80 text-status-waiting',
                       )}
                     >
                       {DIRECTION_LABEL[anomaly.direction]}

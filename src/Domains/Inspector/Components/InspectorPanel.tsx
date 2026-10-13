@@ -204,6 +204,8 @@ export const InspectorPanel = ({
           latency={contextMetrics.context?.latency ?? null}
           threshold={threshold}
           onThresholdChange={setThreshold}
+          isError={contextMetrics.isError}
+          isLoading={contextMetrics.isLoading}
         />
       </AdvancedSection>
     </Container>

@@ -21,6 +21,12 @@ interface AgentNodeFooterProps {
   metrics: TNodeMetrics;
   /** Ventana de contexto del nodo (FR-011); `null` hasta el enriquecimiento. */
   contextWindow: TContextWindow | null;
+  /**
+   * Condición compartida con `cardHeight` (`lib/cardHeight.ts`): decide si se
+   * pinta (y si el alto reserva) la fila de flujo in/out (FR-011). El pie no la
+   * recalcula; llega ya resuelta desde `AgentNode`.
+   */
+  hasContextFlow: boolean;
   isRunning: boolean;
   status: TNodeStatus;
   currentTool: TCurrentTool | null;
@@ -42,6 +48,7 @@ interface AgentNodeFooterProps {
 export const AgentNodeFooter = ({
   metrics,
   contextWindow,
+  hasContextFlow,
   isRunning,
   status,
   currentTool,
@@ -62,7 +69,6 @@ export const AgentNodeFooter = ({
     metrics.tokens?.output ?? null,
     metrics.tokens?.reasoning ?? null,
   ]);
-  const hasContextFlow = inputTokens !== null || outputTokens !== null;
 
   // Reintento (FR-018): número de intento y, si el servidor lo reporta, el
   // momento del próximo. `next` ausente → "no disponible" (edge case).

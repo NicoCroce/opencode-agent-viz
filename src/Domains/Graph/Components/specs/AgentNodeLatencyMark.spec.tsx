@@ -36,6 +36,7 @@ describe('AgentNodeLatencyMark · L8 (FR-021/FR-023)', () => {
     expect(mark).toHaveTextContent('lenta');
     expect(mark).toHaveAccessibleName('Respuesta lenta');
     expect(mark).toHaveClass('text-status-error');
+    expect(mark).toHaveClass('border-status-error/80');
   });
 
   it('marca la rapidez anómala de la última respuesta (bidireccional)', () => {
@@ -59,6 +60,7 @@ describe('AgentNodeLatencyMark · L8 (FR-021/FR-023)', () => {
     expect(mark).toHaveTextContent('rápida');
     expect(mark).toHaveAccessibleName('Respuesta rápida');
     expect(mark).toHaveClass('text-status-waiting');
+    expect(mark).toHaveClass('border-status-waiting/80');
   });
 
   it('no marca cuando la anomalía es de una respuesta anterior, no la última', () => {

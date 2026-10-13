@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import {
   readStoredThreshold,
   writeStoredThreshold,
@@ -30,7 +30,10 @@ export const useAnomalyThreshold = (): TAnomalyThreshold => {
   );
 
   // Sin valor en el store todavía, la fuente es `localStorage` (o el default).
-  const threshold = data ?? readStoredThreshold();
+  // La lectura inicial se memoiza una sola vez por montaje: en cada render
+  // volver a leer `localStorage` era un efecto secundario innecesario.
+  const [initialThreshold] = useState(readStoredThreshold);
+  const threshold = data ?? initialThreshold;
 
   const setThreshold = useCallback(
     (value: number) => setQueryData(writeStoredThreshold(value)),

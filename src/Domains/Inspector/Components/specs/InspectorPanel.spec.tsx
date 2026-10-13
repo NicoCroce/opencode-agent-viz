@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { SessionMessageAssistant } from '@opencode/client';
 import type { TSessionMessage } from '@app/Infrastructure/Services/opencodeClient';
@@ -381,6 +381,40 @@ describe('InspectorPanel', () => {
     expect(within(latency).getByText('Respuestas')).toBeInTheDocument();
     expect(within(latency).getByText('Anomalías')).toBeInTheDocument();
     expect(within(latency).getByText('Umbral de anomalía')).toBeInTheDocument();
+  });
+
+  it('cablea los estados de carga y error de la latencia desde useContextMetrics (FR-017, SC-007)', async () => {
+    const user = userEvent.setup();
+    const parent = peerNode('parent', 'Padre');
+
+    // Carga: los mensajes del padre (fuente de las métricas de contexto) siguen
+    // pendientes; la sección Latencia no inventa datos ni monta el control.
+    service.getSessionMessages.mockReturnValue(new Promise(() => {}));
+
+    const { unmount } = renderWithProviders(
+      <InspectorPanel node={node} invokedBy={parent} />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Avanzado' }));
+
+    const loadingSection = screen.getByTestId('latency-section');
+    expect(
+      within(loadingSection).queryByText('Sin respuestas medidas'),
+    ).not.toBeInTheDocument();
+    expect(
+      within(loadingSection).queryByText('Umbral de anomalía'),
+    ).not.toBeInTheDocument();
+    unmount();
+
+    // Error: la consulta del padre falla y la sección lo refleja.
+    service.getSessionMessages.mockRejectedValue(new Error('boom'));
+
+    renderWithProviders(<InspectorPanel node={node} invokedBy={parent} />);
+    await user.click(screen.getByRole('button', { name: 'Avanzado' }));
+
+    const errorSection = screen.getByTestId('latency-section');
+    await waitFor(() =>
+      expect(within(errorSection).getByText('Error')).toBeInTheDocument(),
+    );
   });
 
   // ---------------------------------------------------------------------------

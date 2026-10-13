@@ -53,6 +53,7 @@ export const deriveGroupSpeedup = (
 
 export const deriveSpeedupByNode = (
   model: TGraphModel,
+  groups: TParallelGroup[],
   now: number,
 ): Record<string, TNodeSpeedup>;
 ```
