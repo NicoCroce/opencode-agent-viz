@@ -104,6 +104,17 @@ describe('useSessionDirectory — directory con respaldo (FR-003, R3)', () => {
     // El fallo se declara (estados honestos, Principio VI): no se confunde con
     // "aún cargando".
     expect(result.current.isError).toBe(true);
+    expect(result.current.isNotFound).toBe(false);
+  });
+
+  it('flags isNotFound only when the server says the session does not exist', async () => {
+    getSession.mockRejectedValue({ _tag: 'SessionNotFoundError' });
+
+    const { result } = renderDirectory('alpha-missing', []);
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.isError).toBe(true);
+    expect(result.current.isNotFound).toBe(true);
   });
 
   it('short-circuits to null without loading when there is no id', () => {

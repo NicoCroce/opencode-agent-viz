@@ -1138,7 +1138,7 @@ describe('WorkspacePage — sesión inexistente sale de la carga (review 1, FR-0
       isError: false,
       error: null,
     });
-    service.getSession.mockRejectedValue(new Error('404: session not found'));
+    service.getSession.mockRejectedValue({ _tag: 'SessionNotFoundError' });
 
     renderWorkspace(client);
 

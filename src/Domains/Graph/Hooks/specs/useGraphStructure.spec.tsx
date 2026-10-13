@@ -580,6 +580,23 @@ describe('useGraphStructure', () => {
   });
 
   /**
+   * El respaldo del `directory` falló por red/servidor (no por «no existe»):
+   * es un error con reintento, NO «no encontrada» (FR-005 solo para 404 real).
+   */
+  it('declara error, no "no encontrada", cuando el directorio falla por red', async () => {
+    renderStructure(MISSING, null, {
+      isLoading: false,
+      isError: true,
+      isNotFound: false,
+    });
+
+    await waitFor(() => expect(latest?.isLoading).toBe(false));
+
+    expect(latest!.notFound).toBe(false);
+    expect(latest!.isError).toBe(true);
+  });
+
+  /**
    * Fallo de red/servidor al cargar el subárbol: **error con reintento**, no
    * "no encontrada" y nunca un esqueleto terminal (FR-004/SC-002).
    */
