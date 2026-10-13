@@ -22,6 +22,12 @@ interface UseSessionOpenPerfParams {
  * subárbol ya estaba en el caché de consultas (`graph.session.open` si no,
  * `graph.session.revisit` si sí). La medida se registra cuando el grafo tiene
  * nodos, es decir, cuando la estructura está disponible.
+ *
+ * La prueba de "estructura ya cacheada" mira la key nueva del subárbol
+ * (`queryKeys.graph.for(directory, sessionId)`), que es donde
+ * `useGraphStructure` guarda el resultado del cargador desde `011` (contrato de
+ * subárbol §3): la key vieja del listado global (`sessions.list`) ya no se
+ * puebla, por lo que la métrica quedaría fija en `0`.
  */
 export const useSessionOpenPerf = ({
   id,
@@ -39,7 +45,7 @@ export const useSessionOpenPerf = ({
       return;
     }
     const cached =
-      queryClient.getQueryData(queryKeys.sessions.list(directory)) !== undefined;
+      queryClient.getQueryData(queryKeys.graph.for(directory, id)) !== undefined;
     const metric = cached
       ? PERF_METRIC.sessionRevisit
       : PERF_METRIC.sessionOpen;
