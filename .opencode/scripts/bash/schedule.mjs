@@ -19,6 +19,10 @@
 //      y --group-files archivos) para ahorrar ciclos de implementador.
 //   5. Las unidades que tocan SHARED_FILES no se fusionan con otras tareas; instalaciones y tareas sin
 //      rutas inferidas van solas; las olas se parten en --max simultáneas.
+//   6. Notas de coherencia (no bloquean): archivos de código citados en spec.md, plan.md, data-model.md
+//      o contracts/ que no existen aún y ninguna tarea escribe (`sin dueño`), y dependencias escritas en
+//      prosa fuera de la línea de la tarea ("T025 antes de T029", "T029 depende de T025", "T025 → T029"),
+//      que se aplican como aristas explícitas.
 //
 // Salida: tabla corta por stdout + <run-dir>/schedule.json + <run-dir>/units/Uxx.md (uno por unidad,
 // con feature_directory, `## writes` y las líneas de tarea). El orquestador NO lee tasks.md:
@@ -26,6 +30,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 const args = process.argv.slice(2);
 const opt = { max: 10, groupTasks: 3, groupFiles: 4, runDir: null };
@@ -59,6 +64,7 @@ let cur = { idx: 0, name: '(sin fase)', kind: 'story' };
 phases.push(cur);
 let storyDeps = {};
 let inStoryDeps = false;
+const proseLines = [];
 
 const kindOf = (name) =>
   /setup|foundational|blocking/i.test(name) ? 'block' : /polish|cross-cutting|converg|verify|fix/i.test(name) ? 'final' : 'story';
@@ -83,7 +89,10 @@ for (const line of lines) {
     }
   }
   const tm = line.match(taskRe);
-  if (!tm) continue;
+  if (!tm) {
+    if (/\bT\d+\b/.test(line)) proseLines.push({ text: line, section: cur.name });
+    continue;
+  }
   const [, mark, id, tags, desc] = tm;
   all.push({
     id, done: mark !== ' ', parallel: /\[P\]/.test(tags), story: (tags.match(/\[(US\d+)\]/) || [])[1] ?? null,
@@ -121,6 +130,51 @@ for (const t of tasks) {
   for (const m of t.desc.matchAll(/(?:depende(?:n)? de|dep\.|tras|after|depends on|requiere|necesita)\s+((?:T\d+(?:\s*(?:,|y|and|\/|&)\s*)?)+)/gi))
     for (const d of m[1].match(/T\d+/g)) if (d !== t.id && pendingIds.has(d)) t.explicit.add(d);
 }
+
+// Dependencias en prosa (fuera de la línea de la tarea): se aplican como aristas explícitas.
+const proseNotes = [];
+const ids = (s) => s.match(/T\d+/g) ?? [];
+const ID_LIST = '(T\\d+(?:\\s*(?:,|y|and|/|&)\\s*T\\d+)*)';
+function addProseDep(pred, succ, section) {
+  if (pred === succ || !pendingIds.has(pred) || !pendingIds.has(succ)) return;
+  const t = tasks.find((x) => x.id === succ);
+  if (t.explicit.has(pred)) return;
+  t.explicit.add(pred);
+  proseNotes.push(`dependencia en prosa aplicada: ${succ} ← ${pred} (sección «${section}»)`);
+}
+for (const { text, section } of proseLines) {
+  for (const m of text.matchAll(new RegExp(`${ID_LIST}\\s+(?:antes de|before)\\s+${ID_LIST}`, 'gi')))
+    for (const p of ids(m[1])) for (const s of ids(m[2])) addProseDep(p, s, section);
+  for (const m of text.matchAll(new RegExp(`${ID_LIST}\\s+(?:depende(?:n)? de|depends on|tras|after|requiere)\\s+${ID_LIST}`, 'gi')))
+    for (const s of ids(m[1])) for (const p of ids(m[2])) addProseDep(p, s, section);
+  for (const m of text.matchAll(/(T\d+)\s*(?:→|->|⇒)\s*(?=(T\d+))/g)) addProseDep(m[1], m[2], section);
+}
+
+// Archivos de código citados en los documentos de diseño que no existen y ninguna tarea escribe.
+const ownerNotes = [];
+(() => {
+  const docs = ['spec.md', 'plan.md', 'data-model.md'].map((f) => path.join(featureDir, f));
+  const cdir = path.join(featureDir, 'contracts');
+  if (fs.existsSync(cdir)) for (const f of fs.readdirSync(cdir)) if (f.endsWith('.md')) docs.push(path.join(cdir, f));
+  let repoFiles = [];
+  try { repoFiles = execFileSync('git', ['ls-files', '-co', '--exclude-standard'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).split('\n').filter(Boolean); } catch { return; }
+  const allWrites = all.flatMap((t) => extractWrites(t.desc));
+  const codeRe = /^[\w@.\/\-]+\.(?:tsx?|jsx?|mjs)$/;
+  const skipRe = /(^|\/)(node_modules|dist|specs|__fixtures__)\/|\.(spec|test)\.|^@|^\.\.\//;
+  const exists = (tok) => repoFiles.some((f) => f === tok || f.endsWith('/' + tok));
+  const covered = (tok) => allWrites.some((w) => w === tok || w.endsWith('/' + tok) || tok.endsWith('/' + w)
+    || (w.endsWith('/') && tok.includes('/') && ('/' + w).includes('/' + path.posix.dirname(tok) + '/')));
+  const seen = new Set();
+  for (const doc of docs) {
+    if (!fs.existsSync(doc)) continue;
+    for (const m of fs.readFileSync(doc, 'utf8').matchAll(/`([^`\n]+)`/g)) {
+      const tok = m[1].trim().replace(/^\.\//, '');
+      if (!codeRe.test(tok) || skipRe.test(tok) || seen.has(tok)) continue;
+      seen.add(tok);
+      if (!exists(tok) && !covered(tok)) ownerNotes.push(`⚠ sin dueño: ${tok} (citada por ${path.basename(doc)})`);
+    }
+  }
+})();
 
 // ---------- predecesores y niveles ----------
 const warnings = [];
@@ -217,7 +271,7 @@ waves.forEach((w, i) => w.forEach((u) => {
 fs.writeFileSync(path.join(runDir, 'schedule.json'), JSON.stringify({
   feature_directory: featureDir, max: opt.max,
   waves: waves.map((w, i) => ({ wave: i + 1, units: w.map((u) => ({ id: u.id, tasks: u.tasks.map((t) => t.id), writes: [...u.writes], shared: u.shared, solo: u.solo })) })),
-  storyDeps, warnings,
+  storyDeps, warnings, unowned: ownerNotes, proseDeps: proseNotes,
 }, null, 1));
 
 const width = Math.max(...waves.map((w) => w.length));
@@ -232,5 +286,11 @@ if (Object.keys(storyDeps).length) notes.push('historias: ' + Object.entries(sto
 const big = units.filter((u) => u.writes.size > opt.groupFiles).map((u) => u.id);
 if (big.length) notes.push(`unidades con >${opt.groupFiles} archivos (riesgo de corte de pasos): ${big.join(' ')}`);
 notes.push(...warnings);
+const MAX_NOTES = 8;
+if (ownerNotes.length) {
+  notes.push(...ownerNotes.slice(0, MAX_NOTES));
+  if (ownerNotes.length > MAX_NOTES) notes.push(`⚠ sin dueño: +${ownerNotes.length - MAX_NOTES} más (detalle en schedule.json)`);
+}
+notes.push(...proseNotes.slice(0, MAX_NOTES));
 notes.forEach((x) => console.log('· ' + x));
 console.log(`detalle: ${runDir}/units/Uxx.md · ${runDir}/schedule.json`);

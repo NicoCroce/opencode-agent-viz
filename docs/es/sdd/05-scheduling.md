@@ -58,6 +58,23 @@ las tareas estén marcadas `[P]`**.
 - El plan de tandas (cuántos subagentes por tanda) se muestra al usuario y se
   guarda en la memoria del flujo.
 
+## Notas de coherencia de `schedule.mjs`
+
+Además de las olas, el script emite avisos que no bloquean, pero que el
+orquestador resuelve **antes** de lanzar la ola:
+
+- `⚠ sin dueño: <ruta> (citada por <doc>)`: `spec.md`, `plan.md`,
+  `data-model.md` o `contracts/` citan un archivo de código que aún no existe y
+  que ninguna tarea escribe. Se añade a los `writes` de la unidad correcta, se
+  crea una tarea (vuelta a `tasks`) o se descarta si era solo una mención.
+- `dependencia en prosa aplicada: Tyyy ← Txxx`: una dependencia escrita fuera de
+  la línea de la tarea («T025 antes de T029», «T029 depende de T025»,
+  «T025 → T029») se aplica como arista explícita.
+- **Cadena de estado sin dueño** (regla del orquestador, no del script): si
+  `contracts/` declara una cadena que cruza dos unidades, tiene que existir una
+  unidad de integración de extremo a extremo con su spec, caso negativo
+  incluido (dato inexistente / 404). Si falta, se vuelve a `tasks`.
+
 ## Verificación de alcance
 
 Al terminar cada tanda, el orquestador **no confía**: contrasta
@@ -65,6 +82,10 @@ Al terminar cada tanda, el orquestador **no confía**: contrasta
 
 - Si aparece un archivo fuera de lo declarado, la tanda se marca como fallida y
   no se continúa sin resolverlo. En modo Auto, se frena.
+- Con `scope-check.sh check <base.tsv> --per-unit <Uxx.md…>` se añade un informe
+  por unidad: `SIN CAMBIOS` (una unidad no tocó nada de sus `writes`, trabajo
+  omitido en silencio) y `RECLAMADO POR n UNIDADES` (un archivo está en los
+  `writes` de 2+ unidades de la ola; es un error de `schedule`).
 - Solo el orquestador marca `[X]` en `tasks.md` y guarda el estado.
 
 Esta verificación es lo que hace seguro el paralelismo compartido: el contrato

@@ -141,6 +141,24 @@ la compuerta de constitución o en los tests vuelve a costar una reanudación.
 sino por **estado mezclado**: cortarse a mitad de los commits deja un historial
 a medias (el fallo real fue 7/12 commits), y eso es peor que no haber empezado.
 
+### Reincidencia: partir el alcance del researcher
+
+La señal `step-limits` reapareció en los researchers con los 40 pasos ya
+aplicados: el problema no era el techo sino un alcance demasiado grande (plan +
+mapa de tests + dos contratos en una sola investigación). La corrección **no**
+fue subir otra vez `steps`, sino:
+
+- **Un researcher, un artefacto o rol**, con una lista cerrada de archivos o
+  preguntas (si el alcance abarca más, el orquestador lo divide en varios
+  researchers con `topic_key` sufijado, `findings/<rol>-<parte>`).
+- **Guardado incremental:** el researcher guarda un borrador en Engram hacia la
+  mitad de su presupuesto (upsert en la misma `topic_key`); si lo cortan, el
+  informe parcial no se pierde y se reanuda solo para lo que falta.
+- **Mediciones del store de OpenCode** (`~/.local/share/opencode`): los
+  researchers no tienen acceso. El orquestador lanza antes un `general` con
+  `shell`, guarda el resultado en `.opencode/runs/<run>/` y se lo pasa como
+  dato.
+
 ### La otra mitad: cerrar antes del corte
 
 Subir el techo reduce la probabilidad de corte, pero no la elimina. El contrato

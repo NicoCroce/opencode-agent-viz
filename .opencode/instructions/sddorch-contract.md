@@ -54,7 +54,7 @@ resumen: <1-2 líneas>
 
 Tu agente tiene un techo de `steps`. Al agotarlo te quitan las herramientas y ya no puedes guardar ni responder con el formato: el corte es **destructivo**.
 
-1. **Persiste primero** (archivos, Engram) antes de ampliar el alcance.
+1. **Persiste primero** (archivos, Engram) antes de ampliar el alcance. Si eres researcher, guarda un borrador del informe (`mem_save` con tu `topic_key`) hacia la mitad de tu presupuesto y vuelve a guardar (upsert) al terminar.
 2. Si no vas a terminar, **cierra con `BLOCKED`**: lo hecho, lo que falta, qué necesitas.
 3. No estires con workarounds (`sleep`, reintentos a ciegas sobre el mismo error).
 4. Si el techo no alcanza de forma recurrente, repórtalo como `harness_signal` de tipo `agent`.

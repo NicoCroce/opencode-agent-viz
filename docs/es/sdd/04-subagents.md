@@ -32,6 +32,9 @@ El diseño de permisos es una capa de seguridad, no un detalle:
   `glob`, `grep`, consultas `git` y **solo las skills de su rol**. `*.env*` está
   denegado. Acceso web limitado a dominios técnicos (web.dev, owasp.org, MDN,
   W3C, React, Chrome).
+  No accede al store de OpenCode (`~/.local/share/opencode`): lo que haya que
+  medir ahí lo mide el orquestador con un `general` y se lo pasa como archivo.
+  Un researcher cubre un solo artefacto o rol.
 - **`sddorch-researcher-market`** no ve el código: `read` solo sobre `docs/`,
   `specs/`, `AGENTS.md`, `README.md`, constitución y `.opencode/roles/`. Tiene
   web abierta (search + fetch) y solo skills `pm-*`.

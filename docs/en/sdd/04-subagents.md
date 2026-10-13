@@ -31,6 +31,9 @@ The permission design is a security layer, not a detail:
 - **`sddorch-researcher-code`** cannot write files. Only `read`, `glob`, `grep`,
   query `git`, and **only its role's skills**. `*.env*` is denied. Web access is
   limited to technical domains (web.dev, owasp.org, MDN, W3C, React, Chrome).
+  It has no access to the OpenCode store (`~/.local/share/opencode`): whatever
+  must be measured there is measured by the orchestrator with a `general` and
+  handed over as a file. A researcher covers a single artifact or role.
 - **`sddorch-researcher-market`** does not see the code: `read` only over
   `docs/`, `specs/`, `AGENTS.md`, `README.md`, the constitution, and
   `.opencode/roles/`. It has open web (search + fetch) and only `pm-*` skills.

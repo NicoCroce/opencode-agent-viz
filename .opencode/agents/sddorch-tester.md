@@ -53,15 +53,17 @@ Lee antes `.opencode/instructions/sddorch-contract.md`, `AGENTS.md` y carga la s
 El orquestador te da:
 - `feature_directory`;
 - los archivos de producto a cubrir (los `affected_files` de la implementación);
-- los `writes` permitidos: los `specs/` y `__fixtures__/` que puedes crear o ampliar.
+- los `writes` permitidos: los `specs/` y `__fixtures__/` que puedes crear o ampliar;
+- la ruta de `contracts/` (si hay).
 
 ## Procedimiento
 
 1. Decide con el criterio de `test-generator` qué archivos merecen test (lógica pura, hooks, services con reglas; no routers, barrels ni páginas sin lógica).
 2. Mira el spec vecino como canon y añade casos; no sobreescribas specs existentes.
-3. Datos concretos y reales; los eventos del SDK, desde `__fixtures__/`. Nada de `it.todo`, stubs vacíos ni `any`.
-4. Ejecuta solo tus specs: `pnpm vitest run <ruta>`. Corrige hasta que pasen.
-5. Si un test falla porque el **código de producto** es incorrecto, no lo arregles: repórtalo como bloqueo con el archivo y el caso que lo demuestra.
+3. **Caso negativo por contrato.** Por cada cadena de estado o contrato que cruce unidades, cubre también el camino de fallo (dato inexistente / 404, error, vacío) con una verificación de extremo a extremo de esa cadena, no solo de cada mitad por separado.
+4. Datos concretos y reales; los eventos del SDK, desde `__fixtures__/`. Nada de `it.todo`, stubs vacíos ni `any`.
+5. Ejecuta solo tus specs: `pnpm vitest run <ruta>`. Corrige hasta que pasen.
+6. Si un test falla porque el **código de producto** es incorrecto, no lo arregles: repórtalo como bloqueo con el archivo y el caso que lo demuestra.
 
 ## Salida
 
