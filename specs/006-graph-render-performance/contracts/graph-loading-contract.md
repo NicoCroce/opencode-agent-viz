@@ -27,13 +27,15 @@ Internamente se compone de dos hooks (no exportados por el barrel):
 
 ### 1.1 `useGraphStructure(sessionId, directory)`
 
-- **Entradas de red**: **ninguna nueva**. Solo lee consultas ya existentes:
-  - `queryKeys.sessions.list(directory)` (ya cargada por el listado de sesiones),
-  - `queryKeys.sessions.status()` (mapa global sembrado por `EventStreamProvider`),
+- **Entradas de red** *(Actualización 011, FR-013: el subárbol ya no se deriva de la lista global y la fase estructural **sí** abre red —la del cargador—, sustituyendo la redacción original «ninguna entrada de red nueva»)*. Lo que **no** se abre es ninguna consulta de **contenido**; solo se leen **consultas estructurales de sesiones** y consultas ya existentes:
+  - **Consultas estructurales de sesiones** (nuevas con `011`): el cargador del subárbol de la sesión abierta bajo demanda (`Graph/lib/loadPlan/subtree.ts`), con las raíces de `queryKeys.sessions.roots(directory)` y 1 request por nodo interno vía `queryKeys.sessions.children(parentID)`. Antes: `queryKeys.sessions.list(directory)`.
+  - `queryKeys.sessions.status()` (mapa global sembrado por `EventStreamProvider`).
+  - `queryKeys.sessions.activity()` (marca de actividad en vivo).
   - `queryKeys.agents.list(directory)`.
-- **Salida**: `TGraphModel` con nodos `enrichment: 'pending'` y `data.metrics = EMPTY_METRICS`, más `executionPlan` y layout derivados de `topologySignature`.
+  - **Consultas de contenido** (mensajes, log, permisos, formularios, inbox): **ninguna** en la fase estructural; las abre `useGraphEnrichment` (§1.2).
+- **Salida**: `TGraphModel` con nodos `enrichment: 'pending'` y `data.metrics = EMPTY_METRICS`, más `executionPlan` y layout derivados de `topologySignature`. El cargador declara además su resultado (`TSubtreeLoadResult`: `truncated`/`reason`/`loadedCount` y `notFound`), que el hook expone de forma aditiva a `useGraphModel` (FR-005, FR-006; ver [subtree-structure-contract.md](../../011-fix-session-roots-subtree/contracts/subtree-structure-contract.md) §1).
 - **Estados en la fase de estructura**: solo son **definitivos** los estados derivables de `SessionStatus` (`running`, `retrying`, `created`); `compacting`, `waiting-permission`/`waiting-input` y los terminales (`succeeded`/`failed`/`interrupted`) requieren `compaction`/`outcome` (señal/log), formularios, permisos o `hasActivity` (mensajes) y quedan **provisionales** mientras `enrichment === 'pending'`, fijándose al enriquecer (ver [data-model.md](../data-model.md) §2.2). La paridad (FR-007) se contrasta **solo** con nodos `enrichment === 'ready'`.
-- **Garantía**: disponible en el primer render en que las tres consultas anteriores tienen datos; **no** bloquea en mensajes/log/permisos/formularios/inbox.
+- **Garantía**: disponible en el primer render en que la carga del subárbol y las consultas estructurales anteriores (estado/actividad/agentes) tienen datos; **no** bloquea en mensajes/log/permisos/formularios/inbox.
 
 ### 1.2 `useGraphEnrichment(ids, structure)`
 

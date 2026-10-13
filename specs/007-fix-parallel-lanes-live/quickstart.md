@@ -39,7 +39,7 @@ npm run lint
 **Esperado**: verde. Los specs de esta feature:
 
 - `nodeInterval.spec.ts` (extendido) — `executionInterval` abre activos (`+∞`) y cierra terminados con fin real; `endOf` activo → `now` (E1).
-- `parallelism.spec.ts` (extendido) — activos concurrentes creados con diferencia comparten grupo; secuenciales no; badge = filas (E2, E8).
+- `parallelism.spec.ts` (extendido) — activos concurrentes creados con diferencia comparten grupo; secuenciales no; badge = filas (E2, E8). *(Actualización 011: se añade `invocations.spec.ts` con paso de 2+ invocaciones, sesión reutilizada en dos pasos y caso `background`.)*
 - `executionKey.spec.ts` (nuevo) — cambia con topología y clase/borde de intervalo; estable ante eventos no estructurales (E3).
 - `deriveExecutionLayout.spec.ts` (nuevo) — plan/posiciones/grupos coherentes, sin mutar la entrada (E4).
 - `eventReducer.spec.ts` (extendido) — `reduceActivity` cubre todos los eventos con `sessionID`; `setActivity` monótono (A1, A2).

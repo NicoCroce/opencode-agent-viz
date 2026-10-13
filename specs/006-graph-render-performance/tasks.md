@@ -149,7 +149,7 @@ description: "Task list for feature implementation"
 **Purpose**: Puerta de calidad del repo, no-regresión de alcance y cierre de la línea base antes/después.
 
 - [X] T037 [P] Ejecutar la validación automatizada de `specs/006-graph-render-performance/quickstart.md` §1 (`npx vitest run src/Domains/Graph`, `npx vitest run src/Application/Helpers`, `npm test`, `npm run tsc`, `npm run lint`) y corregir lo que aparezca
-- [X] T038 [P] Verificar que no hay cambios fuera de alcance: sin dependencias nuevas, sin cambios en `src/Infrastructure/Services/opencodeClient.ts`, `src/Infrastructure/EventStreamProvider.tsx`, `src/Domains/Graph/lib/eventReducer.ts`, `src/Domains/queryKeys.ts` ni migración a canvas (R6, R7, Principios I/III/VII)
+- [X] T038 [P] Verificar que no hay cambios fuera de alcance: sin dependencias nuevas, sin cambios en `src/Infrastructure/Services/opencodeClient.ts`, `src/Infrastructure/EventStreamProvider.tsx`, `src/Domains/Graph/lib/eventReducer.ts`, `src/Domains/queryKeys.ts` ni migración a canvas (R6, R7, Principios I/III/VII). *(Histórico: `queryKeys.ts` cambió después, en `011-fix-session-roots-subtree`.)*
 - [ ] T039 Capturar la tabla **antes/después** de SC-001..SC-004 con la muestra y el equipo de referencia (quickstart §5) y adjuntarla al PR
 - [ ] T040 Validar manualmente la paridad (SC-006) y los edge cases sobre la muestra siguiendo `quickstart.md` §3 (US4 + Edge cases)
 
@@ -274,7 +274,7 @@ Task: "deriveMetrics.spec.ts (extender) en src/Domains/Graph/lib/specs/"
 
 - `[P]` = ficheros distintos, sin dependencias de tareas incompletas.
 - `[Story]` mapea cada tarea a su historia para trazabilidad.
-- Sin dependencias nuevas; sin cambios en `opencodeClient.ts`, `EventStreamProvider.tsx`, `eventReducer`, `queryKeys.ts`, layout, resumen ni histórico (R6, R7).
+- Sin dependencias nuevas; sin cambios en `opencodeClient.ts`, `EventStreamProvider.tsx`, `eventReducer`, `queryKeys.ts`, layout, resumen ni histórico (R6, R7). *(Histórico: `queryKeys.ts` **sí** cambió de forma en `011-fix-session-roots-subtree`—`sessions.roots`/`sessions.children`; este bullet describe el alcance de `006` en su momento.)*
 - Los contratos `contracts/graph-render-contract.md` (C1..C6), `contracts/graph-loading-contract.md` (L1..L9) y `contracts/performance-instrumentation-contract.md` (P1..P5) son la fuente de verdad de los criterios de aceptación de cada spec.
 - Los ficheros `buildGraph.spec.ts` (T009/T034) y `useGraphModel.ts`/`AgentGraph.spec.tsx` (T024/T036) se editan en varias fases: ejecutar en el orden de los IDs.
 - Nuevas tareas del pase de análisis (`/speckit.analyze`): T041 (tick del resumen en `WorkspacePage`, hallazgo E1) y T042 (spec de frescura FR-009, hallazgo E2). No se renumeraron tareas.

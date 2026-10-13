@@ -27,6 +27,8 @@ La spec está cerrada con clarificaciones (checklist de requisitos al 100 %): **
 - `executionInterval(node)` (para **solape**) — inicio `startOf`; fin `+∞` si activo, `endOf(node, now)` si terminado; clamp `Math.max(inicio, fin)`.
 - `parallelism.ts` elimina su `intervalOf` privado y consume `executionInterval`/`nodeInterval` (fin del fallback divergente de inicio).
 
+*(Actualización 011.)* Esta decisión conserva su valor como **respaldo estructural**, pero la **unidad de agrupamiento pasa de sesión a invocación**: `deriveInvocations`/`deriveInvocationBatches` (tool parts `subagent`/`task` del padre) alimentan filas y badge; el solape de intervalos de sesión de `deriveSiblingBatches` se mantiene como respaldo cuando el padre aún no tiene mensajes (FR-012). La barra temporal del nodo conserva el intervalo de **sesión**; la paridad exigida es **fila ↔ badge**.
+
 **Rationale**:
 - Tratar el activo como **abierto hasta el presente** es lo que pide el clarify. Para el **solape**, modelar la cota superior como `+∞` es equivalente a evaluar en cualquier `now ≥ max(inicio)`: un nodo terminado solapa a un activo si y solo si su fin es posterior al inicio del activo, que es exactamente la condición con `now` real. Esta equivalencia **elimina el reloj del agrupamiento** (Principio V) y, con él, la sensibilidad al `now` congelado del punto 3.
 - Dos hermanos activos siempre solapan (ambos terminan en `+∞`) → misma fila, sin depender de cuándo se creó cada uno ni de si la marca se refrescó.
@@ -73,7 +75,9 @@ deriveExecutionKey(model): string
 ```
 
 - `finSinReloj(n) = updatedAt ?? metrics.endedAt ?? 0` para nodos terminados (determinístico).
-- El plan (`deriveExecutionLevels`), las posiciones (`layoutExecution`) y los grupos (`deriveParallelGroups` → `toParallelByNode`) se memoizan sobre `deriveExecutionKey(model)`.
+- El plan (`deriveExecutionLevels`), las posiciones (`layoutExecution`) y los grupos (`deriveParallelGroups` → `toParallelByNode`) se memoizan sobre `deriveExecutionKey(model, batches)`.
+
+*(Actualización 011.)* La clave incorpora además la **firma de lotes** (`stepId:parentId:miembros`, R8): con la unidad de agrupamiento en la invocación, llegar los mensajes del padre **solo** cambia los lotes, así que sin esa firma el memo por clave no se invalidaría y el arreglo de las filas sería un no-op silencioso.
 
 **Rationale**:
 - El agrupamiento ahora depende solo de topología + clase de intervalo + bordes reales; la clave cambia **exactamente** cuando eso cambia (un hermano aparece, uno pasa de activo a terminado, o cambia el fin real de un terminado) → FR-003.
@@ -91,9 +95,11 @@ deriveExecutionKey(model): string
 
 **Decision**: Extraer una función pura y componerla donde estén los **estados finales**:
 
-- `lib/execution/deriveExecutionLayout.ts` (puro): `deriveExecutionLayout(model, now) → { graph, plan, parallelGroups, parallelByNode }`, reutilizando `deriveExecutionLevels` + `layoutExecution` + `assembleStructuralGraph` + `deriveParallelGroups` + `toParallelByNode`.
+- `lib/execution/deriveExecutionLayout.ts` (puro): `deriveExecutionLayout(model, now, batches?) → { graph, plan, parallelGroups, parallelByNode }`, reutilizando `deriveExecutionLevels` + `layoutExecution` + `assembleStructuralGraph` + `deriveParallelGroups` + `toParallelByNode`.
 - `useGraphStructure` sigue devolviendo su plan estructural (compatibilidad de su API interna y primera pintura), calculado con la misma lógica (intervalo abierto + clave de ejecución).
-- `useGraphModel` recalcula el plan/paralelismo autoritativo sobre el modelo **enriquecido** (`enriched`, que ya incluye `compacting`/esperas como estados activos definitivos), memoizado por `deriveExecutionKey(enriched)`, y usa `now` vivo (`useNow({ enabled: hasActiveNode })`) leído vía ref para las ventanas de tiempo. Devuelve ese `executionPlan`/`parallelGroups`.
+- `useGraphModel` recalcula el plan/paralelismo autoritativo sobre el modelo **enriquecido** (`enriched`, que ya incluye `compacting`/esperas como estados activos definitivos), memoizado por `deriveExecutionKey(enriched, batches)`, y usa `now` vivo (`useNow({ enabled: hasActiveNode })`) leído vía ref para las ventanas de tiempo. Devuelve ese `executionPlan`/`parallelGroups`.
+
+*(Actualización 011.)* `deriveExecutionLayout(model, now, batches?)` y `deriveExecutionLevels(model, now, batches?)` aceptan los **lotes de invocación** (`TInvocationBatch[]`); la fase de enriquecimiento los expone con `useInvocationBatches(structure)` (memoizada por padre y por identidad de `sessions.messages(id)`, sin consultas nuevas) y `useGraphModel` se los pasa a la clave y al layout. Con lotes vacíos (padre sin mensajes) el comportamiento por solape de sesión queda intacto (FR-012).
 
 **Rationale**:
 - La fase estructural solo conoce `SessionStatus` (`running`/`retrying`/`created`); `compacting`/esperas se fijan en el enriquecimiento (006, data-model §2.2). Para respetar "activo = running/retrying/compacting/esperas" (clarify) el agrupamiento debe ver los estados finales.
