@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { scheduleIdle } from '@app/Application/Helpers/scheduleIdle';
 import type { TSessionMessage } from '@app/Infrastructure/Services/opencodeClient';
 import { queryKeys } from '../../queryKeys';
@@ -7,6 +7,12 @@ import { useGetSessionStatus } from '../../Sessions/Sessions.service';
 import type { TGraphModel } from '../Graph.entity';
 import { buildEnrichmentPlan } from '../lib/buildEnrichmentPlan';
 import { enrichNodeData, readNodeEnrichmentInput } from '../lib/enrichNodeData';
+import {
+  deriveInvocationBatches,
+  deriveInvocations,
+  type TInvocation,
+  type TInvocationBatch,
+} from '../lib/invocations';
 import { loadNodeContent } from '../lib/loadNodeContent';
 import { chunkLoadPlan } from '../lib/loadPriority';
 import { DEFAULT_ANOMALY_THRESHOLD } from '../lib/metrics/anomalyThreshold';
@@ -168,4 +174,82 @@ export const useGraphEnrichment = (
     threshold,
     agentMedianByAgent,
   ]);
+};
+
+/**
+ * Identidad de los mensajes de los padres: la marca de actualización de
+ * `sessions.messages(id)` —la **misma** clave que escribe el enriquecimiento y
+ * que parchea `eventReducer` (L9/R6, FR-009)— por cada padre, en orden estable.
+ * Cambia con cualquier evento en vivo o siembra de contenido, sin abrir ninguna
+ * consulta.
+ */
+const messagesIdentity = (
+  queryClient: QueryClient,
+  parentIds: string[],
+): string =>
+  parentIds
+    .map(
+      (id) =>
+        `${id}:${
+          queryClient.getQueryState(queryKeys.sessions.messages(id))
+            ?.dataUpdatedAt ?? 0
+        }`,
+    )
+    .join('|');
+
+/**
+ * `useInvocationBatches(structure)` — lotes por **invocación** del padre (la
+ * unidad de paralelismo, FR-007 de 011; contrato `invocation-lanes` §1):
+ *
+ * - **Sin consultas nuevas**: lee `sessions.messages(id)` de la caché, la misma
+ *   clave que carga esta fase y que parchea el reducer de eventos (FR-009).
+ * - Solo mira los **padres** (nodos con hijos): son los únicos que emiten
+ *   invocaciones de subagente (Principio VII).
+ * - **Memoizada por `(sessionId, identidad de mensajes)`** (T039): el memo se
+ *   invalida con la marca de cada clave padre, así que al llegar los mensajes
+ *   del padre aparecen los lotes y con ellos cambia la clave de ejecución
+ *   (`deriveExecutionKey`, R8) — sin ese cambio de clave, el arreglo del
+ *   paralelismo sería un no-op silencioso.
+ * - Mientras el padre no tenga mensajes no aporta lotes y manda el respaldo
+ *   estructural por solape de sesión (FR-012).
+ */
+export const useInvocationBatches = (
+  structure: TGraphModel,
+): TInvocationBatch[] => {
+  const queryClient = useQueryClient();
+
+  // Sesiones padre con al menos un hijo en el subárbol, en orden estable.
+  const parentIds = useMemo(() => {
+    const seen = new Set<string>();
+    const ids: string[] = [];
+    for (const edge of structure.edges) {
+      if (seen.has(edge.source)) continue;
+      seen.add(edge.source);
+      ids.push(edge.source);
+    }
+    return ids;
+  }, [structure.edges]);
+
+  const identity = messagesIdentity(queryClient, parentIds);
+
+  return useMemo(
+    // El memo se rige por `identity`, la identidad de los mensajes de los padres
+    // (T039): el cuerpo relee la caché vigente **solo** cuando alguna marca
+    // cambia, de modo que el tick de 1 s no re-deriva invocaciones.
+    // Mismo patrón que el plan por `deriveExecutionKey` en `useGraphModel` (R4/R8).
+    () => {
+      const batches: TInvocationBatch[] = [];
+      for (const id of parentIds) {
+        const messages = queryClient.getQueryData<TSessionMessage[]>(
+          queryKeys.sessions.messages(id),
+        );
+        if (messages === undefined) continue;
+        const invocations: TInvocation[] = deriveInvocations(messages);
+        batches.push(...deriveInvocationBatches(invocations, id));
+      }
+      return batches;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- la clave es la identidad de mensajes (T039)
+    [identity],
+  );
 };

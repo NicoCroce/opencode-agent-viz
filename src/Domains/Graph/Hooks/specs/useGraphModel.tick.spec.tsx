@@ -28,6 +28,11 @@ import { useGraphModel } from '../useGraphModel';
  */
 
 const service = vi.hoisted(() => ({
+  // Origen estructural del subárbol (FR-013): raíces del proyecto, hijas por
+  // padre y sesión por id (respaldo del directorio/ancestros).
+  listRootSessions: vi.fn(),
+  listChildSessions: vi.fn(),
+  getSession: vi.fn(),
   listSessions: vi.fn(),
   listAgents: vi.fn(),
   getSessionMessages: vi.fn(),
@@ -75,8 +80,39 @@ const installGraphClock = (): void => {
   vi.stubGlobal('cancelIdleCallback', (handle: number) => clearTimeout(handle));
 };
 
-/** Resetea los loaders del servicio mock para el subárbol dado. */
+/**
+ * Resetea los loaders del servicio mock para el subárbol dado.
+ *
+ * El origen estructural es el **subárbol** de la sesión abierta (FR-013), no la
+ * ventana global de `sessions.list`: la lista plana se traduce a sus raíces
+ * (`listRootSessions`), a las hijas por padre (`listChildSessions`) y al respaldo
+ * por id (`getSession`). `listSessions` se conserva disponible pero vacío: el
+ * grafo no debe depender de él.
+ */
 const resetServiceMocks = (sessions: SessionInfo[]): void => {
+  const byId: Record<string, SessionInfo> = Object.fromEntries(
+    sessions.map((item) => [item.id, item]),
+  );
+  const childrenOf = (parentID: string): SessionInfo[] =>
+    sessions.filter((item) => item.parentID === parentID);
+
+  service.listRootSessions.mockReset().mockResolvedValue({
+    sessions: sessions.filter((item) => item.parentID === undefined),
+    truncated: false,
+  });
+  service.listChildSessions
+    .mockReset()
+    .mockImplementation((parentID: string) =>
+      Promise.resolve(childrenOf(parentID)),
+    );
+  service.getSession.mockReset().mockImplementation((id: string) => {
+    const found = byId[id];
+    // El servicio propaga el rechazo del SDK; "no encontrada" se decide aguas
+    // arriba (contrato de subárbol §4).
+    return found !== undefined
+      ? Promise.resolve(found)
+      : Promise.reject(new Error(`sesión ${id} inexistente`));
+  });
   service.listSessions.mockReset().mockResolvedValue(sessions);
   service.listAgents.mockReset().mockResolvedValue([]);
   service.getSessionPermissions.mockReset().mockResolvedValue([]);

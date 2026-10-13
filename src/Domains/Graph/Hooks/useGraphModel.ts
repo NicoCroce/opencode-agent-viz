@@ -16,8 +16,8 @@ import { deriveEffortByNode } from '../lib/effort/deriveEffort';
 import { deriveSpeedupByNode } from '../lib/metrics/speedup';
 import { sameNode } from '../lib/reconcile/comparators';
 import { isActiveStatus } from '../lib/nodeStatus';
-import { useGraphEnrichment } from './useGraphEnrichment';
-import { useGraphStructure } from './useGraphStructure';
+import { useGraphEnrichment, useInvocationBatches } from './useGraphEnrichment';
+import { useGraphStructure, type TDirectoryResolution } from './useGraphStructure';
 import { useNow } from './useNow';
 
 /**
@@ -43,6 +43,20 @@ export interface UseGraphModelResult {
   isLoading: boolean;
   isError: boolean;
   error: Error | null;
+  /**
+   * La sesión abierta **no existe** (FR-005): estado "no encontrada",
+   * distinto de error y de "sin agentes" (contrato de subárbol §4). Aditivo
+   * (R6): se propaga tal cual de la fase estructural y `GraphPane` lo sitúa
+   * entre la carga acotada y el vacío.
+   */
+  notFound: boolean;
+  /**
+   * El subárbol se cortó por el presupuesto **global** de nodos (FR-006,
+   * SC-009). Aditivo (R6): se propaga tal cual de la fase estructural para que
+   * `GraphPane` pinte el aviso persistente y no bloqueante, sin romper la forma
+   * pública de `UseGraphModelResult`.
+   */
+  truncated: boolean;
 }
 
 /**
@@ -52,15 +66,25 @@ export interface UseGraphModelResult {
  * (`useGraphEnrichment`: carga progresiva priorizada que completa métricas y
  * marca `enrichment: 'ready'`).
  *
- * Conserva **exactamente** la firma y la forma de `UseGraphModelResult` (L8):
- * `isLoading` sigue indicando que la estructura aún no está disponible y
- * `isError`/`error` siguen viniendo de `sessionsQuery` (FR-002, FR-008).
+ * Conserva la firma y la forma de `UseGraphModelResult` (L8): `isLoading` sigue
+ * indicando que la estructura aún no está disponible y `isError`/`error` siguen
+ * gobernados por la fase estructural (FR-002, FR-008). Las incorporaciones son
+ * **aditivas** (R6): `notFound` (FR-005) y `truncated` (FR-006), propagados tal
+ * cual de la estructura.
+ *
+ * El tercer argumento (`directoryResolution`) es **aditivo y opcional**
+ * (contrato de subárbol §4): `WorkspacePage` propaga el estado de resolución del
+ * `directory` (`useSessionDirectory`) para que la estructura distinga "aún
+ * resolviendo" (esqueleto acotado) de "no resuelto / sesión inexistente"
+ * (`notFound`), sin dejar un esqueleto terminal. Omitirlo mantiene el
+ * comportamiento previo (con `directory` nulo se asume carga en curso).
  */
 export const useGraphModel = (
   sessionId: string | null,
   directory: string | null,
+  directoryResolution?: TDirectoryResolution,
 ): UseGraphModelResult => {
-  const structure = useGraphStructure(sessionId, directory);
+  const structure = useGraphStructure(sessionId, directory, directoryResolution);
 
   // Umbral de anomalía de latencia (FR-022): preferencia compartida con el
   // detalle; al cambiar, el enriquecimiento recalcula `context.latency`.
@@ -74,6 +98,13 @@ export const useGraphModel = (
   );
 
   const enriched = useGraphEnrichment(ids, structure.graph, threshold);
+
+  // Lotes por **invocación** del padre (T039): la unidad de paralelismo (FR-007).
+  // Se derivan de las mismas claves de mensajes que carga el enriquecimiento
+  // (sin consultas nuevas) y son la **fuente única** de filas y badge: el plan y
+  // el paralelismo se derivan juntos en `deriveExecutionLayout(enriched, now,
+  // batches)`, de modo que la paridad fila ↔ badge es estructural (FR-008).
+  const batches = useInvocationBatches(structure.graph);
 
   // El tick se activa **solo** si hay al menos un nodo activo (FR-006, SC-005):
   // sin actividad, `now` no altera ninguna duración, así que no hay tick ni
@@ -101,19 +132,21 @@ export const useGraphModel = (
   });
 
   // Clave de ejecución sobre el modelo **enriquecido**: el agrupamiento no
-  // depende del reloj, solo de la topología y de la clase/borde de intervalo de
-  // cada nodo (FR-008, Principio V).
-  const executionKey = deriveExecutionKey(enriched);
+  // depende del reloj, solo de la topología, de la clase/borde de intervalo de
+  // cada nodo (FR-008, Principio V) y de la **firma de lotes** (R8): al llegar
+  // los mensajes del padre cambian los lotes y el plan se recalcula.
+  const executionKey = deriveExecutionKey(enriched, batches);
 
   // Plan/paralelismo **autoritativo**: derivado de `enriched` (estados finales,
-  // incluidos `compacting`/esperas) con la única lógica pura compartida
-  // (`deriveExecutionLayout`): niveles/tandas, posiciones por carril/columna y
-  // badge `parallel` de la misma lógica de intervalos (FR-010, contract §5).
+  // incluidos `compacting`/esperas) con los lotes por invocación y la única
+  // lógica pura compartida (`deriveExecutionLayout`): niveles/tandas, posiciones
+  // por carril/columna y badge `parallel` de la misma fuente de lotes (FR-010,
+  // contract §5).
   const layout = useMemo(
     () => {
       // eslint-disable-next-line react-hooks/refs -- lectura puntual del reloj vivo al derivar
       const nowAtDerive = nowRef.current;
-      return deriveExecutionLayout(enriched, nowAtDerive);
+      return deriveExecutionLayout(enriched, nowAtDerive, batches);
     },
     // Intencionadamente memoizado por la clave de ejecución, no por `enriched`:
     // los eventos de contenido/estado no estructurales y el tick no recomputan
@@ -226,10 +259,18 @@ export const useGraphModel = (
     executionPlan: layout.plan,
     activeNodeId,
     latestActiveNodeId: latestActiveId,
-    // Mientras no sepamos el directorio del proyecto no podemos cargar nada; el
-    // esqueleto sigue gobernado por la estructura (no por el enriquecimiento).
+    // Mientras el directorio del proyecto se resuelve no podemos cargar el
+    // subárbol: el esqueleto sigue gobernado por la estructura (no por el
+    // enriquecimiento) y es acotado (contrato de subárbol §4, FR-004/SC-002).
     isLoading: structure.isLoading,
     isError: structure.isError,
     error: structure.error,
+    // La sesión inexistente la decide el cargador del subárbol **y** la
+    // resolución del `directory` (FR-005); es aditivo y la estructura ya lo
+    // expone resuelto (`false` si la sesión existe y no hay nodos aún).
+    notFound: structure.notFound,
+    // El corte por presupuesto global también nace en el cargador (FR-006); es
+    // aditivo y la estructura ya lo expone resuelto (`false` si completo).
+    truncated: structure.truncated,
   };
 };

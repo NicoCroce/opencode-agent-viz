@@ -67,6 +67,47 @@ const parallelPair = (): TGraphModel =>
     { a: 'root', b: 'root' },
   );
 
+/** Raíz con cuatro hijas activas: permite dos lotes disjuntos. */
+const twoBatches = (): TGraphModel =>
+  model(
+    [
+      node('root', { isRoot: true, status: 'running' }),
+      node('a', { createdAt: 100, status: 'running' }),
+      node('b', { createdAt: 110, status: 'running' }),
+      node('c', { createdAt: 120, status: 'running' }),
+      node('d', { createdAt: 130, status: 'running' }),
+    ],
+    { a: 'root', b: 'root', c: 'root', d: 'root' },
+  );
+
+/**
+ * Firma de lote de invocación (data-model §5, `TInvocationBatch`): el paso del
+ * padre que originó el lote y las sesiones hijas que invocó. Se declara aquí de
+ * forma **estructural**, sin importar `lib/invocations.ts` (T035), para que este
+ * spec compile y corra mientras ese módulo todavía no existe.
+ */
+interface TBatch {
+  stepId: string;
+  parentId: string;
+  sessionIds: string[];
+}
+
+const batch = (
+  stepId: string,
+  parentId: string,
+  sessionIds: string[],
+): TBatch => ({ stepId, parentId, sessionIds });
+
+/**
+ * La clave se invoca **siempre** con la firma de lotes explícita (aunque sea
+ * vacía): así el spec no depende de que el parámetro tenga valor por defecto.
+ */
+const key = (m: TGraphModel, batches: TBatch[] = []): string =>
+  deriveExecutionKey(m, batches);
+
+/** Un paso del padre con dos hijas invocadas a la vez. */
+const parallelBatch = (): TBatch[] => [batch('msg_1', 'root', ['a', 'b'])];
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -76,8 +117,8 @@ describe('deriveExecutionKey', () => {
     const first = parallelPair();
     const second = parallelPair();
 
-    expect(deriveExecutionKey(first)).toBe(deriveExecutionKey(second));
-    expect(deriveExecutionKey(first)).toBe(deriveExecutionKey(first));
+    expect(key(first)).toBe(key(second));
+    expect(key(first)).toBe(key(first));
   });
 
   it('is independent of the node and edge array order', () => {
@@ -86,7 +127,7 @@ describe('deriveExecutionKey', () => {
     second.nodes = [...second.nodes].reverse();
     second.edges = [...second.edges].reverse();
 
-    expect(deriveExecutionKey(first)).toBe(deriveExecutionKey(second));
+    expect(key(first)).toBe(key(second));
   });
 
   it('changes when a node appears or disappears (topology)', () => {
@@ -95,13 +136,13 @@ describe('deriveExecutionKey', () => {
     extra.nodes.push(node('c', { createdAt: 120, status: 'running' }));
     extra.edges.push({ id: 'root->c', source: 'root', target: 'c', type: 'agent' });
 
-    expect(deriveExecutionKey(base)).not.toBe(deriveExecutionKey(extra));
+    expect(key(base)).not.toBe(key(extra));
 
     const missing = parallelPair();
     missing.nodes = missing.nodes.filter((n) => n.id !== 'b');
     missing.edges = missing.edges.filter((e) => e.target !== 'b');
 
-    expect(deriveExecutionKey(base)).not.toBe(deriveExecutionKey(missing));
+    expect(key(base)).not.toBe(key(missing));
   });
 
   it('changes when a node id changes', () => {
@@ -113,7 +154,7 @@ describe('deriveExecutionKey', () => {
       edge.target === 'a' ? { ...edge, target: 'a2', id: 'root->a2' } : edge,
     );
 
-    expect(deriveExecutionKey(base)).not.toBe(deriveExecutionKey(renamed));
+    expect(key(base)).not.toBe(key(renamed));
   });
 
   it('changes when a node parent changes (topology)', () => {
@@ -123,7 +164,7 @@ describe('deriveExecutionKey', () => {
       edge.target === 'b' ? { ...edge, source: 'a', id: 'a->b' } : edge,
     );
 
-    expect(deriveExecutionKey(base)).not.toBe(deriveExecutionKey(reparented));
+    expect(key(base)).not.toBe(key(reparented));
   });
 
   it('changes when a node start time changes', () => {
@@ -131,7 +172,7 @@ describe('deriveExecutionKey', () => {
     const shifted = parallelPair();
     shifted.nodes[1].data.createdAt = 500;
 
-    expect(deriveExecutionKey(base)).not.toBe(deriveExecutionKey(shifted));
+    expect(key(base)).not.toBe(key(shifted));
   });
 
   it('changes when an active node becomes terminated', () => {
@@ -140,7 +181,7 @@ describe('deriveExecutionKey', () => {
     terminated.nodes[1].data.status = 'succeeded';
     terminated.nodes[1].data.updatedAt = 400;
 
-    expect(deriveExecutionKey(active)).not.toBe(deriveExecutionKey(terminated));
+    expect(key(active)).not.toBe(key(terminated));
   });
 
   it('changes when the real end of a terminated node changes', () => {
@@ -152,7 +193,7 @@ describe('deriveExecutionKey', () => {
     later.nodes[1].data.status = 'succeeded';
     later.nodes[1].data.updatedAt = 900;
 
-    expect(deriveExecutionKey(base)).not.toBe(deriveExecutionKey(later));
+    expect(key(base)).not.toBe(key(later));
   });
 
   it('changes when a terminated node falls back to metrics.endedAt', () => {
@@ -164,8 +205,8 @@ describe('deriveExecutionKey', () => {
     withMetric.nodes[1].data.status = 'succeeded';
     withMetric.nodes[1].data.metrics = metrics({ endedAt: 400 });
 
-    expect(deriveExecutionKey(withUpdated)).not.toBe(
-      deriveExecutionKey(withMetric),
+    expect(key(withUpdated)).not.toBe(
+      key(withMetric),
     );
   });
 
@@ -174,7 +215,7 @@ describe('deriveExecutionKey', () => {
     const fresh = parallelPair();
     fresh.nodes[1].data.updatedAt = 999_999;
 
-    expect(deriveExecutionKey(base)).toBe(deriveExecutionKey(fresh));
+    expect(key(base)).toBe(key(fresh));
   });
 
   it('does not change when an active node switches between active statuses', () => {
@@ -185,9 +226,9 @@ describe('deriveExecutionKey', () => {
     const waiting = parallelPair();
     waiting.nodes[1].data.status = 'waiting-permission';
 
-    const key = deriveExecutionKey(base);
-    expect(deriveExecutionKey(retrying)).toBe(key);
-    expect(deriveExecutionKey(waiting)).toBe(key);
+    const baseline = key(base);
+    expect(key(retrying)).toBe(baseline);
+    expect(key(waiting)).toBe(baseline);
   });
 
   it('does not change when a terminated node switches between terminal statuses with the same end', () => {
@@ -199,10 +240,13 @@ describe('deriveExecutionKey', () => {
     failed.nodes[1].data.status = 'failed';
     failed.nodes[1].data.updatedAt = 400;
 
-    expect(deriveExecutionKey(succeeded)).toBe(deriveExecutionKey(failed));
+    expect(key(succeeded)).toBe(key(failed));
   });
 
   it('does not change on non-structural data (title, tool, position, badge, metrics, enrichment)', () => {
+    // El badge (`parallel`) y `enrichment` son **derivados**, no entradas: un
+    // cambio de badge solo no mueve la clave. Lo que sí la mueve es la **firma
+    // de lotes** que los origina (ver el describe siguiente, FR-008/R8).
     const base = parallelPair();
     const decorated = parallelPair();
 
@@ -220,17 +264,30 @@ describe('deriveExecutionKey', () => {
       loopEvidence: ['loop'],
     });
 
-    expect(deriveExecutionKey(base)).toBe(deriveExecutionKey(decorated));
+    expect(key(base)).toBe(key(decorated));
+  });
+
+  it('does not change when the model is only re-enriched (messages arrive, no new batches)', () => {
+    // Llegan los mensajes del padre (`enrichment: 'pending'` → `'ready'`) sin
+    // lotes nuevos: la clave no se mueve. El recálculo lo dispara la firma de
+    // lotes, no la llegada de datos por sí sola.
+    const pending = parallelPair();
+
+    const ready = parallelPair();
+    ready.nodes[1].data.enrichment = 'ready';
+    ready.nodes[1].data.updatedAt = 999_999;
+
+    expect(key(pending)).toBe(key(ready));
   });
 
   it('does not depend on the wall clock (no Date.now)', () => {
     const base = parallelPair();
 
     vi.spyOn(Date, 'now').mockReturnValue(1_000);
-    const early = deriveExecutionKey(base);
+    const early = key(base);
 
     vi.spyOn(Date, 'now').mockReturnValue(9_999_999);
-    const late = deriveExecutionKey(base);
+    const late = key(base);
 
     expect(early).toBe(late);
   });
@@ -243,8 +300,79 @@ describe('deriveExecutionKey', () => {
       node('a', { createdAt: 100, status: 'succeeded' }),
     ]);
 
-    expect(deriveExecutionKey(active)).not.toBe(
-      deriveExecutionKey(terminated),
+    expect(key(active)).not.toBe(
+      key(terminated),
     );
+  });
+});
+
+describe('deriveExecutionKey · firma de lotes (FR-008, research R8)', () => {
+  it('changes when the invocation batches appear even though the model does not (rows are no longer a no-op)', () => {
+    // El punto exacto que hacía no-op el arreglo del paralelismo: el plan de
+    // filas/columnas y el badge se memoizan por esta clave, y al llegar los
+    // mensajes del padre **solo** cambian los lotes, no la topología.
+    const m = parallelPair();
+
+    expect(key(m)).not.toBe(key(m, parallelBatch()));
+  });
+
+  it('is deterministic for the same model and the same batches', () => {
+    expect(key(parallelPair(), parallelBatch())).toBe(
+      key(parallelPair(), parallelBatch()),
+    );
+  });
+
+  it('changes when the members of a batch change', () => {
+    const m = parallelPair();
+
+    expect(key(m, [batch('msg_1', 'root', ['a', 'b'])])).not.toBe(
+      key(m, [batch('msg_1', 'root', ['a'])]),
+    );
+  });
+
+  it('distinguishes the step that produced the batch even with the same members', () => {
+    // Los ids de los lotes son parte de la firma, no solo sus miembros.
+    const m = parallelPair();
+
+    expect(key(m, [batch('msg_1', 'root', ['a', 'b'])])).not.toBe(
+      key(m, [batch('msg_2', 'root', ['a', 'b'])]),
+    );
+  });
+
+  it('changes when a reused session moves from one step to two', () => {
+    // Una sesión reutilizada aporta varios intervalos: un paso con las dos
+    // hijas frente a dos pasos de una hija cada uno (FR-007).
+    const m = parallelPair();
+
+    expect(key(m, [batch('msg_1', 'root', ['a', 'b'])])).not.toBe(
+      key(m, [batch('msg_1', 'root', ['a']), batch('msg_2', 'root', ['b'])]),
+    );
+  });
+
+  it('changes when a batch appears or disappears', () => {
+    const m = parallelPair();
+
+    expect(key(m, [batch('msg_1', 'root', ['a', 'b'])])).not.toBe(
+      key(m, [batch('msg_1', 'root', ['a', 'b']), batch('msg_2', 'root', ['a'])]),
+    );
+  });
+
+  it('is independent of the batch order and of the member order', () => {
+    const m = twoBatches();
+
+    expect(
+      key(m, [batch('msg_1', 'root', ['a', 'b']), batch('msg_2', 'root', ['c', 'd'])]),
+    ).toBe(
+      key(m, [batch('msg_2', 'root', ['d', 'c']), batch('msg_1', 'root', ['b', 'a'])]),
+    );
+  });
+
+  it('keeps the topology sensitivity with the same batches', () => {
+    const base = parallelPair();
+    const extra = parallelPair();
+    extra.nodes.push(node('c', { createdAt: 120, status: 'running' }));
+    extra.edges.push({ id: 'root->c', source: 'root', target: 'c', type: 'agent' });
+
+    expect(key(base, parallelBatch())).not.toBe(key(extra, parallelBatch()));
   });
 });

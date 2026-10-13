@@ -1,11 +1,23 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { TGraphModel, TGraphNode } from '../../Graph.entity';
 import { deriveExecutionLayout } from '../execution/deriveExecutionLayout';
+import { deriveParallelBatches } from '../parallelism';
 import {
   EXECUTION_ROW_HEIGHT,
   EXECUTION_ROW_PAD,
   executionColumnX,
 } from '../executionLevels';
+
+// Envuelve la fusión real de lotes para poder contar invocaciones: el arreglo de
+// la revisión exige derivar los lotes **una sola vez** por plan (filas y badge de
+// la misma lista), sin reagrupar por solape de hermanos dos veces.
+vi.mock('../parallelism', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../parallelism')>();
+  return {
+    ...actual,
+    deriveParallelBatches: vi.fn(actual.deriveParallelBatches),
+  };
+});
 
 type TNodeOverrides = Omit<Partial<TGraphNode['data']>, 'metrics'> & {
   metrics?: Partial<TGraphNode['data']['metrics']>;
@@ -238,5 +250,23 @@ describe('deriveExecutionLayout', () => {
     expect(graph).toEqual(before);
     expect(layout.graph).not.toBe(graph);
     expect(layout.graph.nodes).not.toBe(graph.nodes);
+  });
+
+  it('fusiona los lotes una sola vez por plan (filas y badge de la misma fuente)', () => {
+    const spy = vi.mocked(deriveParallelBatches);
+    spy.mockClear();
+
+    const { plan, parallelByNode } = deriveExecutionLayout(example(), 1000);
+
+    // Una única fusión alimenta filas (`plan`) y badge (`parallelByNode`): antes
+    // se derivaba dos veces por nodo (`deriveExecutionLevels` y
+    // `deriveParallelGroups`), con el respaldo por solape de hermanos O(n²).
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(plan.levels.map((level) => level.parallel)).toEqual([
+      false,
+      true,
+      true,
+    ]);
+    expect(parallelByNode.B).toEqual({ groupId: 'A#B', size: 2 });
   });
 });
