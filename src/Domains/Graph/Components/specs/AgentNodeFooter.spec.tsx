@@ -25,12 +25,18 @@ const renderFooter = (
   overrides: {
     metrics?: TNodeMetrics;
     contextWindow?: TContextWindow | null;
+    /**
+     * Condición compartida con `cardHeight` (FR-011): el pie no la recalcula,
+     * la recibe resuelta desde `AgentNode` (igual que en producción).
+     */
+    hasContextFlow?: boolean;
   } = {},
 ) =>
   render(
     <AgentNodeFooter
       metrics={overrides.metrics ?? metrics()}
       contextWindow={overrides.contextWindow ?? null}
+      hasContextFlow={overrides.hasContextFlow ?? false}
       isRunning={false}
       status="succeeded"
       currentTool={null}
@@ -42,6 +48,7 @@ const renderFooter = (
 describe('AgentNodeFooter · flujo in/out (S7, FR-011)', () => {
   it('muestra entrada (ventana) y salida (output + reasoning)', () => {
     renderFooter({
+      hasContextFlow: true,
       contextWindow: window({ windowTokens: 1200 }),
       metrics: metrics({
         tokens: {
@@ -59,6 +66,7 @@ describe('AgentNodeFooter · flujo in/out (S7, FR-011)', () => {
 
   it('cae a "no disponible" en el extremo ausente, nunca a cero', () => {
     renderFooter({
+      hasContextFlow: true,
       contextWindow: window({ windowTokens: 800 }),
       metrics: metrics({
         tokens: {
@@ -74,8 +82,46 @@ describe('AgentNodeFooter · flujo in/out (S7, FR-011)', () => {
     expect(screen.getByText('contexto: 800 ↓ · — ↑')).toBeInTheDocument();
   });
 
+  it('muestra la fila cuando solo hay salida (ventana ausente)', () => {
+    renderFooter({
+      hasContextFlow: true,
+      contextWindow: null,
+      metrics: metrics({
+        tokens: {
+          input: 100,
+          output: 200,
+          reasoning: null,
+          cacheRead: 0,
+          cacheWrite: 0,
+        },
+      }),
+    });
+
+    expect(screen.getByText('contexto: — ↓ · 200 ↑')).toBeInTheDocument();
+  });
+
   it('no muestra la línea cuando no hay ventana ni salida', () => {
     renderFooter({ contextWindow: null });
+
+    expect(screen.queryByText(/contexto:/)).not.toBeInTheDocument();
+  });
+
+  it('obedece la condición compartida y no la recalcula localmente', () => {
+    // La condición llega resuelta desde `cardHeight.hasContextFlow` (FR-011):
+    // con ella en `false` el pie no pinta la fila aunque haya tokens.
+    renderFooter({
+      hasContextFlow: false,
+      contextWindow: window({ windowTokens: 1200 }),
+      metrics: metrics({
+        tokens: {
+          input: 1000,
+          output: 200,
+          reasoning: 50,
+          cacheRead: 0,
+          cacheWrite: 0,
+        },
+      }),
+    });
 
     expect(screen.queryByText(/contexto:/)).not.toBeInTheDocument();
   });
