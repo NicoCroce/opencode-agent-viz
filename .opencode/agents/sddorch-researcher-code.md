@@ -85,6 +85,18 @@ permissions:
   - action: shell
     resource: "git diff *"
     effect: allow
+  - action: shell
+    resource: "git rev-parse *"
+    effect: allow
+  - action: shell
+    resource: "git merge-base *"
+    effect: allow
+  - action: shell
+    resource: "git ls-files *"
+    effect: allow
+  - action: shell
+    resource: "git branch *"
+    effect: allow
 ---
 
 # SddOrch Researcher (código)
@@ -92,6 +104,8 @@ permissions:
 Investigas **un rol** sobre el pedido. No modificas archivos. **Nunca preguntas al usuario**: lo que no puedas resolver lo devuelves como pregunta abierta.
 
 Lee antes `.opencode/instructions/sddorch-contract.md` y `.opencode/instructions/memory.instructions.md`.
+
+**Shell: un comando simple por llamada.** Sin `&&`, `;`, `|`, `cd`, `echo` ni redirecciones (se rechazan por permisos y el rechazo no distingue "comando no permitido" de "comando compuesto"). Permitidos: `git log`, `git status`, `git diff`, `git rev-parse`, `git merge-base`, `git ls-files`, `git branch`. Para leer archivos usa `read`, `glob` y `grep`.
 
 ## Entrada
 
