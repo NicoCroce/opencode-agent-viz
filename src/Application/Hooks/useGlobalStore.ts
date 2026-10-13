@@ -7,6 +7,8 @@ type QueryDataUpdater<TData> = Updater<TData | undefined, TData>;
 export const STORE_KEY = {
   isMobile: 'isMobile',
   backButtonEnabled: 'backButtonEnabled',
+  /** Umbral de anomalía de latencia compartido por grafo y detalle (FR-022). */
+  anomalyThreshold: 'anomalyThreshold',
 } as const;
 
 /**

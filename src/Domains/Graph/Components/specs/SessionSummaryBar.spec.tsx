@@ -37,6 +37,7 @@ const summary = (overrides: Partial<TSessionSummary> = {}): TSessionSummary => (
     availability: 'available',
   },
   elapsedMs: 83_000,
+  sessionSpeedup: { serialMs: 120_000, wallMs: 48_000, speedup: 2.5 },
   ...overrides,
 });
 
@@ -101,6 +102,23 @@ describe('SessionSummaryBar', () => {
     expect(screen.getByText('$0.0123')).toBeInTheDocument();
     expect(screen.getByText('12.4k')).toBeInTheDocument();
     expect(screen.getByText('1m 23s')).toBeInTheDocument();
+  });
+
+  it('shows the global parallelism metric ×N (P8, FR-008)', () => {
+    renderBar({
+      sessionSpeedup: { serialMs: 120_000, wallMs: 48_000, speedup: 2.5 },
+    });
+
+    expect(screen.getByText('Paralelismo')).toBeInTheDocument();
+    expect(screen.getByText('×2.5')).toBeInTheDocument();
+  });
+
+  it('shows "no disponible" for the global parallelism without a speedup', () => {
+    renderBar({ sessionSpeedup: { serialMs: null, wallMs: 0, speedup: null } });
+
+    expect(screen.getByText('Paralelismo')).toBeInTheDocument();
+    // Costo, Tokens y Tiempo siguen presentes; el paralelismo cae a "no disponible".
+    expect(screen.getAllByLabelText('no disponible')).toHaveLength(1);
   });
 
   it('shows "no disponible" for every missing datum (FR-038)', () => {

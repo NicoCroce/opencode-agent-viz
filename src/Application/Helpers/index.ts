@@ -11,6 +11,8 @@ export * from './toolStatus';
 export * from './totalTokens';
 export * from './formatModelRef';
 export * from './formatToolInput';
+export * from './formatPercent';
+export * from './formatSpeedup';
 export * from './questionState';
 export * from './queryKey';
 export * from './array';

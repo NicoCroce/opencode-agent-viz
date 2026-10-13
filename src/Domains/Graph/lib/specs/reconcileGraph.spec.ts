@@ -1,13 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import type {
+  TContextBreakdown,
+  TContextWindow,
   TGraphEdge,
   TGraphNode,
   TGraphNodeData,
+  TNodeContextMetrics,
   TNodeEffort,
+  TNodeSpeedup,
 } from '../../Graph.entity';
 import { EMPTY_METRICS } from '../../Graph.entity';
 import { reconcileGraphModel } from '../reconcileGraph';
-import { sameEffort, sameNodeData } from '../reconcile/comparators';
+import {
+  sameContext,
+  sameEffort,
+  sameNodeData,
+  sameSpeedup,
+} from '../reconcile/comparators';
 
 /**
  * Spec del contrato de render (feature 006), criterios C1..C2 de
@@ -440,6 +449,268 @@ describe('reconcileGraphModel · S8 (effort en la identidad de nodo)', () => {
     it('reutiliza el mismo objeto cuando ambos carecen de `effort`', () => {
       const prev = { nodes: [makeNode('root')], edges: [] };
       const next = { nodes: [makeNode('root')], edges: [] };
+
+      const result = reconcileGraphModel(prev, next);
+
+      expect(result.nodes[0]).toBe(prev.nodes[0]);
+      expect(result.nodes).toBe(prev.nodes);
+    });
+  });
+});
+
+/**
+ * Contexto y aceleración en la identidad de nodo (data-model §7;
+ * `contracts/context-metrics-contract.md` §5 y `parallel-speedup-contract.md` §5):
+ * `context` y `speedup` deben entrar en `sameNodeData` o el nodo no se reemplaza
+ * y el panel/badge quedan congelados. Ambos son opcionales.
+ */
+describe('reconcileGraphModel · contexto y speedup en la identidad de nodo', () => {
+  const makeBreakdown = (chars = 100): TContextBreakdown => ({
+    buckets: [{ category: 'toolResult', chars, tokens: 10, pct: 100 }],
+    chars,
+    windowTokens: 10,
+    hasTokens: true,
+  });
+
+  const makeWindow = (): TContextWindow => ({
+    windowTokens: 10,
+    cacheRead: 2,
+    cacheWrite: 1,
+    hitRate: 0.2,
+    costPerKToken: 0.01,
+  });
+
+  const makeContext = (
+    overrides: Partial<TNodeContextMetrics> = {},
+  ): TNodeContextMetrics => ({
+    breakdown: makeBreakdown(),
+    window: makeWindow(),
+    latency: null,
+    provisional: false,
+    ...overrides,
+  });
+
+  const makeSpeedup = (overrides: Partial<TNodeSpeedup> = {}): TNodeSpeedup => ({
+    groupId: 'g1',
+    size: 2,
+    serialMs: 200,
+    wallMs: 100,
+    speedup: 1.8,
+    efficiency: 0.9,
+    provisional: false,
+    ...overrides,
+  });
+
+  describe('sameContext', () => {
+    it('trata `undefined` y `null` como equivalentes (sin contexto)', () => {
+      expect(sameContext(undefined, undefined)).toBe(true);
+      expect(sameContext(null, null)).toBe(true);
+      expect(sameContext(undefined, null)).toBe(true);
+      expect(sameContext(null, undefined)).toBe(true);
+    });
+
+    it('detecta el paso de ausente a presente', () => {
+      expect(sameContext(undefined, makeContext())).toBe(false);
+      expect(sameContext(makeContext(), null)).toBe(false);
+    });
+
+    it('detecta cambios de breakdown (chars, buckets y windowTokens)', () => {
+      expect(
+        sameContext(makeContext(), makeContext({ breakdown: makeBreakdown(200) })),
+      ).toBe(false);
+    });
+
+    it('detecta cambios de window (hitRate)', () => {
+      expect(
+        sameContext(
+          makeContext(),
+          makeContext({ window: { ...makeWindow(), hitRate: 0.5 } }),
+        ),
+      ).toBe(false);
+    });
+
+    it('detecta cambios de provisional', () => {
+      expect(
+        sameContext(makeContext(), makeContext({ provisional: true })),
+      ).toBe(false);
+    });
+
+    it('detecta cambios de latencia', () => {
+      expect(
+        sameContext(
+          makeContext(),
+          makeContext({
+            latency: {
+              samples: [
+                { stepId: 's1', startedAt: 1, ttftMs: 10, totalMs: 20 },
+              ],
+              medianMs: 20,
+              reference: 'node',
+              anomalies: [],
+            },
+          }),
+        ),
+      ).toBe(false);
+    });
+
+    it('detecta cambios de la evolución (growth)', () => {
+      expect(
+        sameContext(
+          makeContext(),
+          makeContext({
+            growth: [{ stepId: 'a1', startedAt: 1, windowTokens: 100 }],
+          }),
+        ),
+      ).toBe(false);
+    });
+
+    it('trata `undefined` y `[]` como equivalentes en growth', () => {
+      expect(
+        sameContext(makeContext({ growth: [] }), makeContext({ growth: undefined })),
+      ).toBe(true);
+    });
+
+    it('detecta cambios de las compactaciones', () => {
+      expect(
+        sameContext(
+          makeContext(),
+          makeContext({
+            compactions: [
+              { id: 'c1', at: 5, status: 'completed', reason: 'auto' },
+            ],
+          }),
+        ),
+      ).toBe(false);
+    });
+
+    it('detecta cambios en el estado o motivo de una compactación', () => {
+      const base = makeContext({
+        compactions: [{ id: 'c1', at: 5, status: 'completed', reason: 'auto' }],
+      });
+      expect(
+        sameContext(
+          base,
+          makeContext({
+            compactions: [{ id: 'c1', at: 5, status: 'failed', reason: 'auto' }],
+          }),
+        ),
+      ).toBe(false);
+      expect(
+        sameContext(
+          base,
+          makeContext({
+            compactions: [{ id: 'c1', at: 5, status: 'completed', reason: 'manual' }],
+          }),
+        ),
+      ).toBe(false);
+    });
+
+    it('trata `undefined` y `[]` como equivalentes en compactions', () => {
+      expect(
+        sameContext(
+          makeContext({ compactions: [] }),
+          makeContext({ compactions: undefined }),
+        ),
+      ).toBe(true);
+    });
+
+    it('es verdadero con el mismo contenido aunque cambie la identidad', () => {
+      expect(sameContext(makeContext(), makeContext())).toBe(true);
+    });
+
+    it('es verdadero con growth y compactions equivalentes', () => {
+      const growth = [{ stepId: 'a1', startedAt: 1, windowTokens: 100 }];
+      const compactions = [
+        { id: 'c1', at: 5, status: 'completed' as const, reason: 'auto' as const },
+      ];
+      expect(
+        sameContext(makeContext({ growth, compactions }), makeContext({ growth, compactions })),
+      ).toBe(true);
+    });
+  });
+
+  describe('sameSpeedup', () => {
+    it('trata `undefined` y `null` como equivalentes (sin grupo)', () => {
+      expect(sameSpeedup(undefined, null)).toBe(true);
+      expect(sameSpeedup(null, undefined)).toBe(true);
+    });
+
+    it('detecta el paso de ausente a presente', () => {
+      expect(sameSpeedup(undefined, makeSpeedup())).toBe(false);
+      expect(sameSpeedup(makeSpeedup(), null)).toBe(false);
+    });
+
+    it('detecta cambios de speedup, efficiency, size y provisional', () => {
+      expect(sameSpeedup(makeSpeedup(), makeSpeedup({ speedup: 2.5 }))).toBe(false);
+      expect(sameSpeedup(makeSpeedup(), makeSpeedup({ efficiency: 0.5 }))).toBe(false);
+      expect(sameSpeedup(makeSpeedup(), makeSpeedup({ size: 3 }))).toBe(false);
+      expect(sameSpeedup(makeSpeedup(), makeSpeedup({ serialMs: 400 }))).toBe(
+        false,
+      );
+      expect(sameSpeedup(makeSpeedup(), makeSpeedup({ wallMs: 50 }))).toBe(false);
+      expect(sameSpeedup(makeSpeedup(), makeSpeedup({ provisional: true }))).toBe(
+        false,
+      );
+    });
+
+    it('es verdadero con el mismo contenido', () => {
+      expect(sameSpeedup(makeSpeedup(), makeSpeedup())).toBe(true);
+    });
+  });
+
+  describe('sameNodeData', () => {
+    it('propaga el cambio de context al reconciliar', () => {
+      const prev = {
+        nodes: [makeNode('root', { data: { context: makeContext() } })],
+        edges: [],
+      };
+      const next = {
+        nodes: [
+          makeNode('root', {
+            data: { context: makeContext({ provisional: true }) },
+          }),
+        ],
+        edges: [],
+      };
+
+      const result = reconcileGraphModel(prev, next);
+
+      expect(result.nodes[0]).not.toBe(prev.nodes[0]);
+      expect(result.nodes[0]).toBe(next.nodes[0]);
+    });
+
+    it('propaga el cambio de speedup al reconciliar', () => {
+      const prev = {
+        nodes: [makeNode('root', { data: { speedup: makeSpeedup() } })],
+        edges: [],
+      };
+      const next = {
+        nodes: [makeNode('root', { data: { speedup: makeSpeedup({ speedup: 3 }) } })],
+        edges: [],
+      };
+
+      const result = reconcileGraphModel(prev, next);
+
+      expect(result.nodes[0]).not.toBe(prev.nodes[0]);
+    });
+
+    it('reutiliza el mismo objeto cuando context y speedup no cambian', () => {
+      const prev = {
+        nodes: [
+          makeNode('root', {
+            data: { context: makeContext(), speedup: makeSpeedup() },
+          }),
+        ],
+        edges: [],
+      };
+      const next = {
+        nodes: [
+          makeNode('root', {
+            data: { context: makeContext(), speedup: makeSpeedup() },
+          }),
+        ],
+        edges: [],
+      };
 
       const result = reconcileGraphModel(prev, next);
 

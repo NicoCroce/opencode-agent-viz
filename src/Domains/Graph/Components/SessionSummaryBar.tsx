@@ -2,6 +2,7 @@ import { Container } from '@app/Application/Components';
 import {
   formatCost,
   formatDuration,
+  formatSpeedup,
   formatTokens,
   totalTokens,
 } from '@app/Application/Helpers';
@@ -23,6 +24,12 @@ export interface SessionSummaryBarProps {
   summary: TSummaryCounts & {
     metrics: Pick<TNodeMetrics, 'cost' | 'tokens'>;
     elapsedMs: number | null;
+    /**
+     * Aceleración global de la sesión (FR-008). Tipo estructural local —solo el
+     * campo que se pinta— para no importar `TSessionSpeedup` de `Inspector` desde
+     * un componente (AGENTS §8.3); `TSessionSummary` lo satisface.
+     */
+    sessionSpeedup?: { speedup: number | null } | null;
   };
 }
 
@@ -68,6 +75,11 @@ export const SessionSummaryBar = ({ summary }: SessionSummaryBarProps) => {
         label="Tiempo"
         value={summary.elapsedMs}
         format={formatDuration}
+      />
+      <SummaryMetric
+        label="Paralelismo"
+        value={summary.sessionSpeedup?.speedup ?? null}
+        format={formatSpeedup}
       />
     </Container>
   );

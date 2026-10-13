@@ -2,7 +2,14 @@ import { Container } from '@app/Application/Components';
 import { NODE_STATUS_LABEL } from '@app/Application/Helpers';
 import { NODE_STATUS_COLOR } from '@app/Application/Helpers/nodeStatusColor';
 import { cn } from '@app/Application/lib/utils';
-import type { TNodeParallelism, TNodeStatus } from '../Graph.entity';
+import type {
+  TLatencyReport,
+  TNodeParallelism,
+  TNodeSpeedup,
+  TNodeStatus,
+} from '../Graph.entity';
+import { AgentNodeLatencyMark } from './AgentNodeLatencyMark';
+import { AgentNodeSpeedupBadge } from './AgentNodeSpeedupBadge';
 
 interface AgentNodeHeaderProps {
   /** Título de la tarea; si falta, se muestra el nombre del agente. */
@@ -10,13 +17,18 @@ interface AgentNodeHeaderProps {
   agentName: string;
   /** Paralelismo del nodo; `null` cuando corrió solo. */
   parallel: TNodeParallelism | null;
+  /** Aceleración real del grupo; `null` cuando corrió solo (FR-009). */
+  speedup: TNodeSpeedup | null;
+  /** Serie de latencia del nodo; `null` hasta el enriquecimiento (FR-023). */
+  latency: TLatencyReport | null;
   isRunning: boolean;
   status: TNodeStatus;
 }
 
 /**
  * Encabezado del card: tarea (máx. 2 líneas) a la izquierda y un **cluster meta**
- * a la derecha con punto de estado + badge de paralelismo + etiqueta de estado.
+ * a la derecha con punto de estado + badge de paralelismo + badge de aceleración
+ * + marca de anomalía de latencia + etiqueta de estado.
  * El punto es decorativo (`aria-hidden`): el detalle preciso lo da la etiqueta y
  * el escaneo periférico, el rail (`NodeStatusRail`, FR-001). El medidor de
  * esfuerzo (FR-026) **no** va aquí: vive en su banda al pie del card
@@ -29,6 +41,8 @@ export const AgentNodeHeader = ({
   title,
   agentName,
   parallel,
+  speedup,
+  latency,
   status,
 }: AgentNodeHeaderProps) => (
   <Container row align="start" justify="between" space="small" className="min-w-0">
@@ -51,6 +65,8 @@ export const AgentNodeHeader = ({
           {`∥${parallel.size}`}
         </span>
       ) : null}
+      <AgentNodeSpeedupBadge speedup={speedup} />
+      <AgentNodeLatencyMark latency={latency} />
       <span className="text-[11px] text-muted-foreground">
         {NODE_STATUS_LABEL[status]}
       </span>

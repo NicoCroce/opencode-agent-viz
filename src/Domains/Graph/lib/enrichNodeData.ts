@@ -13,7 +13,14 @@ import type {
   TGraphNodeData,
 } from '../Graph.entity';
 import { deriveMetricBase, resolveMetrics } from './deriveMetrics';
-import { toNodeStatus } from './nodeStatus';
+import { deriveContextBreakdown } from './metrics/contextBreakdown';
+import {
+  deriveContextCompactions,
+  deriveContextGrowth,
+} from './metrics/contextGrowth';
+import { deriveLatency } from './metrics/latency';
+import { deriveContextWindow } from './metrics/windowStats';
+import { isActiveStatus, toNodeStatus } from './nodeStatus';
 
 /** Datos de caché ya resueltos que alimentan la fusión de un nodo. */
 export interface TNodeEnrichmentInput {
@@ -65,6 +72,17 @@ export interface TEnrichNodeDataInput extends TNodeEnrichmentInput {
   node: TGraphNode;
   sessionStatus: SessionStatus | undefined;
   now: number;
+  /**
+   * Umbral de anomalía de latencia vigente (FR-022). Opcional: sin él se usa el
+   * default de `latency-anomaly-contract` §4.
+   */
+  threshold?: number;
+  /**
+   * Mediana de `totalMs` del mismo agente (FR-020): referencia de respaldo
+   * cuando el nodo tiene menos de `MIN_SAMPLES` muestras propias. `null` si el
+   * agente tampoco tiene historial.
+   */
+  agentMedianMs?: number | null;
 }
 
 /**
@@ -81,6 +99,8 @@ export const enrichNodeData = ({
   sessionStatus,
   signal,
   now,
+  threshold,
+  agentMedianMs,
 }: TEnrichNodeDataInput): TGraphNodeData => {
   const { id } = node;
   const base = deriveMetricBase(messages);
@@ -95,6 +115,9 @@ export const enrichNodeData = ({
     outcome: signal?.outcome ?? null,
     lastAssistantErrored: base.lastAssistantErrored,
   });
+
+  const metrics = resolveMetrics(base, sessionStatus, now, 0);
+  const breakdown = deriveContextBreakdown(messages);
 
   return {
     ...node.data,
@@ -112,7 +135,19 @@ export const enrichNodeData = ({
         : null,
     interruptReason:
       status === 'interrupted' ? (signal?.interruptReason ?? null) : null,
-    metrics: resolveMetrics(base, sessionStatus, now, 0),
+    metrics,
+    // Métricas de contexto (FR-001/FR-016/FR-018; research R3): desglose +
+    // ventana/caché + evolución + compactaciones + serie de latencia con
+    // anomalías. Memoizable por identidad de `messages`; la referencia
+    // (nodo/agente) y el umbral vienen del modelo.
+    context: {
+      breakdown,
+      window: deriveContextWindow(metrics, breakdown.windowTokens),
+      growth: deriveContextGrowth(messages),
+      compactions: deriveContextCompactions(messages),
+      latency: deriveLatency(messages, { threshold, agentMedianMs }),
+      provisional: isActiveStatus(status),
+    },
     currentTool: base.currentTool,
     enrichment: 'ready',
   };

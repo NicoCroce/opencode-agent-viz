@@ -360,6 +360,29 @@ describe('useGraphModel — filas paralelas en vivo y paridad (E5/A5)', () => {
     expect(graph.nodes).toHaveLength(LANE_IDS.length + 1);
   });
 
+  it('adjunta data.speedup por nodo a los hermanos concurrentes (P7, T021)', async () => {
+    const queryClient = createRevisitClient();
+    queryClient.setQueryData(
+      queryKeys.sessions.status(),
+      laneStatuses(busyStatus),
+    );
+
+    const { result } = renderGraph(queryClient, LANE_ROOT);
+
+    await waitFor(() => expect(allLanesReady(result.current)).toBe(true));
+
+    for (const id of LANE_IDS) {
+      const node = laneNode(result.current, id);
+      expect(node.data.speedup).toBeDefined();
+      expect(node.data.speedup?.size).toBe(LANE_IDS.length);
+      // Los hermanos siguen corriendo: la aceleración es provisional.
+      expect(node.data.speedup?.provisional).toBe(true);
+    }
+
+    // La raíz no participa de un grupo paralelo: sin badge de aceleración.
+    expect(laneNode(result.current, LANE_ROOT).data.speedup).toBeNull();
+  });
+
   it('la disposición en vivo se mantiene idéntica al llegar el estado completo y al reabrir (A5)', async () => {
     const queryClient = createRevisitClient();
     queryClient.setQueryData(

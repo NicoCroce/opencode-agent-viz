@@ -87,6 +87,51 @@ describe('cardHeight', () => {
     );
   });
 
+  it('la línea de flujo in/out suma una fila al card (S7, FR-011)', () => {
+    const withFlow = data({
+      metrics: {
+        ...EMPTY_METRICS,
+        tokens: {
+          input: 1000,
+          output: 200,
+          reasoning: 50,
+          cacheRead: 0,
+          cacheWrite: 0,
+        },
+      },
+    });
+
+    expect(cardHeight(withFlow, NODE_WIDTH)).toBeGreaterThan(
+      cardHeight(data(), NODE_WIDTH),
+    );
+  });
+
+  it('la ventana de contexto sola ya reserva la línea de flujo', () => {
+    const withWindow = data({
+      context: {
+        breakdown: {
+          buckets: [],
+          chars: 0,
+          windowTokens: 1000,
+          hasTokens: true,
+        },
+        window: {
+          windowTokens: 1000,
+          cacheRead: 0,
+          cacheWrite: 0,
+          hitRate: null,
+          costPerKToken: null,
+        },
+        latency: null,
+        provisional: false,
+      },
+    });
+
+    expect(cardHeight(withWindow, NODE_WIDTH)).toBeGreaterThan(
+      cardHeight(data(), NODE_WIDTH),
+    );
+  });
+
   it('el encabezado reserva el cluster meta: punto + estado + badge (84 px)', () => {
     // Punto de estado (6 px) + separación (6 px) sobre la base del estado y el
     // badge de paralelos. El medidor de esfuerzo ya no va aquí.

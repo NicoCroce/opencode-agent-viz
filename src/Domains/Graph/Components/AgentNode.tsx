@@ -77,12 +77,15 @@ const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) =>
           title={data.title}
           agentName={data.agentName}
           parallel={parallel}
+          speedup={data.speedup ?? null}
+          latency={data.context?.latency ?? null}
           isRunning={isRunning}
           status={data.status}
         />
         <AgentNodeModelLine model={data.model} />
         <AgentNodeFooter
           metrics={data.metrics}
+          contextWindow={data.context?.window ?? null}
           isRunning={isRunning}
           status={data.status}
           currentTool={data.currentTool}

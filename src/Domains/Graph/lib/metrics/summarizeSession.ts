@@ -11,6 +11,7 @@ import type {
 } from '../../../Inspector/Inspector.entity';
 import { sumNullable } from '@app/Application/Helpers/number';
 import { isActiveStatus } from '../nodeStatus';
+import { deriveSessionSpeedup } from './speedup';
 
 export const summarizeSession = (
   root: SessionInfo,
@@ -104,6 +105,9 @@ export const summarizeSession = (
     loopCount: nodes.filter((n) => n.data.metrics.hasLoop).length,
     agentInvocations,
     resourceUsage,
+    // Aceleración global de la sesión (FR-008): serie (suma de duraciones) frente
+    // al tiempo real activo (unión de intervalos, sin contar dos veces el solape).
+    sessionSpeedup: deriveSessionSpeedup(graph, now),
     elapsedMs,
   };
 };
