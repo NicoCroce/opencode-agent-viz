@@ -7,19 +7,28 @@ interface SubagentsSectionProps {
   tasks: TTaskEntry[];
   /** Otros agentes del mismo grupo de paralelismo. */
   parallelPeers: TGraphNode[];
+  /** La consulta de la sección falló (Principio VI). */
+  isError?: boolean;
+  /** La consulta de la sección está en curso (Principio VI). */
+  isLoading?: boolean;
 }
 
 /**
  * Agrupa bajo un único encabezado `Subagentes` las tareas delegadas y los
- * agentes en paralelo (FR-007/FR-008). Con ambos vacíos muestra un estado
- * vacío explícito sin desaparecer.
+ * agentes en paralelo (FR-007/FR-008). Resuelve los estados de pantalla en
+ * orden **error → carga → vacío → datos** (Principio VI) y, con ambos vacíos,
+ * muestra un estado vacío explícito sin desaparecer.
  */
 export const SubagentsSection = ({
   tasks,
   parallelPeers,
+  isError = false,
+  isLoading = false,
 }: SubagentsSectionProps) => (
   <SectionFrame
     title="Subagentes"
+    isError={isError}
+    isLoading={isLoading}
     isEmpty={tasks.length === 0 && parallelPeers.length === 0}
     emptyLabel="Sin subagentes ni agentes en paralelo."
   >

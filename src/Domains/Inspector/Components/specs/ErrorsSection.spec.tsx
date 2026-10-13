@@ -30,4 +30,44 @@ describe('ErrorsSection', () => {
 
     expect(screen.getByText('Fallo de red')).toHaveClass('text-status-error');
   });
+
+  it('shows the error state instead of the rows and the empty state', () => {
+    render(
+      <ErrorsSection
+        errors={[{ message: 'Fallo de red', at: 0 }]}
+        isError
+        isLoading={false}
+      />,
+    );
+
+    expect(
+      screen.getByText('Ocurrió un error al cargar los datos'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Sin errores.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Fallo de red')).not.toBeInTheDocument();
+  });
+
+  it('shows the loading skeleton instead of the rows and the empty state', () => {
+    const { container } = render(
+      <ErrorsSection errors={[]} isError={false} isLoading />,
+    );
+
+    // `ListSkeleton` monta 2 líneas `animate-pulse` por defecto.
+    expect(container.querySelectorAll('.animate-pulse')).toHaveLength(2);
+    expect(screen.queryByText('Sin errores.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Ocurrió un error al cargar los datos'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the explicit empty state once the source resolved without errors', () => {
+    render(<ErrorsSection errors={[]} isError={false} isLoading={false} />);
+
+    expect(screen.getByText('Errores')).toBeInTheDocument();
+    expect(screen.getByText('Sin errores.')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Ocurrió un error al cargar los datos'),
+    ).not.toBeInTheDocument();
+    expect(document.querySelectorAll('.animate-pulse')).toHaveLength(0);
+  });
 });

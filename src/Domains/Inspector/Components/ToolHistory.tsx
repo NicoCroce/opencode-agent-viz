@@ -11,15 +11,32 @@ import { useToolHistory } from '../Hooks/useToolHistory';
 
 interface ToolHistoryProps {
   tools: TToolHistoryEntry[];
+  /** La consulta de mensajes falló (Principio VI). */
+  isError?: boolean;
+  /** La consulta de mensajes está en curso (Principio VI). */
+  isLoading?: boolean;
 }
 
-export const ToolHistory = ({ tools }: ToolHistoryProps) => {
+/**
+ * Sección **Herramientas** del panel de detalle: encabezado, lista truncada a
+ * diez entradas con el control `Disclosure` "Ver N más" y estado vacío. Resuelve
+ * los cuatro estados de pantalla vía `SectionFrame` con la prioridad
+ * **error → carga → vacío → datos**; el encabezado y el estado vacío se
+ * conservan tal cual. Presentación pura.
+ */
+export const ToolHistory = ({
+  tools,
+  isError = false,
+  isLoading = false,
+}: ToolHistoryProps) => {
   const { visibleTools, hiddenCount, canExpand, isExpanded, toggle } =
     useToolHistory(tools);
 
   return (
     <SectionFrame
       title="Herramientas"
+      isError={isError}
+      isLoading={isLoading}
       isEmpty={tools.length === 0}
       emptyLabel="Sin actividad de herramientas todavía."
     >

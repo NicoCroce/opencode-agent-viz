@@ -272,4 +272,98 @@ describe('AnswersSection', () => {
 
     expect(onOpenHistory).toHaveBeenCalledTimes(1);
   });
+
+  it('shows the error state instead of the list and the empty state', () => {
+    render(
+      <AnswersSection
+        entries={[answer('a1', 1, 'Respuesta cargada')]}
+        showReasoning={false}
+        onToggleReasoning={() => {}}
+        isError
+      />,
+    );
+
+    expect(
+      screen.getByText('Ocurrió un error al cargar los datos'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Sin respuestas todavía'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Respuesta cargada')).not.toBeInTheDocument();
+  });
+
+  it('shows the loading skeleton instead of the list and the empty state', () => {
+    const { container } = render(
+      <AnswersSection
+        entries={[answer('a1', 1, 'Respuesta cargada')]}
+        showReasoning={false}
+        onToggleReasoning={() => {}}
+        isLoading
+      />,
+    );
+
+    // `ListSkeleton` monta 2 líneas `animate-pulse` por defecto.
+    expect(container.querySelectorAll('.animate-pulse')).toHaveLength(2);
+    expect(
+      screen.queryByText('Sin respuestas todavía'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Respuesta cargada')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Ocurrió un error al cargar los datos'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps the reasoning toggle and "Ver histórico completo" mounted and operable in error', async () => {
+    const user = userEvent.setup();
+    const onToggleReasoning = vi.fn();
+    const onOpenHistory = vi.fn();
+
+    render(
+      <AnswersSection
+        entries={[]}
+        showReasoning={false}
+        onToggleReasoning={onToggleReasoning}
+        onOpenHistory={onOpenHistory}
+        isError
+      />,
+    );
+
+    const toggle = screen.getByRole('button', { name: /razonamiento/i });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+    await user.click(toggle);
+    expect(onToggleReasoning).toHaveBeenCalledTimes(1);
+
+    await user.click(
+      screen.getByRole('button', { name: 'Ver histórico completo' }),
+    );
+    expect(onOpenHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the reasoning toggle and "Ver histórico completo" mounted and operable while loading', async () => {
+    const user = userEvent.setup();
+    const onToggleReasoning = vi.fn();
+    const onOpenHistory = vi.fn();
+
+    render(
+      <AnswersSection
+        entries={[]}
+        showReasoning
+        onToggleReasoning={onToggleReasoning}
+        onOpenHistory={onOpenHistory}
+        isLoading
+      />,
+    );
+
+    const toggle = screen.getByRole('button', { name: /razonamiento/i });
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(toggle);
+    expect(onToggleReasoning).toHaveBeenCalledTimes(1);
+
+    await user.click(
+      screen.getByRole('button', { name: 'Ver histórico completo' }),
+    );
+    expect(onOpenHistory).toHaveBeenCalledTimes(1);
+  });
 });

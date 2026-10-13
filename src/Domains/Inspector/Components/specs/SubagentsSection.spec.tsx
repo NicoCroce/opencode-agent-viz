@@ -120,4 +120,81 @@ describe('SubagentsSection', () => {
       screen.queryByText('Sin subagentes ni agentes en paralelo.'),
     ).not.toBeInTheDocument();
   });
+
+  it('shows the error state instead of the empty state when the query fails', () => {
+    render(<SubagentsSection tasks={[]} parallelPeers={[]} isError />);
+
+    expect(
+      screen.getByText('Ocurrió un error al cargar los datos'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Sin subagentes ni agentes en paralelo.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not render the content when the query fails', () => {
+    render(
+      <SubagentsSection
+        tasks={[task({ description: 'Tarea uno' })]}
+        parallelPeers={[peer({ data: { ...peer().data, title: 'Peer uno' } })]}
+        isError
+      />,
+    );
+
+    expect(
+      screen.getByText('Ocurrió un error al cargar los datos'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Tarea uno')).not.toBeInTheDocument();
+    expect(screen.queryByText('Peer uno')).not.toBeInTheDocument();
+  });
+
+  it('gives the error state priority over the loading state', () => {
+    const { container } = render(
+      <SubagentsSection tasks={[]} parallelPeers={[]} isError isLoading />,
+    );
+
+    expect(
+      screen.getByText('Ocurrió un error al cargar los datos'),
+    ).toBeInTheDocument();
+    expect(container.querySelector('.animate-pulse')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Sin subagentes ni agentes en paralelo.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the loading skeleton instead of the empty state while the query is in flight', () => {
+    const { container } = render(
+      <SubagentsSection tasks={[]} parallelPeers={[]} isLoading />,
+    );
+
+    expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Sin subagentes ni agentes en paralelo.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not render the content while the query is in flight', () => {
+    const { container } = render(
+      <SubagentsSection
+        tasks={[task({ description: 'Tarea uno' })]}
+        parallelPeers={[peer({ data: { ...peer().data, title: 'Peer uno' } })]}
+        isLoading
+      />,
+    );
+
+    expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
+    expect(screen.queryByText('Tarea uno')).not.toBeInTheDocument();
+    expect(screen.queryByText('Peer uno')).not.toBeInTheDocument();
+  });
+
+  it('shows the legitimate empty state only once the source has resolved', () => {
+    const { container } = render(
+      <SubagentsSection tasks={[]} parallelPeers={[]} isError={false} isLoading={false} />,
+    );
+
+    expect(
+      screen.getByText('Sin subagentes ni agentes en paralelo.'),
+    ).toBeInTheDocument();
+    expect(container.querySelector('.animate-pulse')).not.toBeInTheDocument();
+  });
 });
