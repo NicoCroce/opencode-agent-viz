@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "tsc": "tsc --project tsconfig.json",
-    "tsc:node": "tsc --project tsconfig.node.json --noEmit",
+    "tsc:node": "tsc --project tsconfig.node.json --noEmit --composite false",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
