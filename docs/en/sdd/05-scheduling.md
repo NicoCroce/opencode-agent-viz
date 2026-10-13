@@ -58,6 +58,23 @@ tasks are marked `[P]`**.
 - The wave plan (how many subagents per wave) is shown to the user and saved to
   the flow's memory.
 
+## Coherence notes from `schedule.mjs`
+
+Besides the waves, the script emits non-blocking warnings that the orchestrator
+resolves **before** launching the wave:
+
+- `⚠ sin dueño: <path> (citada por <doc>)` (unowned): `spec.md`, `plan.md`,
+  `data-model.md` or `contracts/` cite a code file that does not exist yet and
+  that no task writes. Add it to the right unit's `writes`, create a task (back
+  to `tasks`), or drop it if it was only a mention.
+- `dependencia en prosa aplicada: Tyyy ← Txxx` (prose dependency applied): a
+  dependency written outside the task line ("T025 before T029", "T029 depends
+  on T025", "T025 → T029") is applied as an explicit edge.
+- **Unowned state chain** (an orchestrator rule, not a script one): if
+  `contracts/` declares a chain that crosses two units, an end-to-end
+  integration unit with its spec must exist, negative case included (missing
+  data / 404). If it is missing, go back to `tasks`.
+
 ## Scope verification
 
 At the end of each wave, the orchestrator **does not trust**: it checks
@@ -65,6 +82,10 @@ At the end of each wave, the orchestrator **does not trust**: it checks
 
 - If a file appears outside what was declared, the wave is marked failed and
   the flow does not continue without resolving it. In Auto mode, it stops.
+- `scope-check.sh check <base.tsv> --per-unit <Uxx.md…>` adds a per-unit
+  report: `SIN CAMBIOS` (a unit touched none of its `writes`: silently skipped
+  work) and `RECLAMADO POR n UNIDADES` (a file sits in the `writes` of 2+ units
+  of the wave; a `schedule` error).
 - Only the orchestrator marks `[X]` in `tasks.md` and saves state.
 
 This verification is what makes shared-tree parallelism safe: the contract

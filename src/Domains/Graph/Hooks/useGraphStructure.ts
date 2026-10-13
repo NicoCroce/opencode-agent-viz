@@ -64,6 +64,12 @@ export interface TDirectoryResolution {
   isLoading: boolean;
   /** El respaldo terminó **sin** resolver el `directory` (sesión inexistente). */
   isError: boolean;
+  /**
+   * El fallo fue un «la sesión no existe» del servidor. Si se omite, todo
+   * `isError` se trata como no encontrada (llamadores previos); `false` lo
+   * trata como fallo real de red/servidor.
+   */
+  isNotFound?: boolean;
 }
 
 export interface UseGraphStructureResult {
@@ -294,8 +300,9 @@ export const useGraphStructure = (
   // existe (FR-005). Es el desenlace que documenta `useSessionDirectory` y, sin
   // esta derivación, `notFound` era **inalcanzable**: el cargador del subárbol
   // no corre sin `directory`, así que la vista quedaba en esqueleto terminal.
-  const sessionNotFound =
+  const directoryFailed =
     hasSession && directory === null && !resolution.isLoading && resolution.isError;
+  const sessionNotFound = directoryFailed && resolution.isNotFound !== false;
 
   return {
     graph,
@@ -310,7 +317,7 @@ export const useGraphStructure = (
     // esqueleto es legítimo; ambas cargas son **acotadas** (terminan al resolver
     // o fallar), nunca terminales (contrato de subárbol §4, FR-004/SC-002).
     isLoading: directoryPending || subtreeQuery.isLoading,
-    isError: subtreeQuery.isError,
+    isError: subtreeQuery.isError || (directoryFailed && !sessionNotFound),
     error: subtreeQuery.error ?? null,
   };
 };

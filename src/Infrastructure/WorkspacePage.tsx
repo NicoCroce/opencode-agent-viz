@@ -150,10 +150,12 @@ export const WorkspacePage = () => {
     directory,
     isLoading: directoryLoading,
     isError: directoryError,
+    isNotFound: directoryNotFound,
   } = useSessionDirectory(id ?? null, items);
   const graph = useGraphModel(id ?? null, directory, {
     isLoading: directoryLoading,
     isError: directoryError,
+    isNotFound: directoryNotFound,
   });
   // El modo "seguir" se ancla al nodo activo más reciente (FR-005), no al
   // primero en orden de nodo; `activeNodeId` se conserva para otros usos.

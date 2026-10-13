@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { opencodeService } from '@app/Infrastructure/Services/opencodeClient';
+import { isSessionNotFound } from '@app/Infrastructure/Services/lib/sessionErrors';
 import { queryKeys } from '../../queryKeys';
 import type { TRootSessionItem } from './useRootSessions';
 
@@ -10,6 +11,11 @@ export interface TSessionDirectory {
   isLoading: boolean;
   /** El respaldo falló (p. ej. la sesión no existe): no se confunde con "cargando". */
   isError: boolean;
+  /**
+   * El respaldo falló porque el servidor dijo que la sesión no existe. Un fallo
+   * de red/servidor (`isError` sin `isNotFound`) NO es "no encontrada".
+   */
+  isNotFound: boolean;
 }
 
 /**
@@ -49,16 +55,17 @@ export const useSessionDirectory = (
   });
 
   if (fromItems !== null) {
-    return { directory: fromItems, isLoading: false, isError: false };
+    return { directory: fromItems, isLoading: false, isError: false, isNotFound: false };
   }
 
   if (!needsFallback) {
-    return { directory: null, isLoading: false, isError: false };
+    return { directory: null, isLoading: false, isError: false, isNotFound: false };
   }
 
   return {
     directory: query.data?.location.directory ?? null,
     isLoading: query.isLoading,
     isError: query.isError,
+    isNotFound: query.isError && isSessionNotFound(query.error),
   };
 };

@@ -109,7 +109,10 @@ Crear `opencodeClient.ts` con:
 
 - Carpeta `specs/` junto al código (NO mezclados con .tsx).
 - Tests de lógica pura: reductor de eventos, `buildGraph()`, queries.
-- Tests de hooks: usando `renderWithProviders`.
+- Tests de hooks: usando `renderWithProviders`. Acepta `queryClient` propio (`createTestQueryClient({ gcTime: Infinity })` si el spec revalida contra caché sembrada) y `seed(queryClient)`, que siembra la caché ANTES de renderizar.
+- Radix en jsdom: `src/test/setup.ts` instala los polyfills de puntero y `scrollIntoView` (`src/test/radix.ts`); con `Select`/`AlertDialog` usa `setupRadixUser()` y espera el foco con `findBy…`/`waitFor`.
+- `Alert` del barrel raíz es el primitivo de `ui/`; el wrapper del proyecto se importa desde `@app/Application/Components/Molecules/Alert`.
+- `pnpm tsc` no cubre `vite.config.ts`; verifícalo con `pnpm tsc:node`.
 - Fixtures: eventos reales grabados desde una ejecución de OpenCode (en `__fixtures__/`).
 
 ### 8. Restricciones

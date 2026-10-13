@@ -140,6 +140,24 @@ because of **mixed state**: being cut halfway through the commits leaves a
 half-done history (the real failure was 7/12 commits), and that is worse than
 never having started.
 
+### Recurrence: split the researcher's scope
+
+The `step-limits` signal came back for the researchers with the 40 steps already
+applied: the problem was not the ceiling but a scope that was too large (plan +
+test map + two contracts in a single investigation). The fix was **not** to
+raise `steps` again, but:
+
+- **One researcher, one artifact or role**, with a closed list of files or
+  questions (if the scope covers more, the orchestrator splits it into several
+  researchers with a suffixed `topic_key`, `findings/<role>-<part>`).
+- **Incremental saving:** the researcher saves a draft to Engram around the
+  middle of its budget (upsert on the same `topic_key`); if it is cut off, the
+  partial report is not lost and is resumed only for what is missing.
+- **Measurements against the OpenCode store** (`~/.local/share/opencode`):
+  researchers have no access. The orchestrator first launches a `general` with
+  `shell`, stores the result under `.opencode/runs/<run>/` and hands it over as
+  data.
+
 ### The other half: closing before the cut
 
 Raising the ceiling reduces the chance of a cut, but does not remove it. The

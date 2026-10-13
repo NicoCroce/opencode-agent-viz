@@ -60,7 +60,7 @@ SHARED_FILES: [index.ts, queryKeys.ts, "*.routes.ts", Routes.tsx, package.json, 
 |---|---|
 | `node .opencode/scripts/bash/schedule.mjs <feature_directory>/tasks.md` | Fase `schedule`. Escribe `.opencode/runs/<feature>/schedule.json` y `units/Uxx.md`. |
 | `.opencode/scripts/bash/mark-tasks.sh <tasks.md> T001 …` | Marca `[X]`; una llamada por ola. |
-| `.opencode/scripts/bash/scope-check.sh snapshot <base.tsv>` / `check <base.tsv> <Uxx.md…>` | Alcance de una ola, antes y después. |
+| `.opencode/scripts/bash/scope-check.sh snapshot <base.tsv>` / `check <base.tsv> --per-unit <Uxx.md…>` | Alcance de una ola, antes y después (con informe por unidad). |
 | `.opencode/scripts/bash/verify.sh [lint tsc test build]` | Solo PASS/FAIL y primeras líneas de error; log completo en `.opencode/runs/_verify/`. |
 
 `.opencode/runs/` (ignorada por git) es el área de trabajo: `prd.md`, `rfc.md`, `schedule.json`, `units/`, `cambios_de_contrato.md`.
@@ -96,6 +96,8 @@ Solo `sddorch-release` usa git. En Engram solo escriben researchers y writer, en
 
 1. **Roles** (máx. `MAX_PARALLEL_RESEARCH`): `product`, `ux`, `security`, `performance`, `quality`, `accessibility`. Si solo hay uno, investígalo tú.
 2. **Researchers** en varias llamadas `subagent` en el mismo turno, en primer plano. Prompt: `run`, norte, rol, `.opencode/roles/<rol>.md`, decisiones ya tomadas y alcance.
+   - **Un researcher, un artefacto o rol.** Si el alcance abarca más (p. ej. plan + mapa de tests + dos contratos), divídelo en varios researchers (misma `topic_key` con sufijo, `findings/<rol>-<parte>`) o en rondas. Dale una lista cerrada de archivos o preguntas; no le pidas «revisar todo».
+   - **Mediciones del store de OpenCode** (`~/.local/share/opencode`): los researchers no tienen acceso (ni `external_directory` ni `shell`). Si un rol necesita medir contra el store, lanza antes un `general` con `shell` (`sqlite3 -readonly` o la API del servidor), guarda el resultado en un archivo bajo `.opencode/runs/<run>/` y pásale al researcher esa ruta como dato. Si el researcher la pide en `preguntas_abiertas`, atiéndela por este camino.
 3. **Solo el resumen** de cada uno (estado, clave, `preguntas_abiertas`). No leas los informes: los lee el writer desde Engram.
 4. **Centraliza las preguntas** en **una** `question`: deduplica, rol delante (`[seguridad]`), recomendada primero, impacto en la descripción; omite las ya resueltas por `decision/*`. Plan: pregunta lo que tenga impacto. Auto: solo lo bloqueante; el resto, opción recomendada como supuesto.
 5. **Una decisión por clave**: `sddorch/<run>/decision/<slug>` (qué, por qué, alternativas), incluidos los supuestos de Auto.
@@ -133,6 +135,7 @@ Escala a SDD completo si una unidad necesita contratos, datos o dependencias nue
    - `specify`: hasta 3 preguntas (`[NEEDS CLARIFICATION]`). Una sola `question` y **reanudas** al mismo `sessionID` con las respuestas.
    - `clarify`: el comando exige **una pregunta por vez**: el hijo devuelve la siguiente, tú la haces con `question` y reanudas con la respuesta, hasta `DONE`.
    - `plan` recibe además `<feature_directory>/discovery/rfc.md` como insumo.
+   - `tasks` recibe como `$ARGUMENTS` extra: «por cada cadena de estado de `contracts/` que cruce dos unidades, añade una tarea de integración de extremo a extremo con su spec, incluido el caso negativo (dato inexistente / 404); ninguna frontera entre unidades queda sin dueño».
 3. `feature_directory` sale de `.specify/feature.json`; no lo inventes.
 4. Al empezar cada fase escribe `▶ Fase N/M: <fase>` (con `(reintento)` si se repite) y actualiza `todowrite`. Al terminar, guarda el `state`.
 
@@ -152,6 +155,9 @@ Ejecuta `schedule.mjs`. Calcula olas por fases bloqueantes, `[P]`, conflictos de
 - `*` toca `SHARED_FILES`: no se fusiona; solo conflictos de ruta la serializan. Indica al hijo que no toque archivos fuera de su lista.
 - Más de 4 archivos: pártela o avisa del riesgo de corte.
 - Instalaciones, migraciones y generadores van solos.
+- `⚠ sin dueño: <ruta> (citada por <doc>)`: `spec.md`, `plan.md`, `data-model.md` o `contracts/` citan un archivo de código que ninguna tarea escribe. Antes de lanzar la ola decide: añadir esa ruta a los `writes` de la unidad correcta, crear una tarea (vuelve a `tasks`) o descartarla si es solo una mención. Nunca esperes a que lo descubra `scope-check`.
+- **Cadena de estado sin dueño**: si `contracts/` declara una cadena de estado que cruza dos unidades, debe existir una unidad de integración E2E con su spec (caso negativo incluido). Si falta, devuelve a `tasks` con esa exigencia antes de lanzar.
+- **Dependencias en prosa**: `dependencia en prosa aplicada: Tyyy ← Txxx (sección <x>)` indica que el script leyó una dependencia escrita fuera de la línea de la tarea y ya la aplicó como arista. Solo revísala si parece falsa; si lo es, corrige la prosa de `tasks.md` y vuelve a ejecutar.
 
 Si `converge` añade tareas, vuelve a ejecutarlo: solo planifica las pendientes.
 
@@ -159,9 +165,9 @@ Si `converge` añade tareas, vuelve a ejecutarlo: solo planifica las pendientes.
 
 Sin worktrees: todos comparten el árbol.
 
-1. **Preflight único** (por fase, no por unidad): un `general` ejecuta los pasos previos de `speckit.implement.md` (hooks, prerrequisitos, gate de checklists, archivos `ignore`) sin implementar. Una decisión pendiente llega como `preguntas_abiertas`. Avisa una vez de que desde aquí se modifica código.
+1. **Preflight único** (por fase, no por unidad): un `general` ejecuta los pasos previos de `speckit.implement.md` (hooks, prerrequisitos, gate de checklists, archivos `ignore`) sin implementar. Una decisión pendiente llega como `preguntas_abiertas`. Que confirme también que cada cadena de estado de `contracts/` que cruza unidades tiene su unidad de integración E2E (si no, vuelve a `tasks`). Avisa una vez de que desde aquí se modifica código.
 2. Por ola: `scope-check.sh snapshot .opencode/runs/<feature>/base.tsv`; luego, en el mismo turno, un `sddorch-implementer` por unidad (prompt: ruta de `Uxx.md`, `run` y clave del norte). Informa `ola i/n: k en paralelo`.
-3. Al terminar la ola: `scope-check.sh check <base.tsv> <Uxx.md>`. Si hay archivos fuera de alcance, esa unidad falla; en Auto, frena.
+3. Al terminar la ola: `scope-check.sh check <base.tsv> --per-unit <Uxx.md…>` (todas las unidades de la ola). Además de los archivos fuera de alcance, avisa de una unidad `SIN CAMBIOS` (trabajo omitido en silencio) y de archivos `RECLAMADO POR n UNIDADES` (error de `schedule`). Si hay archivos fuera de alcance o avisos, esa unidad falla; en Auto, frena.
 4. Una llamada a `mark-tasks.sh` con las tareas `DONE`; guarda el `state`.
 5. Añade los `cambios_de_contrato` de cada hijo a `.opencode/runs/<feature>/cambios_de_contrato.md`. Sus `Decisiones` solo pasan a `decision/<slug>` si afectan a otras unidades.
 6. `.opencode/scripts/bash/verify.sh tsc` tras cada ola; si falla, no empieza la siguiente hasta arreglarlo.
@@ -170,7 +176,7 @@ Sin worktrees: todos comparten el árbol.
 
 ## Fases de cierre
 
-- **tests**: `sddorch-tester` con los archivos de producto modificados y los `specs/` permitidos. Un bloqueo por código incorrecto vuelve a `implement` como tarea de arreglo.
+- **tests**: `sddorch-tester` con los archivos de producto modificados y los `specs/` permitidos. Pásale también la ruta de `contracts/`: exige, por cada contrato y cadena de estado, un caso negativo (dato inexistente, error, vacío) además del camino feliz. Un bloqueo por código incorrecto vuelve a `implement` como tarea de arreglo.
 - **converge**: `general` con la ruta de `cambios_de_contrato.md` como insumo. Si añade tareas, repite `schedule → implement`; para sin tareas o en `MAX_CONVERGE_CYCLES` (informa lo pendiente y pregunta).
 - **code-review**: `sddorch-reviewer` con la ruta de `cambios_de_contrato.md`.
 - **verify**: `verify.sh` completo. Si falla, pregunta (corregir, continuar o detener); no marques la feature completa con fallos sin consentimiento.
@@ -199,7 +205,8 @@ Preguntas solo en descubrimiento y fases iniciales, solo cuando hace falta, siem
 
 - Acumula las `harness_signals` en `sddorch/harness-signal/<slug>` (sube el contador si existe). Al cerrar, propón con `question` solo las repetidas 2+ veces o que causaron un fallo o reintento. Solo propones; no creas nada sin aprobación.
 - No puedes ver los pasos de un hijo: el corte se detecta después. **Antes de la ola**, avisa si una unidad parece grande (más de 4 archivos, tests iterativos), con la alternativa (partir o subir `steps`). **Al volver un hijo cortado** (respuesta vacía, sin bloque del contrato, o `BLOCKED` sin artefactos), avísalo en esa ola con diagnóstico y el número propuesto.
-- Sube `steps` **solo del agente que falla**, con evidencia, **un escalón**. Si viene de tareas grandes, **divide la tarea**. Registra el ajuste en `sddorch/harness-signal/step-limits`.
+- Sube `steps` **solo del agente que falla**, con evidencia, **un escalón**. Si viene de tareas grandes, **divide la tarea**; si viene de un researcher, **divide el alcance** (ver *Descubrimiento*). Registra el ajuste en `sddorch/harness-signal/step-limits`.
+- Los researchers guardan un borrador a mitad de camino (mismo `topic_key`, upsert) para que un corte no pierda el informe; si vuelve cortado, lee su clave antes de relanzarlo y reanúdalo solo para completar lo que falta.
 
 ## Reglas
 

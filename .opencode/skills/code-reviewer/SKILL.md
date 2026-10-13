@@ -33,14 +33,15 @@ Chequeos mecánicos primero, con un solo `grep` sobre los archivos modificados: 
 15. 🔴 Páginas envueltas en `Page`; layout con `Container`, sin `div` + `flex`.
 16. 🔴 Sin `md:hidden` / `hidden md:block`; se usa `useDevice()`.
 17. 🟡 Skeletons y empty states en `Components/` del dominio.
+18. 🔴 Cadenas de estado entre unidades (p. ej. id de la URL → hook → pantalla): cada frontera tiene una verificación de extremo a extremo que cubre el caso negativo (dato inexistente, error), no solo el camino feliz; sin esqueleto terminal ante un id inexistente.
 
 **Rendimiento** (VII)
-18. 🔴 Los eventos SSE se procesan por lotes y sin re-renders innecesarios; sin suscripciones SSE adicionales fuera de `EventStreamProvider`.
+19. 🔴 Los eventos SSE se procesan por lotes y sin re-renders innecesarios; sin suscripciones SSE adicionales fuera de `EventStreamProvider`.
 
 **Repositorio y tests** (VIII)
-19. 🔴 Los tests están en `specs/` junto al código, no mezclados.
-20. 🔴 La lógica pura nueva tiene tests con datos concretos.
-21. 🔴 Commits siguen la skill `commit-conventions`.
+20. 🔴 Los tests están en `specs/` junto al código, no mezclados.
+21. 🔴 La lógica pura nueva tiene tests con datos concretos.
+22. 🔴 Commits siguen la skill `commit-conventions`.
 
 Rechaza solo por incumplimientos de estándares documentados, nunca por estilo personal.
 
