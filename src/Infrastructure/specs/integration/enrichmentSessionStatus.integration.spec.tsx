@@ -149,6 +149,14 @@ beforeEach(() => {
   resetServiceMock();
 });
 
+/**
+ * Margen explícito para el E2E de frontera: monta la página real, la sonda del
+ * modelo y espera el flush del arné; sufre timeout bajo carga con el límite por
+ * defecto de Vitest (5 s). 20 s es holgado (>2× lo observado) y no debilita
+ * ninguna aserción: sólo evita el falso fallo por timeout.
+ */
+const INTEGRATION_TIMEOUT_MS = 20_000;
+
 describe('integración U6↔U5 — estado de sesión → nodo (T030)', () => {
   it('funde el estado global y la señal de ejecución en el nodo enriquecido', async () => {
     const client = createIntegrationQueryClient();
@@ -246,4 +254,4 @@ describe('integración U6↔U5 — estado de sesión → nodo (T030)', () => {
     expect(childNode?.data.context?.latency?.reference).toBeNull();
     expect(childNode?.data.context?.latency?.anomalies).toEqual([]);
   });
-});
+}, INTEGRATION_TIMEOUT_MS);
