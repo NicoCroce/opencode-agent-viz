@@ -20,6 +20,10 @@
  *   hooks reales (por import profundo o `vi.importActual`) y sustituyen **solo**
  *   los componentes pesados por marcadores identificables (`TESTID`) que
  *   exponen sus props en atributos `data-*`.
+ * - Piezas sueltas del Inspector: `buildGraphNode` (nodo mínimo del grafo),
+ *   `renderInspectorPanel` (panel real en una columna de ancho simulado, porque
+ *   jsdom no mide layout) y `expectNoTruncation` (aserción de recorte por
+ *   clases, no por medición).
  *
  * El fichero **no** es `*.spec.tsx`: Vitest solo recolecta
  * `src/**\/*.{test,spec}.{ts,tsx}` (`vitest.config.ts`), así que este arnés no se
@@ -77,10 +81,10 @@
  * página —y sus barrels mockeados— se evaluaran **durante** la construcción del
  * mock).
  */
-import { act, render, type RenderResult } from '@testing-library/react';
+import { act, render, screen, type RenderResult } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { vi, type Mock } from 'vitest';
+import { expect, vi, type Mock } from 'vitest';
 import type { ReactNode } from 'react';
 import type {
   AgentInfo,
@@ -92,11 +96,14 @@ import type {
 } from '@opencode/client';
 import { STORE_KEY } from '@app/Application/Hooks';
 import type { TQuestionEntry } from '@app/Application/Helpers/questionState';
+import { INSPECTOR_MIN_WIDTH } from '@app/Application/Helpers/panelWidth';
+import { renderWithProviders } from '@app/test/renderWithProviders';
 import { queryKeys } from '@app/Domains/queryKeys';
 import type {
   TExecutionSignal,
   TGraphModel,
   TGraphNode,
+  TGraphNodeData,
 } from '@app/Domains/Graph/Graph.entity';
 import type { TSubtreeLoadResult } from '@app/Domains/Graph/lib/loadPlan/subtree';
 import type { TLineageNav } from '@app/Domains/History/HistoryEntry.entity';
@@ -383,7 +390,8 @@ export interface TResetServiceMockOptions {
  * trae datos, de modo que cada caso siembra **solo** lo que su frontera
  * necesita. `getSessionForm` queda sin implementación a propósito (se configura
  * en el caso que siembra formularios); con `listSessionForms` vacío nunca se
- * invoca.
+ * invoca. `getSessionDiff` resuelve `[]` (y no queda sin valor) para que el
+ * panel real no avise «Query data cannot be undefined».
  */
 export const resetServiceMock = (
   service: TOpencodeServiceMock = serviceMock,
@@ -411,6 +419,7 @@ export const resetServiceMock = (
   service.getSessionContext.mockReset();
   service.getSessionContext.mockResolvedValue([]);
   service.getSessionDiff.mockReset();
+  service.getSessionDiff.mockResolvedValue([]);
   service.getSessionStats.mockReset();
   service.exportSession.mockReset();
   service.getSessionInstructions.mockReset();
@@ -480,6 +489,182 @@ export const flushIdle = async (): Promise<void> => {
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
+};
+
+/* -------------------------------------------------------------------------- */
+/* Nodos, panel real y aserciones de layout (sin medición)                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `data-testid` de la columna que simula el ancho del panel real. No es
+ * contrato de producción: es el ancla del arnés para localizar la raíz del
+ * panel (`getInspectorPanelRoot`) sin depender del orden del DOM.
+ */
+export const INSPECTOR_PANEL_COLUMN_TEST_ID = 'inspector-panel-column';
+
+/**
+ * Overrides de `buildGraphNode`: parchea `data` y, opcionalmente, `id` y
+ * `position`.
+ */
+export type TBuildGraphNodeOverrides = Partial<TGraphNodeData> & {
+  /** Id del nodo; por defecto el `sessionId` resultante. */
+  id?: string;
+  /** Posición en el lienzo; por defecto `{ x: 0, y: 0 }`. */
+  position?: TGraphNode['position'];
+};
+
+/**
+ * `TGraphNode` mínimo y determinista (`type: 'agent'`, origen neutro y métricas
+ * a cero) para montar piezas que dependen del modelo del grafo real sin pasar
+ * por `buildGraph`/React Flow. `overrides` parchea `data` (y `id`/`position`),
+ * de modo que cada caso cambia solo lo que observa.
+ *
+ * Los campos son **exactamente** los que exige `TGraphNodeData`; no se añaden
+ * `enrichment`/`context`/`effort`/`speedup` (opcionales) para no inventar
+ * señales que el enriquecimiento derivaría.
+ */
+export const buildGraphNode = (
+  overrides: TBuildGraphNodeOverrides = {},
+): TGraphNode => {
+  const { id, position, ...dataOverrides } = overrides;
+  const sessionId = dataOverrides.sessionId ?? INTEGRATION_SESSION_ID;
+
+  return {
+    id: id ?? sessionId,
+    type: 'agent',
+    position: position ?? { x: 0, y: 0 },
+    data: {
+      sessionId,
+      title: 'tarea',
+      createdAt: 1,
+      updatedAt: 2,
+      agentName: 'develop',
+      directory: INTEGRATION_DIRECTORY,
+      model: null,
+      status: 'succeeded',
+      retry: null,
+      interruptReason: null,
+      metrics: {
+        durationMs: 0,
+        startedAt: 0,
+        endedAt: 0,
+        cost: 0,
+        tokens: null,
+        invocations: 0,
+        retryCount: 0,
+        hasLoop: false,
+        loopEvidence: [],
+      },
+      isRoot: true,
+      currentTool: null,
+      parallel: null,
+      ...dataOverrides,
+    },
+  };
+};
+
+export interface TRenderInspectorPanelOptions {
+  /** Ancho simulado de la columna en px; por defecto el mínimo del panel. */
+  width?: number;
+  /** Siembra la caché ANTES de renderizar (claves que consume el Inspector). */
+  seed?: (client: QueryClient) => void;
+  /** Cliente propio; por defecto `createIntegrationQueryClient()`. */
+  queryClient?: QueryClient;
+  /** Entradas del router; por defecto `['/']`. */
+  initialEntries?: string[];
+}
+
+/**
+ * Monta el `InspectorPanel` **real** (no el marcador del arnés) dentro de una
+ * columna de ancho simulado, con `renderWithProviders` y la caché sembrada.
+ *
+ * jsdom **no mide layout**: no hay caja, `clientWidth`/`scrollWidth` ni un
+ * `getComputedStyle` con anchos útiles, así que el ancho de producción
+ * `[INSPECTOR_MIN_WIDTH, INSPECTOR_MAX_WIDTH]` se simula fijando el ancho de la
+ * columna que envuelve al panel; la garantía observable es de clases y texto
+ * (ver `expectNoTruncation`).
+ *
+ * La importación del panel es diferida, igual que la de `WorkspacePage` en
+ * `renderWorkspace` y por el mismo motivo: el panel (vía sus hooks) alcanza
+ * `@app/Infrastructure/Services/opencodeClient`, que los specs mockean con un
+ * factory que importa este arnés; evaluarlo durante la construcción del mock
+ * provocaría un ciclo de espera.
+ */
+export const renderInspectorPanel = async (
+  node: TGraphNode,
+  {
+    width = INSPECTOR_MIN_WIDTH,
+    seed,
+    queryClient = createIntegrationQueryClient(),
+    initialEntries = ['/'],
+  }: TRenderInspectorPanelOptions = {},
+): Promise<RenderResult & { queryClient: QueryClient }> => {
+  const { InspectorPanel } = await import(
+    '@app/Domains/Inspector/Components/InspectorPanel'
+  );
+
+  return renderWithProviders(
+    <div data-testid={INSPECTOR_PANEL_COLUMN_TEST_ID} style={{ width }}>
+      <InspectorPanel node={node} />
+    </div>,
+    { queryClient, seed, initialEntries },
+  );
+};
+
+/**
+ * Raíz del panel: el primer hijo de la columna. Evita repetir
+ * `firstElementChild as HTMLElement` en cada spec.
+ */
+export const getInspectorPanelRoot = (): HTMLElement => {
+  const column = screen.getByTestId(INSPECTOR_PANEL_COLUMN_TEST_ID);
+  const root = column.firstElementChild;
+  if (!(root instanceof HTMLElement)) {
+    throw new Error(
+      `La columna ${INSPECTOR_PANEL_COLUMN_TEST_ID} no tiene un hijo HTMLElement`,
+    );
+  }
+  return root;
+};
+
+/**
+ * Utilidades de Tailwind que recortarían una etiqueta: truncado, elipsis,
+ * `line-clamp`, recorte oculto o un `white-space` que permita partirla en dos
+ * líneas (`line-clamp-N` representa cualquier `line-clamp-\d`).
+ */
+export const TRUNCATION_UTILITIES = [
+  'truncate',
+  'text-ellipsis',
+  'line-clamp-N',
+  'overflow-hidden',
+  'whitespace-normal',
+  'whitespace-pre',
+] as const;
+
+/**
+ * Patrón que reconoce las utilidades de `TRUNCATION_UTILITIES` dentro de un
+ * `className`; es el matcher de `expectNoTruncation`.
+ */
+export const TRUNCATION_UTILITIES_PATTERN =
+  /\btruncate\b|\btext-ellipsis\b|\bline-clamp-\d|\boverflow-hidden\b|\bwhitespace-(normal|pre)\b/;
+
+/**
+ * Falla con un mensaje legible si `className` usa una utilidad que recorta el
+ * texto de una etiqueta.
+ *
+ * **Por qué no se mide**: jsdom no implementa layout (`getBoundingClientRect`
+ * devuelve ceros, no hay `scrollWidth`/`clientWidth` efectivos), así que "la
+ * etiqueta no se recorta" se asegura por **clases**. Lo que esta aserción **no**
+ * puede garantizar: que el texto quepa en una línea a un ancho dado, ni el
+ * recorte por estilos inline o CSS heredado fuera del `className`.
+ */
+export const expectNoTruncation = (
+  className: string,
+  label = 'la etiqueta',
+): void => {
+  expect(
+    className,
+    `${label} no debe usar utilidades de recorte (jsdom no mide layout: la garantía es por clases)`,
+  ).not.toMatch(TRUNCATION_UTILITIES_PATTERN);
 };
 
 /* -------------------------------------------------------------------------- */
