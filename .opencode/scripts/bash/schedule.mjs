@@ -6,7 +6,10 @@
 //                                            [--group-tasks N] [--group-files N]
 //
 // Qué hace (determinista, sin LLM):
-//   1. Lee las tareas pendientes (`- [ ] T### [P] [USn] descripción`).
+//   1. Lee las tareas pendientes (`- [ ] T### [P] [USn] descripción`). El bloque de una tarea abarca sus
+//      líneas de continuación (hasta la primera línea vacía, otra tarea, otro heading o el inicio de otra
+//      sección); descripciones, `writes:` y dependencias se leen del bloque completo, no solo de la primera
+//      línea, y `raw` conserva el bloque entero.
 //   2. Infiere los `writes` de cada tarea: rutas entre backticks cuyo primer tramo existe en la raíz del repo.
 //   3. Calcula el nivel de cada tarea (camino más largo) con estas dependencias:
 //        - fases bloqueantes (Setup/Foundational) antes de las historias; Polish/Convergence al final;
@@ -69,7 +72,14 @@ const proseLines = [];
 const kindOf = (name) =>
   /setup|foundational|blocking/i.test(name) ? 'block' : /polish|cross-cutting|converg|verify|fix/i.test(name) ? 'final' : 'story';
 
-for (const line of lines) {
+// Una línea de continuación pertenece al bloque de la tarea salvo que sea vacía, otra tarea, un heading
+// o el inicio de otra sección (`**Checkpoint**:`, `**Purpose**:`, `---`, filas de tabla…).
+const blockStops = (l) =>
+  !l.trim() || taskRe.test(l) || /^#{1,6}\s/.test(l)
+  || /^\s*(?:\*\*[^*]+\*\*|---+|\*\*\*+|___+|\|)/.test(l);
+
+for (let i = 0; i < lines.length; i++) {
+  const line = lines[i];
   const pm = line.match(phaseRe);
   if (pm) {
     cur = { idx: phases.length, name: pm[2].trim(), kind: kindOf(pm[2]) };
@@ -93,10 +103,15 @@ for (const line of lines) {
     if (/\bT\d+\b/.test(line)) proseLines.push({ text: line, section: cur.name });
     continue;
   }
+  const block = [line];
+  while (i + 1 < lines.length && !blockStops(lines[i + 1])) block.push(lines[++i]);
   const [, mark, id, tags, desc] = tm;
+  const tail = block.slice(1).map((l) => l.trim()).filter(Boolean);
   all.push({
     id, done: mark !== ' ', parallel: /\[P\]/.test(tags), story: (tags.match(/\[(US\d+)\]/) || [])[1] ?? null,
-    phase: cur, desc: desc.trim(), raw: line.trim(), order: all.length,
+    phase: cur, desc: [desc.trim(), ...tail].join(' ').trim(),
+    raw: [line.trim(), ...block.slice(1).map((l) => l.replace(/\s+$/, ''))].join('\n'),
+    order: all.length,
   });
 }
 const tasks = all.filter((t) => !t.done);
