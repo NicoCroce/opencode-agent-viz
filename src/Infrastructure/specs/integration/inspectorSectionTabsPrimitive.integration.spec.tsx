@@ -4,23 +4,22 @@
  * interno de secciones técnicas.
  *
  * Monta el `InspectorPanel` **real** (no el marcador del arnés) con
- * `renderWithProviders` + `createIntegrationQueryClient` y el SDK mockeado por
- * el arnés (`serviceMock`/`resetServiceMock`), con la caché sembrada **vacía**:
- * los mensajes, el diff, las preguntas, los permisos, la bandeja, el contexto,
- * los servidores MCP y las instrucciones resuelven a `[]` (dato inexistente),
- * de modo que cada panel cae en su estado vacío legítimo en vez de en carga.
- * Las siete secciones son las **reales** (no marcadores): la frontera U1↔U3
- * exige observar el contenido montado de verdad.
+ * `renderInspectorPanel` —columna de ancho simulado + SDK mockeado por el
+ * arnés (`serviceMock`/`resetServiceMock`)— y la caché sembrada **vacía**: los
+ * mensajes, el diff, las preguntas, los permisos, la bandeja, el contexto, los
+ * servidores MCP y las instrucciones resuelven a `[]` (dato inexistente), de
+ * modo que cada panel cae en su estado vacío legítimo en vez de en carga. Las
+ * siete secciones son las **reales** (no marcadores): la frontera U1↔U3 exige
+ * observar el contenido montado de verdad.
  *
  * **Anchos mínimo y máximo simulados** (SC-003): el panel de producción vive en
  * una columna redimensionable de `[INSPECTOR_MIN_WIDTH, INSPECTOR_MAX_WIDTH]`
- * px, y como jsdom no mide layout el ancho se simula fijando el ancho de la
- * columna que envuelve al panel (mismo criterio que
- * `detailChatTablistRegression.integration.spec.tsx`). La garantía observable
- * es de **clases y texto**: la lista conserva el alto de control y puede
- * envolver (`min-h-control` + `flex-wrap`, sin `h-control`), ninguna etiqueta
- * se trunca (`whitespace-nowrap`, sin utilidades de recorte) y el número de
- * pestañas no cambia con el ancho.
+ * px; jsdom no mide layout, así que el ancho se simula con la columna que monta
+ * `renderInspectorPanel` y la garantía observable es de **clases y texto** (ver
+ * el JSDoc de ese helper y `expectNoTruncation`): la lista conserva el alto de
+ * control y puede envolver (`min-h-control` + `flex-wrap`, sin `h-control`),
+ * ninguna etiqueta se trunca (`whitespace-nowrap`, sin utilidades de recorte) y
+ * el número de pestañas no cambia con el ancho.
  *
  * Cubre:
  *
@@ -35,18 +34,12 @@
  *    SC-002) y el desplegable "Avanzado" (eliminado en T012) ya no existe.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  screen,
-  waitFor,
-  within,
-  type RenderResult,
-} from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import type { QueryClient } from '@tanstack/react-query';
 import {
   INSPECTOR_MAX_WIDTH,
   INSPECTOR_MIN_WIDTH,
 } from '@app/Application/Helpers/panelWidth';
-import { InspectorPanel } from '@app/Domains/Inspector/Components/InspectorPanel';
 import {
   INSPECTOR_SECTION_PANEL_TEST_ID,
   INSPECTOR_SECTION_TABS_TEST_ID,
@@ -59,10 +52,13 @@ import {
 } from '@app/Domains/Inspector/Hooks/useInspectorSectionTabs';
 import type { TGraphNode } from '@app/Domains/Graph/Graph.entity';
 import { queryKeys } from '@app/Domains/queryKeys';
-import { renderWithProviders } from '@app/test/renderWithProviders';
 import { setupRadixUser } from '@app/test/radix';
 import {
-  createIntegrationQueryClient,
+  buildGraphNode,
+  expectNoTruncation,
+  getInspectorPanelRoot,
+  INSPECTOR_PANEL_COLUMN_TEST_ID,
+  renderInspectorPanel,
   resetServiceMock,
   seedForms,
   seedMessages,
@@ -111,50 +107,20 @@ const PANEL_WIDTHS: readonly (readonly [label: string, width: number])[] = [
   ['máximo', INSPECTOR_MAX_WIDTH],
 ];
 
-/** `data-testid` de la columna que simula el ancho del panel. */
-const PANEL_COLUMN_TEST_ID = 'panel-column';
-
-/**
- * Utilidades que recortarían una etiqueta (SC-003): truncado, elipsis,
- * recorte oculto o cambio de `white-space` que permita partirla en dos líneas.
- */
-const TRUNCATION_UTILITIES =
-  /\btruncate\b|\btext-ellipsis\b|\bline-clamp-\d|\boverflow-hidden\b|\bwhitespace-(normal|pre)\b/;
-
 /**
  * Nodo mínimo del grafo (identidad + métricas) para que el panel componga el
- * resumen continuo; sin `context` para no inventar series de latencia.
+ * resumen continuo; sin `context` para no inventar series de latencia. Se
+ * construye con `buildGraphNode` del arnés y solo se parchea la identidad que
+ * observan los casos.
  */
-const buildNode = (): TGraphNode => ({
+const PANEL_NODE: TGraphNode = buildGraphNode({
   id: SESSION_ID,
-  type: 'agent',
-  position: { x: 0, y: 0 },
-  data: {
-    sessionId: SESSION_ID,
-    title: 'Tarea de secciones',
-    createdAt: null,
-    updatedAt: null,
-    agentName: 'develop',
-    directory: DIRECTORY,
-    model: { providerID: 'opencode-go', id: 'deepseek' },
-    status: 'succeeded',
-    retry: null,
-    interruptReason: null,
-    metrics: {
-      durationMs: 0,
-      startedAt: 0,
-      endedAt: 0,
-      cost: 0,
-      tokens: null,
-      invocations: 0,
-      retryCount: 0,
-      hasLoop: false,
-      loopEvidence: [],
-    },
-    isRoot: true,
-    currentTool: null,
-    parallel: null,
-  },
+  sessionId: SESSION_ID,
+  title: 'Tarea de secciones',
+  createdAt: null,
+  updatedAt: null,
+  directory: DIRECTORY,
+  model: { providerID: 'opencode-go', id: 'deepseek' },
 });
 
 /**
@@ -173,19 +139,12 @@ const seedEmptyPanelCache = (client: QueryClient): void => {
   seedQueryData(client, queryKeys.sessions.instructions(SESSION_ID), []);
 };
 
-/** Columna del panel: simula el ancho mínimo/máximo de producción. */
-const PanelColumn = ({ width }: { width: number }) => (
-  <div data-testid={PANEL_COLUMN_TEST_ID} style={{ width }}>
-    <InspectorPanel node={buildNode()} />
-  </div>
-);
-
-/** Monta el panel real en una columna del ancho indicado, con la caché sembrada. */
-const renderPanelAt = (width: number): RenderResult =>
-  renderWithProviders(<PanelColumn width={width} />, {
-    queryClient: createIntegrationQueryClient(),
-    seed: seedEmptyPanelCache,
-  });
+/**
+ * Monta el panel real en una columna del ancho indicado, con la caché sembrada
+ * (el ancho se simula porque jsdom no mide layout: ver `renderInspectorPanel`).
+ */
+const renderPanelAt = (width: number) =>
+  renderInspectorPanel(PANEL_NODE, { width, seed: seedEmptyPanelCache });
 
 /* -------------------------------------------------------------------------- */
 /* Consultas                                                                    */
@@ -196,10 +155,6 @@ const getTablist = (): HTMLElement =>
 
 const getTab = (id: TInspectorSectionTab): HTMLElement =>
   screen.getByRole('tab', { name: LABEL_BY_TAB[id] });
-
-/** Raíz del panel: la `Container` que `InspectorPanel` rinde dentro de la columna. */
-const getPanelRoot = (): HTMLElement =>
-  screen.getByTestId(PANEL_COLUMN_TEST_ID).firstElementChild as HTMLElement;
 
 /**
  * Encabezados de sección (`SectionHeading`, un `span`) con ese texto exacto
@@ -234,14 +189,14 @@ beforeEach(() => {
 describe('U1↔U3 — el primitivo en el tablist interno de secciones (T022, §6/§5)', () => {
   it.each(PANEL_WIDTHS)(
     'en ancho %s (%i px) la lista conserva el alto, envuelve y no recorta etiquetas',
-    (_label, width) => {
-      renderPanelAt(width);
+    async (_label, width) => {
+      await renderPanelAt(width);
 
       // Ancho simulado (jsdom no mide layout): la columna es la que aguanta los
       // 280–720 px de producción.
-      expect(screen.getByTestId(PANEL_COLUMN_TEST_ID).style.width).toBe(
-        `${width}px`,
-      );
+      expect(
+        screen.getByTestId(INSPECTOR_PANEL_COLUMN_TEST_ID).style.width,
+      ).toBe(`${width}px`);
 
       const tablist = getTablist();
       expect(tablist).toHaveAttribute(
@@ -268,7 +223,8 @@ describe('U1↔U3 — el primitivo en el tablist interno de secciones (T022, §6
       );
       expect(tablist.className).not.toMatch(/\boverflow-x-(auto|scroll)\b/);
 
-      // §6/SC-003: las siete etiquetas, íntegras y en orden, sin truncado.
+      // §6/SC-003: las siete etiquetas, íntegras y en orden, sin truncado
+      // (`expectNoTruncation` es la garantía por clases del arnés).
       const triggers = within(tablist).getAllByRole('tab');
       expect(triggers).toHaveLength(SECTION_LABELS.length);
       expect(triggers.map((trigger) => trigger.textContent)).toEqual(
@@ -276,7 +232,7 @@ describe('U1↔U3 — el primitivo en el tablist interno de secciones (T022, §6
       );
       for (const trigger of triggers) {
         expect(trigger).toHaveClass('whitespace-nowrap');
-        expect(trigger.className).not.toMatch(TRUNCATION_UTILITIES);
+        expectNoTruncation(trigger.className);
       }
 
       // §5: un solo panel con hijos; los seis inactivos `hidden` y sin hijos.
@@ -310,9 +266,9 @@ describe('U1↔U3 — el primitivo en el tablist interno de secciones (T022, §6
   );
 
   it('no duplica ninguna sección entre el resumen y las pestañas (0 duplicados, SC-002)', async () => {
-    renderPanelAt(INSPECTOR_MIN_WIDTH);
+    await renderPanelAt(INSPECTOR_MIN_WIDTH);
 
-    const panelRoot = getPanelRoot();
+    const panelRoot = getInspectorPanelRoot();
     const tabsRoot = getTablist().parentElement as HTMLElement;
 
     // §1: el tablist interno es el último bloque del eje vertical.
@@ -352,9 +308,9 @@ describe('U1↔U3 — el primitivo en el tablist interno de secciones (T022, §6
   });
 
   it('con dato inexistente solo la pestaña activa monta hijos y las seis restantes siguen vacías', async () => {
-    renderPanelAt(INSPECTOR_MIN_WIDTH);
+    await renderPanelAt(INSPECTOR_MIN_WIDTH);
 
-    const panelRoot = getPanelRoot();
+    const panelRoot = getInspectorPanelRoot();
 
     for (const item of INSPECTOR_SECTION_TAB_ITEMS) {
       await selectTab(item.id);
@@ -388,7 +344,9 @@ describe('U1↔U3 — el primitivo en el tablist interno de secciones (T022, §6
       ),
     ).toBeInTheDocument();
     expect(
-      within(getTablist()).getAllByRole('tab').map((tab) => tab.textContent),
+      within(getTablist())
+        .getAllByRole('tab')
+        .map((tab) => tab.textContent),
     ).toEqual(SECTION_LABELS);
   });
 });
