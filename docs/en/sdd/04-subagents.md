@@ -16,7 +16,7 @@ same format.
 | `explore` | subagent | Cheap read-only code exploration (locate files and symbols) | Read-only (`read`, `glob`, `grep`) | — |
 | `sddorch-implementer` | subagent | Runs `implement` tasks or a fast-route unit | Edits only its `writes`; git denied | 80 steps |
 | `sddorch-reviewer` | subagent | Constitution gates | Read-only + `code-reviewer` skill + Engram + `pnpm tsc/lint/test` to verify | 40 steps |
-| `sddorch-tester` | subagent | Tests after `implement` | Edits only `src/*/specs/*`, `__fixtures__/` and `specs/*` | 60 steps |
+| `sddorch-tester` | subagent | Tests after `implement` | Edits only `src/*/specs/*` and `src/*/__fixtures__/*` | 60 steps |
 | `sddorch-release` | subagent | Commits, `pr-detail`, and PR | Only one with `git add/commit`; creates or switches branches (`git switch`); Engram; push denied except PR script | 50 steps |
 
 > **Budget (`steps`).** It is the step ceiling each subagent can use before
@@ -47,8 +47,8 @@ The permission design is a security layer, not a detail:
   verify a specific claim.
 - **`sddorch-implementer`** has git denied (`add`, `commit`, `push`, `stash`,
   `checkout`, `reset`, `rebase`) and cannot touch `tasks.md`.
-- **`sddorch-tester`** can edit **only** under `src/*/specs/*`,
-  `src/*/__fixtures__/*` and `specs/*`.
+- **`sddorch-tester`** can edit **only** under `src/*/specs/*` and
+  `src/*/__fixtures__/*` (the *test specs*, not the Spec-Kit `specs/` folder).
 - **`sddorch-release`** is the **only** one that runs `git add` and `git commit`;
   it can create or switch branches (`git switch`) and query Engram. `git push` is
   denied; the push is done only by the PR script.

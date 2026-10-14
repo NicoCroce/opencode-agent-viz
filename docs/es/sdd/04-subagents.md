@@ -16,7 +16,7 @@ formato.
 | `explore` | subagent | Exploración read-only y barata del código (localizar archivos y símbolos) | Solo lectura (`read`, `glob`, `grep`) | — |
 | `sddorch-implementer` | subagent | Ejecuta tareas de `implement` o una unidad de la ruta rápida | Edita solo sus `writes`; git denegado | 80 pasos |
 | `sddorch-reviewer` | subagent | Compuertas de constitución | Solo lectura + skill `code-reviewer` + Engram + `pnpm tsc/lint/test` para verificar | 40 pasos |
-| `sddorch-tester` | subagent | Tests tras `implement` | Edita solo `src/*/specs/*`, `__fixtures__/` y `specs/*` | 60 pasos |
+| `sddorch-tester` | subagent | Tests tras `implement` | Edita solo `src/*/specs/*` y `src/*/__fixtures__/*` | 60 pasos |
 | `sddorch-release` | subagent | Commits, `pr-detail` y PR | Único con `git add/commit`; crea o cambia de rama (`git switch`); Engram; push denegado salvo script de PR | 50 pasos |
 
 > **Presupuesto (`steps`).** Es el techo de pasos que puede dar cada subagente
@@ -47,8 +47,8 @@ El diseño de permisos es una capa de seguridad, no un detalle:
   verificar una afirmación concreta.
 - **`sddorch-implementer`** tiene git denegado (`add`, `commit`, `push`,
   `stash`, `checkout`, `reset`, `rebase`) y no puede tocar `tasks.md`.
-- **`sddorch-tester`** puede editar **solo** en `src/*/specs/*`,
-  `src/*/__fixtures__/*` y `specs/*`.
+- **`sddorch-tester`** puede editar **solo** en `src/*/specs/*` y
+  `src/*/__fixtures__/*` (los *specs de test*, no la carpeta `specs/` de Spec-Kit).
 - **`sddorch-release`** es el **único** que hace `git add` y `git commit`; puede
   crear o cambiar de rama (`git switch`) y consultar Engram. `git push` está
   denegado; el push lo hace únicamente el script de PR.
