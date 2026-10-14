@@ -4,7 +4,8 @@
 # Uso:
 #   verify.sh [--log-dir <dir>] [lint tsc test build]
 #
-# Sin argumentos corre, en orden: lint, tsc, test, build (VERIFY_COMMANDS de sddorch.md).
+# Sin argumentos corre lint, tsc y build en paralelo y luego test (VERIFY_COMMANDS de sddorch.md).
+# Los resultados se imprimen siempre en el orden lint, tsc, test, build.
 # El log completo de cada comando queda en <log-dir>/<cmd>.log
 # (por defecto .opencode/runs/_verify). En pantalla solo salen: PASS/FAIL, duración y,
 # si falla, las primeras líneas de error. No se detiene en el primer fallo.
@@ -27,12 +28,45 @@ done
 mkdir -p "$LOG_DIR"
 failed=0
 
+has_cmd() {
+    local x
+    for x in "${CMDS[@]}"; do [[ "$x" == "$1" ]] && return 0; done
+    return 1
+}
+
+# `pnpm build` ya corre `tsc`; si tsc está en la lista, build solo corre vite.
+run_cmd() {
+    local c="$1" start=$SECONDS rc
+    if [[ "$c" == "build" ]] && has_cmd tsc; then
+        pnpm exec vite build >"$LOG_DIR/$c.log" 2>&1
+    else
+        pnpm "$c" >"$LOG_DIR/$c.log" 2>&1
+    fi
+    rc=$?
+    echo "$rc" >"$LOG_DIR/$c.rc"
+    echo "$((SECONDS - start))" >"$LOG_DIR/$c.dur"
+}
+
+# lint, tsc y build son independientes: en paralelo. test va aparte, después.
+PARALLEL=()
+SERIAL=()
+for c in "${CMDS[@]}"; do
+    if [[ "$c" == "test" ]]; then SERIAL+=("$c"); else PARALLEL+=("$c"); fi
+done
+
+if [[ ${#PARALLEL[@]} -gt 0 ]]; then
+    for c in "${PARALLEL[@]}"; do run_cmd "$c" & done
+    wait
+fi
+if [[ ${#SERIAL[@]} -gt 0 ]]; then
+    for c in "${SERIAL[@]}"; do run_cmd "$c"; done
+fi
+
 for c in "${CMDS[@]}"; do
     log="$LOG_DIR/$c.log"
-    start=$SECONDS
-    pnpm "$c" >"$log" 2>&1
-    rc=$?
-    dur=$((SECONDS - start))
+    rc=$(<"$LOG_DIR/$c.rc")
+    dur=$(<"$LOG_DIR/$c.dur")
+    rm -f "$LOG_DIR/$c.rc" "$LOG_DIR/$c.dur"
     if [[ $rc -eq 0 ]]; then
         extra=""
         if [[ "$c" == "test" ]]; then
