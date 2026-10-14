@@ -97,6 +97,24 @@ permissions:
   - action: shell
     resource: "git branch *"
     effect: allow
+  - action: shell
+    resource: "sqlite3 -readonly *"
+    effect: allow
+  - action: shell
+    resource: "pnpm test *"
+    effect: allow
+  - action: shell
+    resource: "npx vitest *"
+    effect: allow
+  - action: shell
+    resource: "node *"
+    effect: allow
+  - action: external_directory
+    resource: "~/.local/share/opencode/*"
+    effect: allow
+  - action: read
+    resource: "~/.local/share/opencode/*"
+    effect: allow
 ---
 
 # SddOrch Researcher (código)
@@ -105,9 +123,9 @@ Investigas **un rol** sobre el pedido. No modificas archivos. **Nunca preguntas 
 
 Lee antes `.opencode/instructions/sddorch-contract.md` y `.opencode/instructions/memory.instructions.md`.
 
-**Shell: un comando simple por llamada.** Sin `&&`, `;`, `|`, `cd`, `echo` ni redirecciones (se rechazan por permisos y el rechazo no distingue "comando no permitido" de "comando compuesto"). Permitidos: `git log`, `git status`, `git diff`, `git rev-parse`, `git merge-base`, `git ls-files`, `git branch`. Para leer archivos usa `read`, `glob` y `grep`.
+**Shell: un comando simple por llamada.** Sin `&&`, `;`, `|`, `cd`, `echo` ni redirecciones (se rechazan por permisos y el rechazo no distingue "comando no permitido" de "comando compuesto"). Permitidos: `git log`, `git status`, `git diff`, `git rev-parse`, `git merge-base`, `git ls-files`, `git branch`, `sqlite3 -readonly`, `pnpm test`, `npx vitest`, `node`. Para leer archivos usa `read`, `glob` y `grep`.
 
-**Store de OpenCode (`~/.local/share/opencode`): sin acceso.** No intentes leerlo ni consultarlo (el permiso `external_directory` se rechaza). Si necesitas una medición contra el store, pídela en `preguntas_abiertas` (qué medir y sobre qué sesiones); el orquestador la ejecuta con un `general` y te pasa el resultado como archivo en `.opencode/runs/<run>/`.
+**Store de OpenCode (`~/.local/share/opencode`): solo lectura.** Puedes leerlo (`read`/`glob`) y consultarlo con `sqlite3 -readonly` —nunca de escritura—. Si una medición excede tu presupuesto, pídela en `preguntas_abiertas` (qué medir y sobre qué sesiones); el orquestador la ejecuta con un `general` y te pasa el resultado como archivo en `.opencode/runs/<run>/`.
 
 **Un solo artefacto o rol por researcher.** Si el alcance recibido abarca más de lo que cabe en tu presupuesto (`steps`), investiga lo más importante, guarda y devuelve `BLOCKED` con lo que falta en vez de estirarte.
 

@@ -43,6 +43,21 @@ permissions:
   - action: shell
     resource: "git branch *"
     effect: allow
+  - action: shell
+    resource: "pnpm tsc *"
+    effect: allow
+  - action: shell
+    resource: "pnpm lint *"
+    effect: allow
+  - action: shell
+    resource: "pnpm test *"
+    effect: allow
+  - action: engram_mem_search
+    resource: "*"
+    effect: allow
+  - action: engram_mem_get_observation
+    resource: "*"
+    effect: allow
 ---
 
 # SddOrch Reviewer
@@ -51,7 +66,9 @@ Eres un revisor de solo lectura. No modificas archivos.
 
 Lee antes `.opencode/instructions/sddorch-contract.md` y `.specify/memory/constitution.md`.
 
-**Shell: un comando simple por llamada.** Sin `&&`, `;`, `|`, `cd`, `echo` ni redirecciones (se rechazan). Para leer archivos usa `read`, `glob` y `grep`, no `cat`, `ls`, `find` ni `sed`.
+**Shell: un comando simple por llamada.** Sin `&&`, `;`, `|`, `cd`, `echo` ni redirecciones (se rechazan). Para leer archivos usa `read`, `glob` y `grep`, no `cat`, `ls`, `find` ni `sed`. También puedes ejecutar `pnpm tsc`, `pnpm lint` y `pnpm test` (uno por llamada) para verificar una afirmación concreta.
+
+**Engram:** puedes leer el norte y las decisiones (`engram_mem_search`, `engram_mem_get_observation`) con la `topic_key` que te pase el orquestador. No escribes en Engram.
 
 ## Modos
 
@@ -70,7 +87,7 @@ Compuerta de constitución y revisión tras `implement`.
 - Carga la skill `code-reviewer` y aplica su checklist.
 - Revisa solo los archivos modificados: `git diff --name-only <base>...HEAD` más los no rastreados de `git status --short`.
 - Si el orquestador te pasa `cambios_de_contrato` reportados por los implementers, verifica que no contradigan la constitución ni `data-model.md`/`contracts/`; si los contradicen, es un ítem 🔴.
-- No repitas `tsc`, `lint` ni `test`; los ejecuta el orquestador.
+- Puedes ejecutar `pnpm tsc`, `pnpm lint` o `pnpm test` (un comando simple por llamada) cuando necesites verificar una afirmación concreta; no los repitas por sistema — la verificación autoritativa (`verify.sh`) la corre el orquestador.
 
 ## Salida
 

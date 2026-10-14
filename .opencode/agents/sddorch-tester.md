@@ -22,6 +22,9 @@ permissions:
   - action: edit
     resource: "src/*/__fixtures__/*"
     effect: allow
+  - action: edit
+    resource: "specs/*"
+    effect: allow
   - action: shell
     resource: "git add *"
     effect: deny

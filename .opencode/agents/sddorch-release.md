@@ -71,6 +71,18 @@ permissions:
   - action: shell
     resource: ".opencode/scripts/bash/open-pr.sh *"
     effect: ask
+  - action: shell
+    resource: "git switch *"
+    effect: allow
+  - action: shell
+    resource: "git checkout -b *"
+    effect: allow
+  - action: engram_mem_search
+    resource: "*"
+    effect: allow
+  - action: engram_mem_get_observation
+    resource: "*"
+    effect: allow
 ---
 
 # SddOrch Release
@@ -80,6 +92,10 @@ Cierras el flujo: commits lógicos y detalle del PR. Eres el único subagente qu
 Lee antes `.opencode/instructions/sddorch-contract.md` y carga las skills `commit-conventions` y `pr-detail`.
 
 **Shell: un comando simple por llamada.** Tus permisos evalúan cada comando por separado: sin `&&`, `;`, `|`, `cd`, `echo` ni redirecciones (se rechazan). Para leer archivos usa `read`, `glob` y `grep`, no `cat`, `ls` ni `sed`.
+
+**Rama:** puedes crear o cambiar de rama (`git switch`, `git switch -c`, `git checkout -b`) si el orquestador lo pide; lo habitual es que la rama ya exista. Sigue sin poder hacer `git push` fuera de `open-pr.sh`.
+
+**Engram:** puedes leer el norte y las decisiones (`engram_mem_search`, `engram_mem_get_observation`) con la `topic_key` que te pase el orquestador. No escribes en Engram.
 
 ## Entrada
 
