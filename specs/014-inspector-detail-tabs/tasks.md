@@ -57,7 +57,7 @@ dueño E2E** con caso negativo (dato inexistente / 404). La columna «Dueño E2E
 | U5 ↔ U4/U3 | §1/§2 — anidamiento de dos tablists con `aria-label` propios | T019 | sin nodo seleccionado ⇒ solo existe el tablist externo |
 | U6 ↔ U2 ↔ U4 | §5 — `useSessionMessages` (`isLoading`/`isError`) → `useInspectorData` → Subagentes, Herramientas, Respuestas y Errores | T030 | `getSessionMessages` rechaza (sesión inexistente / 404) ⇒ error, **nunca** vacío |
 | U6 ↔ U4 | §5 — `useSessionDiff` → Archivos; `useSessionForms` + `useSessionPermissions` + `useSessionInbox` → Preguntas y permisos | T031 | diff/forms/permisos/inbox en 404 ⇒ error, **nunca** vacío |
-| U6 ↔ U2 ↔ U4 | §5 — `useContextMetrics` (contexto/latencia) → Latencia completa (FR-009) | T015 | contexto inexistente (404) ⇒ error con referencia y control de umbral **montados** |
+| U6 ↔ U2 ↔ U4 | §5 — `useContextMetrics` (contexto/latencia) → Latencia completa (FR-009) | T015 | contexto inexistente (404) ⇒ `EmptyScreenError` en Latencia con la pestaña montada (**nunca** vacío) |
 
 Los nueve specs viven en `src/Infrastructure/specs/integration/` (misma convención de suites E2E de frontera
 de unidades que `012-refactor-workspace-enrichment`) y reutilizan el arnés
@@ -247,8 +247,11 @@ umbral/control/anomalías y `rg AdvancedSection src` no devuelve código de prod
   `InspectorPanel` real con `sessions.context(id)` sembrado por `seedQueryData`; camino feliz: la pestaña
   Latencia muestra la referencia de umbral, el control del umbral y el listado de respuestas medidas con sus
   anomalías, y las anomalías **no** filtran ni deshabilitan la sección. **Caso negativo (dato inexistente /
-  404)**: `serviceMock.getSessionContext` rechaza ⇒ estado de error visible en Latencia y la referencia y el
-  control de umbral **siguen montados** (nunca vacío falso). Depende de T010.
+  404)**: `serviceMock.getSessionContext` rechaza ⇒ el panel de Latencia resuelve **error** mostrando
+  `EmptyScreenError` (**nunca** vacío ni datos falsos) y la **pestaña permanece montada** (el tablist de 7
+  sigue operativo y Latencia sigue siendo seleccionable). Con error **no** se exige que la referencia y el
+  control de umbral sigan montados: el §5 del contrato manda error → `EmptyScreenError` en los siete paneles
+  (el error sustituye todo el contenido de la sección). Depende de T010.
 - [X] T016 [P] [US3] (writes: `specs/004-inspector-panel-layout/contracts/inspector-layout-contract.md`, `specs/010-context-metrics-insights/contracts/context-panel-contract.md`, `src/Application/Components/Molecules/Disclosure.tsx`) Limpieza documental acotada de FR-010 (y solo esa): actualizar
   `specs/004-inspector-panel-layout/contracts/inspector-layout-contract.md` (§1 ítem 7, §2.1-2.3, §3.1
   `AdvancedSection` y §5:157) y `specs/010-context-metrics-insights/contracts/context-panel-contract.md:58`
@@ -575,7 +578,8 @@ Evaluación de `converge` sobre el árbol ya implementado (T001–T039 marcadas)
 `.opencode/runs/014-inspector-detail-tabs/cambios_de_contrato.md`. **Dos hallazgos accionables**
 (T040, T041); el resto de puntos abiertos del run se cierran como **deuda aceptada** o **no-gap**
 (ver el resumen de convergencia): el criterio «referencia y control de umbral montados con 404» de
-T015 contradice el §5 del contrato (error → `EmptyScreenError` en los siete paneles) y no tiene base
+T015 contradice el §5 del contrato (corregido después en U03 del run `20261013-cierre-deudas`:
+T015 ya no exige ese criterio) (error → `EmptyScreenError` en los siete paneles) y no tiene base
 en FR-009, así que se mantiene el código; el mecanismo de foco (`outline` + `forced-colors`) ya está
 descrito en el §6 del contrato; las constantes/props no listadas en `data-model.md` realizan valores
 ya fijados en `tasks.md`/contrato; la deuda de navegador (§7), los hallazgos latentes H-L1/H-L2 y la
