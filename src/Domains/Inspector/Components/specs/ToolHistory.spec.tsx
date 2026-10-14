@@ -55,4 +55,65 @@ describe('ToolHistory', () => {
       screen.getByRole('button', { name: /Ver 1 más/i }),
     ).toBeInTheDocument();
   });
+
+  it('shows the error state instead of the empty state when the query fails', () => {
+    render(<ToolHistory tools={[]} isError />);
+
+    expect(
+      screen.getByText('Ocurrió un error al cargar los datos'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Sin actividad de herramientas todavía.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not render the content when the query fails', () => {
+    render(<ToolHistory tools={makeTools(3)} isError />);
+
+    expect(
+      screen.getByText('Ocurrió un error al cargar los datos'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('tool-1')).not.toBeInTheDocument();
+  });
+
+  it('gives the error state priority over the loading state', () => {
+    const { container } = render(
+      <ToolHistory tools={[]} isError isLoading />,
+    );
+
+    expect(
+      screen.getByText('Ocurrió un error al cargar los datos'),
+    ).toBeInTheDocument();
+    expect(container.querySelector('.animate-pulse')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Sin actividad de herramientas todavía.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the loading skeleton instead of the empty state while the query is in flight', () => {
+    const { container } = render(<ToolHistory tools={[]} isLoading />);
+
+    expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Sin actividad de herramientas todavía.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not render the content while the query is in flight', () => {
+    const { container } = render(<ToolHistory tools={makeTools(3)} isLoading />);
+
+    expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
+    expect(screen.queryByText('tool-1')).not.toBeInTheDocument();
+  });
+
+  it('shows the legitimate empty state only once the source has resolved', () => {
+    const { container } = render(
+      <ToolHistory tools={[]} isError={false} isLoading={false} />,
+    );
+
+    expect(
+      screen.getByText('Sin actividad de herramientas todavía.'),
+    ).toBeInTheDocument();
+    expect(container.querySelector('.animate-pulse')).not.toBeInTheDocument();
+  });
 });

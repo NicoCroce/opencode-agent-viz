@@ -55,7 +55,10 @@ Visible cuando el nodo participa de un grupo (`speedup !== null`): tamaño, tiem
 
 Serie de `ttftMs` y `totalMs`, mediana de referencia (nodo/agente) y lista de anomalías con magnitud (`ratio`), referencia (`referenceMs`) y origen (`reference`).
 
-El listado de respuestas medidas y el de anomalías se montan **dentro del desplegable "Avanzado"** (`AdvancedSection`), después de Errores, para no saturar el panel principal. Al estar colapsado por defecto, no se montan en el DOM hasta expandir.
+> **Superseded (`014-inspector-detail-tabs`, FR-010).** El desplegable "Avanzado" ya no existe: el
+> listado de respuestas medidas y el de anomalías se montan en la **pestaña Latencia** del tablist de
+> secciones técnicas del detalle. Contrato vigente:
+> `specs/014-inspector-detail-tabs/contracts/inspector-section-tabs-contract.md` (§1, §5).
 
 ## 5. In/out en el nodo (FR-011)
 

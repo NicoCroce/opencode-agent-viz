@@ -1,16 +1,18 @@
+import type { ReactNode } from 'react';
 import { CompactionContext, Container } from '@app/Application/Components';
 import { useAnomalyThreshold } from '@app/Application/Hooks';
 import type { TGraphNode } from '@app/Domains/Graph/Graph.entity';
+import type { TInspectorSectionTab } from '../Hooks/useInspectorSectionTabs';
 import { useControlledReasoning } from '../Hooks/useControlledReasoning';
 import { useContextMetrics } from '../Hooks/useContextMetrics';
 import { useInspectorData } from '../Hooks/useInspectorData';
-import { AdvancedSection } from './AdvancedSection';
 import { AnswersSection } from './AnswersSection';
 import { ContextSection } from './ContextSection';
 import { ErrorsSection } from './ErrorsSection';
 import { FileChanges } from './FileChanges';
 import { InspectorEmptyPrompt } from './InspectorEmptyPrompt';
 import { InspectorIdentity } from './InspectorIdentity';
+import { InspectorSectionTabs } from './InspectorSectionTabs';
 import { LatencySection } from './LatencySection';
 import { MetricsSection } from './MetricsSection';
 import { ModelSection } from './ModelSection';
@@ -54,12 +56,26 @@ interface InspectorPanelProps {
 /**
  * Orquestador puro del panel de detalles (FR-001/SC-003).
  *
- * Con un nodo seleccionado compone las secciones de datos en el orden exacto
- * identidad → Modelo → Métricas → Recursos → Duración mediana por herramienta →
- * Subagentes → Archivos. El contenido técnico (Herramientas, Respuestas,
- * Preguntas y permisos, Errores) se reintroduce dentro del desplegable
- * "Avanzado" en US2 (FR-010..FR-015); el bloque `Subagentes` se compone con
- * `SubagentsSection` (US3, FR-007/FR-008).
+ * Con un nodo seleccionado compone el **resumen continuo** —identidad → Modelo →
+ * Métricas → Contexto (Paralelismo + Aporte al padre) → Recursos → Duración
+ * mediana por herramienta— y cierra el eje vertical con el **tablist de
+ * secciones técnicas** (`InspectorSectionTabs`, FR-001/FR-002): Subagentes,
+ * Archivos, Herramientas, Respuestas, Preguntas y permisos, Errores y Latencia.
+ * El tablist es el último bloque del `Container`, sin `sticky`, sin `key` y sin
+ * efectos de reset (research R1): su estado es efímero y vive en
+ * `InspectorSectionTabs`.
+ *
+ * Las siete secciones llegan ya construidas en un `Record` **exhaustivo por
+ * tipo** (TS estricto obliga a aportar una sección por pestaña) y conservan
+ * literalmente sus props; cada sección resuelve sus propios estados
+ * (error → carga → vacío → datos, Principio VI). Presentación pura: la lógica
+ * de datos vive en los hooks del dominio.
+ *
+ * Las cuatro secciones sin estado propio (Subagentes, Herramientas, Respuestas
+ * y Errores) reciben `isError`/`isLoading` de la consulta de mensajes de
+ * `useInspectorData` (FR-008/SC-005): nunca muestran su vacío mientras la
+ * fuente está en carga o en error. Archivos, Preguntas y permisos y Latencia
+ * conservan sus fuentes actuales.
  */
 export const InspectorPanel = ({
   node,
@@ -102,6 +118,70 @@ export const InspectorPanel = ({
 
   const { metrics, model } = node.data;
 
+  // Una entrada por pestaña, exhaustiva por tipo (contrato §3): añadir una
+  // pestaña obliga a aportar aquí su sección.
+  const sections: Record<TInspectorSectionTab, ReactNode> = {
+    subagents: (
+      <SubagentsSection
+        tasks={tasks}
+        parallelPeers={parallelPeers}
+        isError={isError}
+        isLoading={isLoading}
+      />
+    ),
+    files: (
+      <FileChanges
+        changes={diff.changes}
+        isError={diff.isError}
+        isLoading={diff.isLoading}
+      />
+    ),
+    tools: (
+      <ToolHistory tools={tools} isError={isError} isLoading={isLoading} />
+    ),
+    answers: (
+      <AnswersSection
+        entries={entries}
+        showReasoning={reasoningVisible}
+        onToggleReasoning={toggleReasoning}
+        onOpenHistory={onOpenHistory}
+        sessionId={node.data.sessionId}
+        isError={isError}
+        isLoading={isLoading}
+        renderCompactionContext={() => (
+          <CompactionContext
+            messages={context.messages}
+            isError={context.isError}
+            isLoading={context.isLoading}
+          />
+        )}
+      />
+    ),
+    questions: (
+      <QuestionsSection
+        permissions={permissions.permissions}
+        questions={forms.questions}
+        queuedTurns={inbox.queuedTurns}
+        isError={forms.isError || permissions.isError || inbox.isError}
+        isLoading={
+          forms.isLoading || permissions.isLoading || inbox.isLoading
+        }
+      />
+    ),
+    errors: (
+      <ErrorsSection errors={errors} isError={isError} isLoading={isLoading} />
+    ),
+    latency: (
+      <LatencySection
+        latency={contextMetrics.context?.latency ?? null}
+        threshold={threshold}
+        onThresholdChange={setThreshold}
+        isError={contextMetrics.isError}
+        isLoading={contextMetrics.isLoading}
+      />
+    ),
+  };
+
   return (
     <Container space="medium" className="overflow-auto p-4">
       {/*
@@ -119,9 +199,10 @@ export const InspectorPanel = ({
       {/* Métricas: duración, costo, invocaciones, tokens y aviso de loop (FR-004) */}
       <MetricsSection metrics={metrics} />
 
-      {/* Contexto: composición, ventana/caché y, más adelante, paralelismo y
-          aporte al padre (FR-015..FR-017). La latencia (respuestas y anomalías)
-          vive dentro del desplegable "Avanzado". */}
+      {/* Contexto: composición, ventana/caché, paralelismo y aporte al padre
+          (FR-015..FR-017). Permanece en el resumen continuo, sin pestañas
+          intercaladas; la latencia (respuestas y anomalías) vive en la pestaña
+          Latencia. */}
       <ContextSection
         context={contextMetrics.context}
         tokens={metrics.tokens}
@@ -149,65 +230,13 @@ export const InspectorPanel = ({
       {/* Duración mediana por herramienta (FR-006) */}
       <ToolStats tools={tools} />
 
-      {/* Subagentes: tareas delegadas y agentes en paralelo (FR-007/FR-008) */}
-      <SubagentsSection tasks={tasks} parallelPeers={parallelPeers} />
-
-      {/* Impacto del agente en el repositorio (FR-009) */}
-      <FileChanges
-        changes={diff.changes}
-        isError={diff.isError}
-        isLoading={diff.isLoading}
-      />
-
       {/*
-        Contenido técnico agrupado bajo el desplegable "Avanzado" (FR-010..FR-015),
-        colapsado por defecto. Orden interno: Herramientas → Respuestas →
-        Preguntas y permisos → Errores → Latencia (FR-011; la latencia incluye
-        el listado de respuestas medidas y las anomalías, FR-018..FR-023).
+        Tablist de secciones técnicas (FR-001/FR-002): último bloque del eje
+        vertical, sin `sticky`, `key` ni efectos de reset (research R1). El
+        estado activo es efímero y lo posee `InspectorSectionTabs`; al cerrar el
+        detalle (`node = null`) se desmonta y reabrir vuelve a `Subagentes`.
       */}
-      <AdvancedSection>
-        <ToolHistory tools={tools} />
-
-        <AnswersSection
-          entries={entries}
-          showReasoning={reasoningVisible}
-          onToggleReasoning={toggleReasoning}
-          onOpenHistory={onOpenHistory}
-          sessionId={node.data.sessionId}
-          renderCompactionContext={() => (
-            <CompactionContext
-              messages={context.messages}
-              isError={context.isError}
-              isLoading={context.isLoading}
-            />
-          )}
-        />
-
-        <QuestionsSection
-          permissions={permissions.permissions}
-          questions={forms.questions}
-          queuedTurns={inbox.queuedTurns}
-          isError={forms.isError || permissions.isError || inbox.isError}
-          isLoading={
-            forms.isLoading || permissions.isLoading || inbox.isLoading
-          }
-        />
-
-        <ErrorsSection errors={errors} />
-
-        {/*
-          Latencia: listado de respuestas medidas (TTFT y total) y anomalías
-          bidireccionales, con la referencia y el control de umbral (FR-018..FR-023).
-          Se coloca dentro de "Avanzado" para no saturar el panel principal.
-        */}
-        <LatencySection
-          latency={contextMetrics.context?.latency ?? null}
-          threshold={threshold}
-          onThresholdChange={setThreshold}
-          isError={contextMetrics.isError}
-          isLoading={contextMetrics.isLoading}
-        />
-      </AdvancedSection>
+      <InspectorSectionTabs sections={sections} />
     </Container>
   );
 };

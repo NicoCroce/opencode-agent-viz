@@ -1,5 +1,11 @@
 import type { ReactNode } from 'react';
-import { Button, Container, HistoryEntry } from '@app/Application/Components';
+import {
+  Button,
+  Container,
+  EmptyScreenError,
+  HistoryEntry,
+} from '@app/Application/Components';
+import { ListSkeleton } from '@app/Application/Components/Molecules';
 import type { THistoryEntry } from '@app/Domains/History/History.entity';
 
 interface AnswersSectionProps {
@@ -28,6 +34,16 @@ interface AnswersSectionProps {
    * `HistoryEntry`; sin él la compactación se muestra sin contexto.
    */
   renderCompactionContext?: (sessionId: string) => ReactNode;
+  /**
+   * La consulta de mensajes (`useInspectorData`) falló (Principio VI): el área
+   * de lista muestra el error en lugar del vacío.
+   */
+  isError?: boolean;
+  /**
+   * La consulta de mensajes (`useInspectorData`) está en curso (Principio VI):
+   * el área de lista muestra el esqueleto en lugar del vacío.
+   */
+  isLoading?: boolean;
 }
 
 /**
@@ -55,6 +71,13 @@ const isConversational = (entry: THistoryEntry): boolean =>
  * de razonamiento es un `Button` con `aria-pressed`; ocultarlo nunca afecta a
  * las respuestas. Sin respuestas se muestra un estado vacío explícito y el
  * botón "Ver histórico completo" queda expuesto vía `onOpenHistory` (FR-008).
+ *
+ * No usa `SectionFrame` porque su cabecera lleva el toggle de razonamiento y su
+ * vacío no es excluyente con la lista (FR-008/R7). El área de lista resuelve
+ * igualmente la prioridad error → carga → vacío/datos reutilizando los nodos
+ * por defecto (`EmptyScreenError`, `ListSkeleton`); la cabecera con el toggle y
+ * el botón "Ver histórico completo" permanecen montados en los cuatro estados,
+ * porque ninguno depende de la consulta de mensajes.
  */
 export const AnswersSection = ({
   entries,
@@ -63,18 +86,50 @@ export const AnswersSection = ({
   onOpenHistory,
   sessionId = null,
   renderCompactionContext,
+  isError = false,
+  isLoading = false,
 }: AnswersSectionProps) => {
   const conversational = entries.filter(isConversational);
 
   // "Sin respuestas todavía" solo cuando no hay contenido de agente visible: si
   // únicamente hay herramientas o preguntas, éstas se muestran y el texto queda
-  // vacío de forma explícita (edge case), sin secciones fantasma.
+  // vacío de forma explícita (edge case), sin secciones fantasma. Nunca se
+  // muestra el vacío mientras la fuente está en carga o en error (SC-005).
   const hasText = conversational.some(
     (entry) =>
       entry.kind === 'answer' ||
       entry.kind === 'question' ||
       (entry.kind === 'reasoning' && showReasoning),
   );
+
+  let listArea: ReactNode;
+  if (isError) {
+    listArea = <EmptyScreenError />;
+  } else if (isLoading) {
+    listArea = <ListSkeleton />;
+  } else {
+    listArea = (
+      <>
+        {!hasText ? (
+          <p className="text-xs text-muted-foreground">Sin respuestas todavía</p>
+        ) : null}
+
+        {conversational.length > 0 ? (
+          <Container space="small">
+            {conversational.map((entry) => (
+              <HistoryEntry
+                key={entry.id}
+                entry={entry}
+                showReasoning={showReasoning}
+                sessionId={sessionId}
+                renderCompactionContext={renderCompactionContext}
+              />
+            ))}
+          </Container>
+        ) : null}
+      </>
+    );
+  }
 
   return (
     <Container space="small">
@@ -91,23 +146,7 @@ export const AnswersSection = ({
         </Button>
       </Container>
 
-      {!hasText ? (
-        <p className="text-xs text-muted-foreground">Sin respuestas todavía</p>
-      ) : null}
-
-      {conversational.length > 0 ? (
-        <Container space="small">
-          {conversational.map((entry) => (
-            <HistoryEntry
-              key={entry.id}
-              entry={entry}
-              showReasoning={showReasoning}
-              sessionId={sessionId}
-              renderCompactionContext={renderCompactionContext}
-            />
-          ))}
-        </Container>
-      ) : null}
+      {listArea}
 
       <Button variant="outline" onClick={onOpenHistory}>
         Ver histórico completo

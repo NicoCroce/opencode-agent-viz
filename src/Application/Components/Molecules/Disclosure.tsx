@@ -9,8 +9,8 @@ import { Button } from './Button';
 
 /**
  * Estilo canónico del botón de conmutación: botón fantasma en monoespaciado con
- * chevrons. Antes duplicado literalmente en `AdvancedSection` y `ToolHistory`
- * (magic string), ahora en un único lugar.
+ * chevrons. Antes duplicado literalmente en cada consumidor (magic string),
+ * ahora en un único lugar.
  */
 const DISCLOSURE_BUTTON_CLASSNAME =
   'h-auto! justify-start! gap-1! border-0! bg-transparent! p-0! font-mono text-[11px] text-muted-foreground shadow-none! hover:bg-transparent! hover:text-foreground';
@@ -41,14 +41,14 @@ interface DisclosureProps {
 }
 
 /**
- * Sección colapsable accesible (FR-010..FR-012, contrato 3.1).
+ * Sección colapsable accesible.
  *
- * Unifica el toggle de "Avanzado" (`AdvancedSection`) y el "Ver N más / Ver
- * menos" de `ToolHistory`. Expone estado **controlado** (`expanded`) o **no
- * controlado** (`defaultExpanded`, por defecto colapsado) y conserva
- * `aria-expanded`; cuando hay contenido añade `aria-controls` y una región
- * `role="region"`. El contenido se **renderiza condicionalmente**: colapsado no
- * monta los hijos.
+ * Patrón general de divulgación progresiva del visor; lo usa, entre otros, el
+ * "Ver N más / Ver menos" de `ToolHistory`. Expone estado **controlado**
+ * (`expanded`) o **no controlado** (`defaultExpanded`, por defecto colapsado) y
+ * conserva `aria-expanded`; cuando hay contenido añade `aria-controls` y una
+ * región `role="region"`. El contenido se **renderiza condicionalmente**:
+ * colapsado no monta los hijos.
  */
 export const Disclosure = ({
   title,
