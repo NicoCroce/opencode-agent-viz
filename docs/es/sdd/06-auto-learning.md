@@ -154,10 +154,10 @@ fue subir otra vez `steps`, sino:
 - **Guardado incremental:** el researcher guarda un borrador en Engram hacia la
   mitad de su presupuesto (upsert en la misma `topic_key`); si lo cortan, el
   informe parcial no se pierde y se reanuda solo para lo que falta.
-- **Mediciones del store de OpenCode** (`~/.local/share/opencode`): los
-  researchers no tienen acceso. El orquestador lanza antes un `general` con
-  `shell`, guarda el resultado en `.opencode/runs/<run>/` y se lo pasa como
-  dato.
+- **Mediciones del store de OpenCode** (`~/.local/share/opencode`): el
+  researcher de código lo lee en **solo lectura** (`sqlite3 -readonly`). Si la
+  medición excede su presupuesto, el orquestador lanza un `general` con `shell`,
+  guarda el resultado en `.opencode/runs/<run>/` y se lo pasa como dato.
 
 ### La otra mitad: cerrar antes del corte
 

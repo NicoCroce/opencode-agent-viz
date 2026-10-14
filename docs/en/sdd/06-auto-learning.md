@@ -153,8 +153,9 @@ raise `steps` again, but:
 - **Incremental saving:** the researcher saves a draft to Engram around the
   middle of its budget (upsert on the same `topic_key`); if it is cut off, the
   partial report is not lost and is resumed only for what is missing.
-- **Measurements against the OpenCode store** (`~/.local/share/opencode`):
-  researchers have no access. The orchestrator first launches a `general` with
+- **Measurements against the OpenCode store** (`~/.local/share/opencode`): the
+  code researcher reads it in **read-only** mode (`sqlite3 -readonly`). If the
+  measurement exceeds its budget, the orchestrator launches a `general` with
   `shell`, stores the result under `.opencode/runs/<run>/` and hands it over as
   data.
 
