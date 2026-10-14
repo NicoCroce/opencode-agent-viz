@@ -5,6 +5,7 @@
 #   verify.sh [--log-dir <dir>] [lint tsc test build]
 #
 # Sin argumentos corre lint, tsc y build en paralelo y luego test (VERIFY_COMMANDS de sddorch.md).
+# test usa como máximo 2 workers de Vitest (VERIFY_TEST_WORKERS para cambiarlo).
 # Los resultados se imprimen siempre en el orden lint, tsc, test, build.
 # El log completo de cada comando queda en <log-dir>/<cmd>.log
 # (por defecto .opencode/runs/_verify). En pantalla solo salen: PASS/FAIL, duración y,
@@ -25,6 +26,8 @@ while [[ $# -gt 0 ]]; do
 done
 [[ ${#CMDS[@]} -gt 0 ]] || CMDS=(lint tsc test build)
 
+TEST_WORKERS="${VERIFY_TEST_WORKERS:-2}"
+
 mkdir -p "$LOG_DIR"
 failed=0
 
@@ -39,6 +42,11 @@ run_cmd() {
     local c="$1" start=$SECONDS rc
     if [[ "$c" == "build" ]] && has_cmd tsc; then
         pnpm exec vite build >"$LOG_DIR/$c.log" 2>&1
+    elif [[ "$c" == "test" ]]; then
+        pnpm exec vitest run \
+            --poolOptions.forks.maxForks="$TEST_WORKERS" --poolOptions.forks.minForks=1 \
+            --poolOptions.threads.maxThreads="$TEST_WORKERS" --poolOptions.threads.minThreads=1 \
+            >"$LOG_DIR/$c.log" 2>&1
     else
         pnpm "$c" >"$LOG_DIR/$c.log" 2>&1
     fi
