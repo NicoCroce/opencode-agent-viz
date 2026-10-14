@@ -22,9 +22,6 @@ permissions:
   - action: edit
     resource: "src/*/__fixtures__/*"
     effect: allow
-  - action: edit
-    resource: "specs/*"
-    effect: allow
   - action: shell
     resource: "git add *"
     effect: deny
@@ -56,7 +53,7 @@ Lee antes `.opencode/instructions/sddorch-contract.md`, `AGENTS.md` y carga la s
 El orquestador te da:
 - `feature_directory`;
 - los archivos de producto a cubrir (los `affected_files` de la implementación);
-- los `writes` permitidos: los `specs/` y `__fixtures__/` que puedes crear o ampliar;
+- los `writes` permitidos: los *specs de test* (`src/**/specs/`) y los `__fixtures__/` que puedes crear o ampliar;
 - la ruta de `contracts/` (si hay).
 
 ## Procedimiento
