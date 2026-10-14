@@ -9,14 +9,15 @@ formato.
 | Subagente | Modo | Rol | Permisos clave | Presupuesto |
 |---|---|---|---|---|
 | `sddorch` | primary | Orquestador: descubre, planifica, delega, verifica, escribe memoria | Todo salvo `subagent` genérico y ediciones a Spec-Kit | — |
-| `sddorch-researcher-code` | subagent | Investiga un rol técnico con acceso al repo | Solo lectura + skills de su rol + Engram (su clave) + web acotada | 40 pasos |
+| `sddorch-researcher-code` | subagent | Investiga un rol técnico con acceso al repo | Solo lectura + skills de su rol + Engram (su clave) + web acotada + store en solo lectura (`sqlite3 -readonly`) | 60 pasos |
 | `sddorch-researcher-market` | subagent | Investiga producto/marketing/legal con web y sin código | Documentación del proyecto + skills `pm-*` + Engram (su clave) + web abierta | 40 pasos |
 | `sddorch-writer` | subagent | Redacta PRD y RFC desde los informes en Engram | Templates + constitución + Engram (`prd`/`rfc`) | 30 pasos |
 | `general` | subagent | Ejecuta comandos `plan`, `tasks`, `analyze`, `converge` | General | — |
-| `sddorch-implementer` | subagent | Ejecuta tareas de `implement` o una unidad de la ruta rápida | Edita solo sus `writes`; git denegado | 60 pasos |
-| `sddorch-reviewer` | subagent | Compuertas de constitución | Solo lectura + skill `code-reviewer` | 40 pasos |
-| `sddorch-tester` | subagent | Tests tras `implement` | Edita solo `specs/` y `__fixtures__/` | 60 pasos |
-| `sddorch-release` | subagent | Commits, `pr-detail` y PR | Único con `git add/commit`; push denegado salvo script de PR | 50 pasos |
+| `explore` | subagent | Exploración read-only y barata del código (localizar archivos y símbolos) | Solo lectura (`read`, `glob`, `grep`) | — |
+| `sddorch-implementer` | subagent | Ejecuta tareas de `implement` o una unidad de la ruta rápida | Edita solo sus `writes`; git denegado | 80 pasos |
+| `sddorch-reviewer` | subagent | Compuertas de constitución | Solo lectura + skill `code-reviewer` + Engram + `pnpm tsc/lint/test` para verificar | 40 pasos |
+| `sddorch-tester` | subagent | Tests tras `implement` | Edita solo `src/*/specs/*`, `__fixtures__/` y `specs/*` | 60 pasos |
+| `sddorch-release` | subagent | Commits, `pr-detail` y PR | Único con `git add/commit`; crea o cambia de rama (`git switch`); Engram; push denegado salvo script de PR | 50 pasos |
 
 > **Presupuesto (`steps`).** Es el techo de pasos que puede dar cada subagente
 > antes de ser cortado. Se calibra con evidencia: si un rol lo agota antes de
@@ -31,22 +32,26 @@ El diseño de permisos es una capa de seguridad, no un detalle:
 - **`sddorch-researcher-code`** no puede escribir archivos. Solo `read`,
   `glob`, `grep`, consultas `git` y **solo las skills de su rol**. `*.env*` está
   denegado. Acceso web limitado a dominios técnicos (web.dev, owasp.org, MDN,
-  W3C, React, Chrome).
-  No accede al store de OpenCode (`~/.local/share/opencode`): lo que haya que
-  medir ahí lo mide el orquestador con un `general` y se lo pasa como archivo.
-  Un researcher cubre un solo artefacto o rol.
+  W3C, React, Chrome). Puede leer el store de OpenCode
+  (`~/.local/share/opencode`) en **solo lectura** y consultarlo con
+  `sqlite3 -readonly` (también `pnpm test`, `npx vitest` y `node`); si la medición
+  excede su presupuesto, la hace el orquestador con un `general` y se la pasa como
+  archivo. Un researcher cubre un solo artefacto o rol.
 - **`sddorch-researcher-market`** no ve el código: `read` solo sobre `docs/`,
   `specs/`, `AGENTS.md`, `README.md`, constitución y `.opencode/roles/`. Tiene
   web abierta (search + fetch) y solo skills `pm-*`.
 - **`sddorch-writer`** no investiga: lee los templates de descubrimiento y la
   constitución, y escribe Engram. No tiene `read` del repo ni web.
-- **`sddorch-reviewer`** tampoco escribe: lee y aplica el checklist.
+- **`sddorch-reviewer`** tampoco escribe: lee, aplica el checklist, puede
+  consultar Engram (norte y decisiones) y ejecutar `pnpm tsc`/`lint`/`test` para
+  verificar una afirmación concreta.
 - **`sddorch-implementer`** tiene git denegado (`add`, `commit`, `push`,
   `stash`, `checkout`, `reset`, `rebase`) y no puede tocar `tasks.md`.
-- **`sddorch-tester`** puede editar **solo** en `src/*/specs/*` y
-  `src/*/__fixtures__/*`.
-- **`sddorch-release`** es el **único** que hace `git add` y `git commit`.
-  `git push` está denegado; el push lo hace únicamente el script de PR.
+- **`sddorch-tester`** puede editar **solo** en `src/*/specs/*`,
+  `src/*/__fixtures__/*` y `specs/*`.
+- **`sddorch-release`** es el **único** que hace `git add` y `git commit`; puede
+  crear o cambiar de rama (`git switch`) y consultar Engram. `git push` está
+  denegado; el push lo hace únicamente el script de PR.
 
 ## Contrato de retorno
 

@@ -9,14 +9,15 @@ same format.
 | Subagent | Mode | Role | Key permissions | Budget |
 |---|---|---|---|---|
 | `sddorch` | primary | Orchestrator: discovers, plans, delegates, verifies, writes memory | Everything except generic `subagent` and Spec-Kit edits | — |
-| `sddorch-researcher-code` | subagent | Investigates a technical role with repo access | Read-only + role skills + Engram (its key) + limited web | 40 steps |
+| `sddorch-researcher-code` | subagent | Investigates a technical role with repo access | Read-only + role skills + Engram (its key) + limited web + read-only store (`sqlite3 -readonly`) | 60 steps |
 | `sddorch-researcher-market` | subagent | Investigates product/marketing/legal with web and no code | Project docs + `pm-*` skills + Engram (its key) + open web | 40 steps |
 | `sddorch-writer` | subagent | Writes PRD and RFC from the reports in Engram | Templates + constitution + Engram (`prd`/`rfc`) | 30 steps |
 | `general` | subagent | Runs `plan`, `tasks`, `analyze`, `converge` commands | General | — |
-| `sddorch-implementer` | subagent | Runs `implement` tasks or a fast-route unit | Edits only its `writes`; git denied | 60 steps |
-| `sddorch-reviewer` | subagent | Constitution gates | Read-only + `code-reviewer` skill | 40 steps |
-| `sddorch-tester` | subagent | Tests after `implement` | Edits only `specs/` and `__fixtures__/` | 60 steps |
-| `sddorch-release` | subagent | Commits, `pr-detail`, and PR | Only one with `git add/commit`; push denied except PR script | 50 steps |
+| `explore` | subagent | Cheap read-only code exploration (locate files and symbols) | Read-only (`read`, `glob`, `grep`) | — |
+| `sddorch-implementer` | subagent | Runs `implement` tasks or a fast-route unit | Edits only its `writes`; git denied | 80 steps |
+| `sddorch-reviewer` | subagent | Constitution gates | Read-only + `code-reviewer` skill + Engram + `pnpm tsc/lint/test` to verify | 40 steps |
+| `sddorch-tester` | subagent | Tests after `implement` | Edits only `src/*/specs/*`, `__fixtures__/` and `specs/*` | 60 steps |
+| `sddorch-release` | subagent | Commits, `pr-detail`, and PR | Only one with `git add/commit`; creates or switches branches (`git switch`); Engram; push denied except PR script | 50 steps |
 
 > **Budget (`steps`).** It is the step ceiling each subagent can use before
 > being cut off. It is calibrated with evidence: if a role exhausts it before
@@ -30,23 +31,27 @@ The permission design is a security layer, not a detail:
 
 - **`sddorch-researcher-code`** cannot write files. Only `read`, `glob`, `grep`,
   query `git`, and **only its role's skills**. `*.env*` is denied. Web access is
-  limited to technical domains (web.dev, owasp.org, MDN, W3C, React, Chrome).
-  It has no access to the OpenCode store (`~/.local/share/opencode`): whatever
-  must be measured there is measured by the orchestrator with a `general` and
-  handed over as a file. A researcher covers a single artifact or role.
+  limited to technical domains (web.dev, owasp.org, MDN, W3C, React, Chrome). It
+  can read the OpenCode store (`~/.local/share/opencode`) in **read-only** mode
+  and query it with `sqlite3 -readonly` (also `pnpm test`, `npx vitest` and
+  `node`); if the measurement exceeds its budget, the orchestrator runs it with a
+  `general` and hands it over as a file. A researcher covers a single artifact or
+  role.
 - **`sddorch-researcher-market`** does not see the code: `read` only over
   `docs/`, `specs/`, `AGENTS.md`, `README.md`, the constitution, and
   `.opencode/roles/`. It has open web (search + fetch) and only `pm-*` skills.
 - **`sddorch-writer`** does not investigate: it reads the discovery templates and
   the constitution, and writes Engram. It has no repo `read` or web.
-- **`sddorch-reviewer`** does not write either: it reads and applies the
-  checklist.
+- **`sddorch-reviewer`** does not write either: it reads, applies the checklist,
+  can query Engram (north and decisions) and run `pnpm tsc`/`lint`/`test` to
+  verify a specific claim.
 - **`sddorch-implementer`** has git denied (`add`, `commit`, `push`, `stash`,
   `checkout`, `reset`, `rebase`) and cannot touch `tasks.md`.
-- **`sddorch-tester`** can edit **only** under `src/*/specs/*` and
-  `src/*/__fixtures__/*`.
-- **`sddorch-release`** is the **only** one that runs `git add` and `git commit`.
-  `git push` is denied; the push is done only by the PR script.
+- **`sddorch-tester`** can edit **only** under `src/*/specs/*`,
+  `src/*/__fixtures__/*` and `specs/*`.
+- **`sddorch-release`** is the **only** one that runs `git add` and `git commit`;
+  it can create or switch branches (`git switch`) and query Engram. `git push` is
+  denied; the push is done only by the PR script.
 
 ## Response contract
 
