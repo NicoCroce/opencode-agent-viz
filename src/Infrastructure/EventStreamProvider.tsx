@@ -13,12 +13,17 @@ import type { TConnectionState } from '@app/Domains/Connection/Connection.entity
 import { useActiveSessionsSeed } from './Hooks/useActiveSessionsSeed';
 import { useEventStreamConnection } from './Hooks/useEventStreamConnection';
 import { createEventBatcher } from './lib/eventBatcher';
-import { applyReducedEvent } from './lib/applyReducedEvent';
+import { applyReducedEvents } from './lib/applyReducedEvent';
 import { FLUSH_INTERVAL_MS } from './lib/eventStream.constants';
 
 // Reexport de compatibilidad: el spec importa la función pura desde acá. La
 // ruta canónica es `./lib/applyActiveSeed`.
 export { applyActiveSeed } from './lib/applyActiveSeed';
+
+// Reexport de compatibilidad: `applyReducedEvent` (un evento) se conserva con su
+// comportamiento actual; el provider aplica el flush completo vía
+// `applyReducedEvents`.
+export { applyReducedEvent } from './lib/applyReducedEvent';
 
 interface EventStreamContextValue {
   state: TConnectionState;
@@ -40,7 +45,7 @@ export const EventStreamProvider = ({ children }: { children: ReactNode }) => {
       createEventBatcher<V2Event>({
         flushIntervalMs: FLUSH_INTERVAL_MS,
         onFlush: (events) => {
-          for (const event of events) applyReducedEvent(event, queryClient);
+          applyReducedEvents(events, queryClient);
         },
       }),
     [queryClient],

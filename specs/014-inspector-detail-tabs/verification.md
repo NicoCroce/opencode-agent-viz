@@ -415,3 +415,32 @@ no trazado (F2). No se retira: **cubre huecos reales** del contrato §5 que ning
 
 Consecuencia sobre el recuento: es el **10.º E2E** y el responsable de los +5 tests que separan los
 2078 de T036 de los 2085 vigentes (los otros +2 son de `inspectorNestedTablists`).
+
+---
+
+## T015 · Resolución de la deuda de redacción (anexo del run `20261013-cierre-deudas`, U03)
+
+**Resolución: manda el §5 del contrato; se corrige la especificación, no el código.** El criterio de
+aceptación original de T015 pedía que, con `getSessionContext` en 404, «la referencia y el control de
+umbral **sigan montados**». Eso **contradice** el
+[contrato §5 de la feature 014](./contracts/inspector-section-tabs-contract.md#5-estados-de-cada-panel),
+que manda **error → carga → vacío → datos** en los siete paneles y asigna a **Latencia** el
+**`EmptyScreenError`** como estado de error: el error **sustituye todo el contenido** de la sección.
+En `src/Application/Components/Molecules/SectionFrame.tsx:64-72` el `isError` reemplaza `children`
+por `error ?? <EmptyScreenError />` (solo persiste el encabezado), y en
+`src/Domains/Inspector/Components/LatencySection.tsx:80-…` la referencia de umbral y el control del
+umbral viven **dentro** de `children`; por tanto no pueden quedar montados con error sin romper §5 y
+el Principio VI. El criterio tampoco tiene base en FR-009, que exige que la pestaña de Latencia
+**conserve la sección completa cuando hay datos** (referencia, control y listado con anomalías), no
+que sobreviva al error.
+
+Qué queda exigible y **cubierto** por el E2E (`inspectorLatencyChain.integration.spec.tsx`): con 404
+el panel de **Latencia muestra `EmptyScreenError`** (**nunca** vacío ni datos falsos) y la **pestaña
+permanece montada** — el tablist de 7 sigue operativo y Latencia sigue siendo seleccionable. El
+camino feliz de T015 (referencia, control de umbral, respuestas medidas con anomalías y anomalías que
+no filtran ni deshabilitan la sección) **no cambia**.
+
+Alcance del cambio: **solo redacción**. Se reescribe el criterio de T015 y su fila de «caso negativo»
+en `tasks.md`; **no** se toca ningún fichero de código ni de `.specify/`, y las aserciones del E2E
+citado quedan **sin modificar** (el spec ya verifica el error con `EmptyScreenError` y la pestaña
+montada, no la referencia con 404).

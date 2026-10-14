@@ -5,7 +5,11 @@ import { sameQueryKey } from '@app/Application/Helpers/queryKey';
 import { queryKeys } from '@app/Domains/queryKeys';
 import { reduceEvent } from '@app/Domains/Graph/lib/eventReducer';
 import type { TReducibleEvent } from '@app/Domains/Graph/lib/eventReducer';
-import { applyReducedEvent } from '../lib/applyReducedEvent';
+import {
+  applyReducedEvent,
+  applyReducedEvents,
+} from '../lib/applyReducedEvent';
+import { coalesceQueryUpdates } from '../lib/coalesceQueryUpdates';
 
 /**
  * A3 (`contracts/session-activity-contract.md` §3): `applyReducedEvent` debe
@@ -171,5 +175,145 @@ describe('applyReducedEvent — marca de actividad (A3)', () => {
       ),
     ).toBe(true);
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('coalesceQueryUpdates', () => {
+  const activityKey = queryKeys.sessions.activity();
+  const statusKey = queryKeys.sessions.status();
+
+  it('(a) comprime set+set sobre la misma key en un set con el valor final', () => {
+    const push = (value: string) => (prev: unknown) =>
+      [...(Array.isArray(prev) ? (prev as unknown[]) : []), value];
+    const coalesced = coalesceQueryUpdates([
+      { kind: 'set', queryKey: activityKey, updater: push('a') },
+      { kind: 'set', queryKey: activityKey, updater: push('b') },
+    ]);
+
+    expect(coalesced).toHaveLength(1);
+    const [only] = coalesced;
+    expect(only.kind).toBe('set');
+    if (only.kind !== 'set') throw new Error('se esperaba un set');
+    expect(only.updater([])).toEqual(['a', 'b']);
+  });
+
+  it('(b) comprime invalidate+invalidate consecutivos en una sola invalidación', () => {
+    const coalesced = coalesceQueryUpdates([
+      { kind: 'invalidate', queryKey: statusKey },
+      { kind: 'invalidate', queryKey: statusKey },
+    ]);
+
+    expect(coalesced).toHaveLength(1);
+    expect(coalesced[0].kind).toBe('invalidate');
+  });
+
+  it('(c) no fusiona set seguido de invalidate sobre la misma key', () => {
+    const coalesced = coalesceQueryUpdates([
+      { kind: 'set', queryKey: statusKey, updater: (prev) => prev },
+      { kind: 'invalidate', queryKey: statusKey },
+    ]);
+
+    expect(coalesced.map((update) => update.kind)).toEqual([
+      'set',
+      'invalidate',
+    ]);
+  });
+
+  it('no fusiona keys distintas ni corta la run por updates de otra key', () => {
+    const push = (value: string) => (prev: unknown) =>
+      [...(Array.isArray(prev) ? (prev as unknown[]) : []), value];
+    const coalesced = coalesceQueryUpdates([
+      { kind: 'set', queryKey: activityKey, updater: push('a') },
+      { kind: 'set', queryKey: statusKey, updater: (prev) => prev },
+      { kind: 'set', queryKey: activityKey, updater: push('b') },
+    ]);
+
+    expect(coalesced).toHaveLength(2);
+    const activitySet = coalesced.find(
+      (update) =>
+        update.kind === 'set' && sameQueryKey(update.queryKey, activityKey),
+    );
+    if (activitySet?.kind !== 'set') throw new Error('se esperaba el set de activity');
+    expect(activitySet.updater([])).toEqual(['a', 'b']);
+  });
+});
+
+describe('applyReducedEvents — coalescing por flush', () => {
+  const statusIdle: V2Event = {
+    id: 'evt_status_idle',
+    created: 2_000,
+    type: 'session.status',
+    data: { sessionID: 'ses_1', status: { type: 'idle' } },
+  };
+
+  it('(a) N sets sobre la misma key → 1 setQueryData con el valor final', () => {
+    const client = makeClient();
+    const setSpy = vi.spyOn(client, 'setQueryData');
+
+    applyReducedEvents([statusBusy, statusIdle], client);
+
+    const statusCalls = setSpy.mock.calls.filter(([queryKey]) =>
+      sameQueryKey(queryKey, queryKeys.sessions.status()),
+    );
+    expect(statusCalls).toHaveLength(1);
+    expect(client.getQueryData(queryKeys.sessions.status())).toEqual({
+      ses_1: { type: 'idle' },
+    });
+  });
+
+  it('(b) invalidaciones consecutivas del mismo flush → 1 invalidateQueries', () => {
+    const client = makeClient();
+    const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
+    const secondCreated: V2Event = {
+      ...sessionCreated,
+      id: 'evt_created_2',
+      created: 3_500,
+    };
+
+    applyReducedEvents([sessionCreated, secondCreated], client);
+
+    const listInvalidations = invalidateSpy.mock.calls.filter(([filters]) =>
+      sameQueryKey(filters?.queryKey ?? [], queryKeys.sessions.all),
+    );
+    expect(listInvalidations).toHaveLength(1);
+  });
+
+  it('(d) N eventos con actividad → estado final idéntico al secuencial', () => {
+    const events: V2Event[] = [
+      statusBusy,
+      textDelta,
+      olderTextDelta,
+      statusIdle,
+      sessionCreated,
+    ];
+
+    const coalescedClient = makeClient();
+    applyReducedEvents(events, coalescedClient);
+
+    const sequentialClient = makeClient();
+    for (const event of events) applyReducedEvent(event, sequentialClient);
+
+    expect(coalescedClient.getQueryData(queryKeys.sessions.activity())).toEqual(
+      sequentialClient.getQueryData(queryKeys.sessions.activity()),
+    );
+    expect(coalescedClient.getQueryData(queryKeys.sessions.status())).toEqual(
+      sequentialClient.getQueryData(queryKeys.sessions.status()),
+    );
+    expect(coalescedClient.getQueryData(queryKeys.sessions.activity())).toEqual({
+      ses_1: 3_000,
+    });
+  });
+
+  it('no dispara red y conserva el estado de conexión', () => {
+    const client = makeClient();
+    const fetchSpy = vi.spyOn(client, 'fetchQuery');
+
+    applyReducedEvents([serverConnected, statusBusy], client);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(client.getQueryData(queryKeys.connection.state)).toBe('connected');
+    expect(client.getQueryData(queryKeys.sessions.activity())).toEqual({
+      ses_1: 1_000,
+    });
   });
 });

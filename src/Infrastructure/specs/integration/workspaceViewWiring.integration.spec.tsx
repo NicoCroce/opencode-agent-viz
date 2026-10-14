@@ -134,6 +134,14 @@ const renderWorkspaceWithoutSession = async (client: QueryClient) => {
   );
 };
 
+/**
+ * Margen explícito para el E2E completo: monta la página real con los cinco
+ * slots y corre en ~4,5 s con la máquina libre, muy cerca del límite por defecto
+ * de Vitest (5 s) y por encima de él bajo carga. 20 s es >2× lo observado y no
+ * debilita ninguna aserción: sólo evita el falso fallo por timeout.
+ */
+const INTEGRATION_TIMEOUT_MS = 20_000;
+
 describe('WorkspaceView — cableado de los cinco slots (T023, U2↔U3)', () => {
   beforeEach(() => {
     resetServiceMock();
@@ -261,4 +269,4 @@ describe('WorkspaceView — cableado de los cinco slots (T023, U2↔U3)', () => 
     // Sin sesión no se fuerza ninguna consulta de respaldo del directorio.
     expect(serviceMock.getSession).not.toHaveBeenCalled();
   });
-});
+}, INTEGRATION_TIMEOUT_MS);
