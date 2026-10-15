@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 import { CHAT_PANEL_SELECTOR, isFocusWithinChat } from '../isFocusWithinChat';
 
