@@ -14,7 +14,7 @@
 export interface TLatencySample {
   stepId: string;
   startedAt: number;
-  ttftMs: number | null;   // time.streamed − time.created
+  generationMs: number | null;   // time.streamed − time.created
   totalMs: number | null;  // time.completed − time.created
 }
 
@@ -46,7 +46,8 @@ export const deriveLatency = (
 ): TLatencyReport;
 ```
 
-- **Muestras (FR-018)**: una por mensaje assistant con `time.completed`; `ttftMs = streamed − created` (si `streamed`), `totalMs = completed − created`. Ordenadas por `startedAt` ascendente.
+- **Muestras (FR-018)**: una por mensaje assistant con `time.completed`; `generationMs = streamed − created` (si `streamed`), `totalMs = completed − created`. Ordenadas por `startedAt` ascendente.
+  - **Corrección posterior**: el campo se llamaba `ttftMs`, pero `time.streamed` marca el **fin** del stream del modelo, no el primer token (verificado con 18.741 respuestas reales: en el 88 % `streamed` llega más de 0,5 s después de la primera salida). Se renombró a `generationMs` y la UI lo rotula «generación».
 - **Serie (FR-019)**: `samples` es la serie temporal que la UI grafica.
 - **Referencia (FR-020)**: `medianMs` = mediana de `totalMs` de las muestras del nodo. Si hay **menos de `MIN_SAMPLES`** muestras propias con `totalMs`, se usa `agentMedianMs` (mediana del mismo agente) y `reference = 'agent'`; si tampoco hay, `medianMs = null`, `reference = null`, `anomalies = []` (sin baseline no hay alerta).
 
@@ -81,13 +82,13 @@ export const clampThreshold = (value: number): number =>
 ## 5. Presentación (FR-019, FR-023)
 
 - **Nodo**: marca textual + color cuando la **última** muestra del nodo es anómala; etiqueta "Respuesta lenta" / "Respuesta rápida" (no solo color, a11y).
-- **Detalle**: sección **Latencia** con la serie (TTFT y total), la mediana de referencia y la lista de anomalías con `ratio`, `referenceMs` y `reference` (FR-023).
+- **Detalle**: sección **Latencia** con la serie (generación y total), la mediana de referencia y la lista de anomalías con `ratio`, `referenceMs` y `reference` (FR-023).
 
 ## 6. Validación
 
 | # | Criterio | Cómo se valida |
 |---|----------|----------------|
-| L1 | Muestras con `ttftMs`/`totalMs` correctos desde `time` | spec puro `latency.spec.ts` |
+| L1 | Muestras con `generationMs`/`totalMs` correctos desde `time` | spec puro `latency.spec.ts` |
 | L2 | Con ≥ 3 muestras, la referencia es la mediana del nodo | spec puro |
 | L3 | Con < 3 muestras y mediana de agente, la referencia es del agente | spec puro |
 | L4 | Sin baseline → `anomalies = []` | spec puro |

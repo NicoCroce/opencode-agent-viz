@@ -140,7 +140,7 @@ const sameContextWindow = (a: TContextWindow, b: TContextWindow): boolean =>
 const sameLatencySample = (a: TLatencySample, b: TLatencySample): boolean =>
   a.stepId === b.stepId &&
   a.startedAt === b.startedAt &&
-  a.ttftMs === b.ttftMs &&
+  a.generationMs === b.generationMs &&
   a.totalMs === b.totalMs;
 
 const sameLatencyAnomaly = (a: TLatencyAnomaly, b: TLatencyAnomaly): boolean =>

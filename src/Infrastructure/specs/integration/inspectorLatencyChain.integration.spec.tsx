@@ -116,8 +116,8 @@ const latencyContext = (): TGraphNode['data']['context'] => ({
   },
   latency: {
     samples: [
-      { stepId: 's1', startedAt: START, ttftMs: 120, totalMs: 800 },
-      { stepId: 's2', startedAt: START + MINUTE, ttftMs: 90, totalMs: 600 },
+      { stepId: 's1', startedAt: START, generationMs: 120, totalMs: 800 },
+      { stepId: 's2', startedAt: START + MINUTE, generationMs: 90, totalMs: 600 },
     ],
     medianMs: 500,
     reference: 'node',
@@ -195,9 +195,9 @@ describe('InspectorPanel — cadena contexto/latencia → pestaña Latencia (§5
 
     // Listado de respuestas medidas: la serie completa (dos respuestas).
     expect(within(section).getByText('Respuestas')).toBeInTheDocument();
-    expect(within(section).getByText('TTFT 120ms')).toBeInTheDocument();
+    expect(within(section).getByText('generación 120ms')).toBeInTheDocument();
     expect(within(section).getByText('total 800ms')).toBeInTheDocument();
-    expect(within(section).getByText('TTFT 90ms')).toBeInTheDocument();
+    expect(within(section).getByText('generación 90ms')).toBeInTheDocument();
     expect(within(section).getByText('total 600ms')).toBeInTheDocument();
 
     // Anomalías con su magnitud y la referencia usada (FR-021).

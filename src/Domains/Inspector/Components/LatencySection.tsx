@@ -47,7 +47,7 @@ interface LatencySectionProps {
 
 /**
  * Apartado **Latencia** del panel de contexto (FR-018..FR-023;
- * `contracts/context-panel-contract.md` §4). Muestra la serie de TTFT y latencia
+ * `contracts/context-panel-contract.md` §4). Muestra la serie de generación y latencia
  * total por respuesta, la mediana de referencia (nodo o agente) y la lista de
  * anomalías con su magnitud (`ratio`), la referencia usada y su origen. Incluye
  * el control de umbral configurable (FR-022) y resuelve los cuatro estados de
@@ -147,7 +147,7 @@ export const LatencySection = ({
                   className="shrink-0 gap-2"
                 >
                   <span className="text-foreground/80">
-                    {`TTFT ${formatDuration(sample.ttftMs)}`}
+                    {`generación ${formatDuration(sample.generationMs)}`}
                   </span>
                   <span className="text-foreground">
                     {`total ${formatDuration(sample.totalMs)}`}

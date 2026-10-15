@@ -53,7 +53,7 @@ Visible cuando el nodo participa de un grupo (`speedup !== null`): tamaño, tiem
 
 ## 4. Sección Latencia (FR-019, FR-023)
 
-Serie de `ttftMs` y `totalMs`, mediana de referencia (nodo/agente) y lista de anomalías con magnitud (`ratio`), referencia (`referenceMs`) y origen (`reference`).
+Serie de `generationMs` y `totalMs`, mediana de referencia (nodo/agente) y lista de anomalías con magnitud (`ratio`), referencia (`referenceMs`) y origen (`reference`).
 
 > **Superseded (`014-inspector-detail-tabs`, FR-010).** El desplegable "Avanzado" ya no existe: el
 > listado de respuestas medidas y el de anomalías se montan en la **pestaña Latencia** del tablist de

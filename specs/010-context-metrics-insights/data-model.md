@@ -126,7 +126,7 @@ Se incorpora a `TSessionSummary` (`Inspector.entity.ts`) y a la barra de resumen
 |---|---|---|
 | `stepId` | `string` | `id` del mensaje assistant |
 | `startedAt` | `number` | `time.created` |
-| `ttftMs` | `number \| null` | `streamed − created`; `null` sin `streamed` |
+| `generationMs` | `number \| null` | `streamed − created` (tiempo de generación; `streamed` es el fin del stream, no el primer token); `null` sin `streamed`. Antes `ttftMs` |
 | `totalMs` | `number \| null` | `completed − created`; `null` sin `completed` |
 
 ### 5.2 `TLatencyAnomaly`

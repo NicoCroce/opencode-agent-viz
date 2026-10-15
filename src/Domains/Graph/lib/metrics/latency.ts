@@ -20,9 +20,10 @@ export const median = (values: number[]): number | null => {
 };
 
 /**
- * Muestras de latencia de una respuesta assistant (FR-018): `ttftMs` es el
- * tiempo hasta el primer token (`streamed − created`) y `totalMs` la latencia
- * total (`completed − created`). Solo los mensajes con `time.completed`.
+ * Muestras de latencia de una respuesta assistant (FR-018): `generationMs` es el
+ * tiempo de generación del modelo (`streamed − created`) y `totalMs` la latencia
+ * total (`completed − created`). `streamed` marca el **fin** del stream, no el
+ * primer token. Solo los mensajes con `time.completed`.
  */
 const samplesOf = (messages: TSessionMessage[]): TLatencySample[] =>
   messages
@@ -34,7 +35,7 @@ const samplesOf = (messages: TSessionMessage[]): TLatencySample[] =>
         {
           stepId: info.id,
           startedAt: created,
-          ttftMs: streamed === undefined ? null : streamed - created,
+          generationMs: streamed === undefined ? null : streamed - created,
           totalMs: completed - created,
         },
       ];

@@ -209,7 +209,7 @@ const latencyNode: TGraphNode = {
         costPerKToken: null,
       },
       latency: {
-        samples: [{ stepId: 's1', startedAt: 1000, ttftMs: 120, totalMs: 800 }],
+        samples: [{ stepId: 's1', startedAt: 1000, generationMs: 120, totalMs: 800 }],
         medianMs: 500,
         reference: 'node',
         anomalies: [

@@ -197,8 +197,11 @@ export interface TCompactionEffect {
 export interface TLatencySample {
   stepId: string;
   startedAt: number;
-  /** Tiempo hasta el primer token (`streamed − created`); `null` sin datos. */
-  ttftMs: number | null;
+  /**
+   * Tiempo de generación del modelo (`streamed − created`): `streamed` es el
+   * fin del stream, no el primer token. `null` sin datos.
+   */
+  generationMs: number | null;
   /** Latencia total (`completed − created`); `null` sin datos. */
   totalMs: number | null;
 }

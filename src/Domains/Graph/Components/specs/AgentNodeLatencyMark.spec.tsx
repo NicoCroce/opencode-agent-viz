@@ -5,8 +5,8 @@ import { AgentNodeLatencyMark } from '../AgentNodeLatencyMark';
 
 const report = (overrides: Partial<TLatencyReport> = {}): TLatencyReport => ({
   samples: [
-    { stepId: 's1', startedAt: 0, ttftMs: 100, totalMs: 1000 },
-    { stepId: 's2', startedAt: 1000, ttftMs: 120, totalMs: 1100 },
+    { stepId: 's1', startedAt: 0, generationMs: 100, totalMs: 1000 },
+    { stepId: 's2', startedAt: 1000, generationMs: 120, totalMs: 1100 },
   ],
   medianMs: 1000,
   reference: 'node',

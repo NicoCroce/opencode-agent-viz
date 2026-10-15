@@ -397,7 +397,7 @@ describe('AgentNode — anomalía de latencia (T044, FR-023)', () => {
             costPerKToken: null,
           },
           latency: {
-            samples: [{ stepId: 's1', startedAt: 0, ttftMs: 10, totalMs: 100 }],
+            samples: [{ stepId: 's1', startedAt: 0, generationMs: 10, totalMs: 100 }],
             medianMs: 100,
             reference: 'node',
             anomalies: [

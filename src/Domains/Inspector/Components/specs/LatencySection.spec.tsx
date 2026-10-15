@@ -8,9 +8,9 @@ const MINUTE = 60_000;
 
 const report = (overrides: Partial<TLatencyReport> = {}): TLatencyReport => ({
   samples: [
-    { stepId: 's1', startedAt: START, ttftMs: 100, totalMs: 1000 },
-    { stepId: 's2', startedAt: START + MINUTE, ttftMs: 120, totalMs: 2000 },
-    { stepId: 's3', startedAt: START + 2 * MINUTE, ttftMs: 900, totalMs: 4000 },
+    { stepId: 's1', startedAt: START, generationMs: 100, totalMs: 1000 },
+    { stepId: 's2', startedAt: START + MINUTE, generationMs: 120, totalMs: 2000 },
+    { stepId: 's3', startedAt: START + 2 * MINUTE, generationMs: 900, totalMs: 4000 },
   ],
   medianMs: 2000,
   reference: 'node',
@@ -37,15 +37,15 @@ const renderSection = (props: Partial<Parameters<typeof LatencySection>[0]> = {}
   );
 
 describe('LatencySection · L9 (FR-019/FR-023)', () => {
-  it('lista la serie de TTFT y latencia total por respuesta', () => {
+  it('lista la serie de generación y latencia total por respuesta', () => {
     renderSection();
 
     expect(screen.getByTestId('latency-section')).toHaveTextContent('Latencia');
     expect(screen.getByText('#1 · 09:05')).toBeInTheDocument();
-    expect(screen.getByText('TTFT 100ms')).toBeInTheDocument();
+    expect(screen.getByText('generación 100ms')).toBeInTheDocument();
     expect(screen.getByText('total 1s')).toBeInTheDocument();
     expect(screen.getByText('#3 · 09:07')).toBeInTheDocument();
-    expect(screen.getByText('TTFT 900ms')).toBeInTheDocument();
+    expect(screen.getByText('generación 900ms')).toBeInTheDocument();
     expect(screen.getByText('total 4s')).toBeInTheDocument();
   });
 

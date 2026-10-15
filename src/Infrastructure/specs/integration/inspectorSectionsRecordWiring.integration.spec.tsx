@@ -306,8 +306,8 @@ const QUESTION_ENTRIES: TQuestionEntry[] = [
 
 const LATENCY_REPORT: TLatencyReport = {
   samples: [
-    { stepId: 's1', startedAt: 1000, ttftMs: 120, totalMs: 800 },
-    { stepId: 's2', startedAt: 2000, ttftMs: 150, totalMs: 900 },
+    { stepId: 's1', startedAt: 1000, generationMs: 120, totalMs: 800 },
+    { stepId: 's2', startedAt: 2000, generationMs: 150, totalMs: 900 },
   ],
   medianMs: 850,
   reference: 'node',

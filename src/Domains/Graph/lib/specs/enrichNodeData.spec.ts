@@ -61,7 +61,7 @@ describe('enrichNodeData — latencia (T042, FR-018..FR-023)', () => {
     expect(data.context?.latency?.samples[0]).toEqual({
       stepId: 'a1',
       startedAt: 0,
-      ttftMs: 50,
+      generationMs: 50,
       totalMs: 1000,
     });
     expect(data.context?.latency?.medianMs).toBe(1100);

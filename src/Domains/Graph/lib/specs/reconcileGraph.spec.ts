@@ -542,7 +542,7 @@ describe('reconcileGraphModel · contexto y speedup en la identidad de nodo', ()
           makeContext({
             latency: {
               samples: [
-                { stepId: 's1', startedAt: 1, ttftMs: 10, totalMs: 20 },
+                { stepId: 's1', startedAt: 1, generationMs: 10, totalMs: 20 },
               ],
               medianMs: 20,
               reference: 'node',
