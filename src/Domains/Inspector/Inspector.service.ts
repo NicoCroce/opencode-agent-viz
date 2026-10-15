@@ -25,6 +25,19 @@ export {
 } from './InspectorMessages.service';
 
 /**
+ * Catálogo de modelos del directorio (`ModelInfo[]` crudos). Comparte la clave
+ * `models.list(directory)` con el selector de Chat, que guarda en caché la misma
+ * forma cruda y proyecta con `select`; aquí se lee el límite de contexto.
+ */
+export const useGetModelCatalog = (directory: string | null) =>
+  useQuery({
+    queryKey: queryKeys.models.list(directory ?? ''),
+    queryFn: () => opencodeService.listModels(directory as string),
+    enabled: Boolean(directory),
+    staleTime: Infinity,
+  });
+
+/**
  * Impacto del agente en el repositorio (FR-028..FR-030): archivos afectados y
  * sus parches. Read-only; expone `isError`/`isLoading` para que la sección
  * `FileChanges` renderice error → loading → vacío → datos (Principio VI).

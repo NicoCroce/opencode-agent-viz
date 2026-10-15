@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import type { ModelInfo } from '@opencode/client';
 import type { TSessionMessage } from '@app/Infrastructure/Services/opencodeClient';
 import type { TGraphNode } from '@app/Domains/Graph/Graph.entity';
 import { EMPTY_METRICS } from '@app/Domains/Graph/Graph.entity';
@@ -9,7 +10,10 @@ import { queryKeys } from '../../../queryKeys';
 import { useContextMetrics } from '../useContextMetrics';
 
 vi.mock('@app/Infrastructure/Services/opencodeClient', () => ({
-  opencodeService: { getSessionMessages: vi.fn() },
+  opencodeService: {
+    getSessionMessages: vi.fn(),
+    listModels: vi.fn().mockResolvedValue([]),
+  },
 }));
 
 const node = (sessionId: string, overrides: Partial<TGraphNode['data']> = {}): TGraphNode => ({
@@ -67,6 +71,7 @@ const renderMetrics = (
   inspected: TGraphNode | null,
   invokedBy: TGraphNode | null,
   parentMessages: TSessionMessage[] = [],
+  models?: ModelInfo[],
 ) => {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
@@ -75,6 +80,7 @@ const renderMetrics = (
     queryKeys.sessions.messages(invokedBy?.data.sessionId ?? 'none'),
     parentMessages,
   );
+  if (models) queryClient.setQueryData(queryKeys.models.list('/repo'), models);
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
@@ -128,5 +134,69 @@ describe('useContextMetrics · S4 (aporte al padre)', () => {
     const { result } = renderMetrics(child, null);
 
     expect(result.current.context).toBe(child.data.context);
+  });
+});
+
+const contextWithWindow = (
+  windowTokens: number | null,
+): TGraphNode['data']['context'] => ({
+  breakdown: { buckets: [], chars: 0, windowTokens, hasTokens: false },
+  window: {
+    windowTokens,
+    cacheRead: null,
+    cacheWrite: null,
+    hitRate: null,
+    costPerKToken: null,
+  },
+  latency: null,
+  provisional: false,
+});
+
+const catalogModel = (id: string, providerID: string, context: number) =>
+  ({ id, modelID: id, providerID, limit: { context, output: 8_000 } }) as ModelInfo;
+
+describe('useContextMetrics · uso de la ventana frente al límite del modelo', () => {
+  it('cruza el modelo del nodo con el catálogo de su directorio', () => {
+    const inspected = node('child', {
+      model: { id: 'opus', providerID: 'anthropic', variant: 'high' },
+      context: contextWithWindow(50_000),
+    });
+
+    const { result } = renderMetrics(inspected, null, [], [
+      catalogModel('haiku', 'anthropic', 100_000),
+      catalogModel('opus', 'anthropic', 200_000),
+    ]);
+
+    expect(result.current.usage).toEqual({
+      usedTokens: 50_000,
+      limitTokens: 200_000,
+      ratio: 0.25,
+    });
+  });
+
+  it('sin el modelo en el catálogo no inventa un porcentaje', () => {
+    const inspected = node('child', {
+      model: { id: 'desconocido', providerID: 'anthropic' },
+      context: contextWithWindow(50_000),
+    });
+
+    const { result } = renderMetrics(inspected, null, [], [
+      catalogModel('opus', 'anthropic', 200_000),
+    ]);
+
+    expect(result.current.usage).toBeNull();
+  });
+
+  it('sin ventana medida no hay uso aunque el límite se conozca', () => {
+    const inspected = node('child', {
+      model: { id: 'opus', providerID: 'anthropic' },
+      context: contextWithWindow(null),
+    });
+
+    const { result } = renderMetrics(inspected, null, [], [
+      catalogModel('opus', 'anthropic', 200_000),
+    ]);
+
+    expect(result.current.usage).toBeNull();
   });
 });

@@ -207,6 +207,7 @@ export const InspectorPanel = ({
         context={contextMetrics.context}
         tokens={metrics.tokens}
         compactionEffect={contextMetrics.compactionEffect}
+        usage={contextMetrics.usage}
         isError={isError}
         isLoading={isLoading}
       >

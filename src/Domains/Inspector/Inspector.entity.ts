@@ -44,3 +44,15 @@ export interface TDiffHunk {
   newCount: number;
   lines: TDiffLine[];
 }
+
+/**
+ * Uso de la ventana de contexto del modelo en el último paso medido del nodo.
+ * `ratio` es `usedTokens / limitTokens` sin recortar (puede superar 1).
+ */
+export interface TContextUsage {
+  /** Prompt del último paso: `input + cache.read + cache.write`. */
+  usedTokens: number;
+  /** `ModelInfo.limit.context` del modelo del nodo. */
+  limitTokens: number;
+  ratio: number;
+}

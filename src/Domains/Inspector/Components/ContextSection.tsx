@@ -13,8 +13,10 @@ import type {
   TTokenUsage,
 } from '@app/Domains/Graph/Graph.entity';
 import { ContextCompositionBar } from './ContextCompositionBar';
+import type { TContextUsage } from '../Inspector.entity';
 import { ContextGrowth } from './ContextGrowth';
 import { ContextSectionSkeleton } from './ContextSectionSkeleton';
+import { ContextWindowUsage } from './ContextWindowUsage';
 
 /** Etiqueta legible del motivo de una compactación (FR-016). */
 const COMPACTION_REASON_LABEL: Record<TContextCompactionReason, string> = {
@@ -29,6 +31,8 @@ interface ContextSectionProps {
   tokens?: TTokenUsage | null;
   /** Efecto de la última compactación sobre la ventana (FR-016). */
   compactionEffect?: TCompactionEffect | null;
+  /** Uso de la ventana frente al límite del modelo; `null` si no se conoce. */
+  usage?: TContextUsage | null;
   isError?: boolean;
   isLoading?: boolean;
   /**
@@ -65,6 +69,7 @@ export const ContextSection = ({
   context,
   tokens = null,
   compactionEffect = null,
+  usage = null,
   isError = false,
   isLoading = false,
   children,
@@ -109,9 +114,9 @@ export const ContextSection = ({
         ) : null}
 
         <Container space="none" className="gap-0.5">
-          <DetailRow
-            label="Ventana de contexto"
-            value={formatTokens(window?.windowTokens ?? null)}
+          <ContextWindowUsage
+            windowTokens={window?.windowTokens ?? null}
+            usage={usage}
           />
           <DetailRow
             label="Caché (lectura)"
