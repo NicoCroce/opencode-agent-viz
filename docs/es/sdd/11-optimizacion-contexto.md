@@ -48,7 +48,7 @@ Qué contiene cada una:
 | 4 | `state` compacto y no releer `sddorch.md` | A |
 | 5 | Scripts `mark-tasks.sh`, `verify.sh`, `scope-check.sh` | A |
 | 6 | `pending_question` en el `state` | A |
-| 7 | `compaction.buffer: 800000` | A |
+| 7 | `compaction.buffer: 800000` (revertido, ver A7) | A |
 | 8 | Recorte de `sddorch.md` | A |
 | 9 | `sddorch-release` con `#low` | A |
 | 10 | `specify` y `clarify` en un subagente `general` | B |
@@ -145,6 +145,23 @@ Cada cambio sigue el mismo esquema: **problema → decisión → alternativas de
 - **Problema:** con límite de 1M la compactación automática casi nunca se disparaba y el contexto crecía sin contención.
 - **Decisión:** `compaction.buffer: 800000` en `opencode.json`. El campo `instructions` ya no se usa (en la versión V2 no se resolvía).
 - **Riesgo:** no está verificado que aplique a la versión instalada de OpenCode. Se comprobará en la próxima ejecución.
+
+> **Revertida.** `buffer` no es el punto de disparo: son los tokens que se dejan **libres** bajo el
+> límite del modelo, y OpenCode compacta cuando la ventana supera `límite − buffer`. Con 800k:
+>
+> - En los modelos de 1M compactaba hacia los 200k, que era lo buscado.
+> - En los de menos de 800k (`claude-haiku-4.5`, con 136k de entrada; `deepseek-v4-flash-free` y
+>   `big-pickle`, con 200k) el umbral quedaba **negativo** y compactaba en cada paso.
+>
+> En el historial: 250 compactaciones automáticas con Haiku en 4 sesiones, 247 de ellas a menos de
+> dos pasos de la anterior y con la ventana en ~16k (8 % del contexto). Tras cada una, el
+> orquestador volvía a leer los mismos archivos.
+>
+> OpenCode no admite `buffer` por modelo ni por agente, y ningún valor fijo sirve a la vez para 136k
+> y para 1M. Por eso se quitó de `opencode.json`: vuelve el valor por defecto (10 % del límite) y la
+> compactación automática queda como red de seguridad. La decisión pasa al orquestador con
+> `context-check.mjs` ([§6.5](#65-context-checkmjs)). Las sesiones fuera de SddOrch ya no se
+> compactan a los 200k: crecen hasta cerca del límite real.
 
 #### A8. Recorte de `sddorch.md`
 
@@ -290,6 +307,35 @@ Sin argumentos corre `lint`, `tsc`, `test` y `build` **en paralelo**, sin detene
 
 Con esto, la verificación completa pasó de **200–280 s a 41 s**. Detalle, mediciones y límites en [Optimización de la verificación](12-optimizacion-verificacion.md).
 
+### 6.5 `context-check.mjs`
+
+```bash
+node .opencode/scripts/bash/context-check.mjs [--session <id>] [--apply]
+```
+
+Decide si el orquestador debe compactar. Reemplaza a `compaction.buffer` (A7). SddOrch lo corre al
+cerrar cada fase y cada ola, con el `state` ya guardado en Engram, que son los únicos puntos donde
+compactar no pierde nada.
+
+1. Lee la sesión de `OPENCODE_SESSION_ID`, que OpenCode expone en la shell, con `opencode api`.
+2. Mide la ventana del último paso: `input + cache.read + cache.write`.
+3. El umbral es el menor entre **200k** y el **70 %** de la entrada del modelo
+   (`limit.input ?? limit.context`, del catálogo). El primero contiene el costo por paso en los
+   modelos de 1M; el segundo deja margen en los chicos (Haiku: 95k).
+4. Responde con una línea JSON con `decision`:
+
+| `decision` | Cuándo | Qué hace SddOrch |
+|---|---|---|
+| `keep` | ventana < umbral | sigue |
+| `wait` | la última compactación fue hace menos de 10 pasos | sigue (evita bucles) |
+| `too-large` | justo después de la última compactación la ventana ya llegaba al 80 % del umbral | avisa y sugiere una sesión nueva que retome desde el `state` |
+| `compact` | en otro caso | con `--apply` la pide (`POST /api/session/<id>/compact`); OpenCode la ejecuta en el siguiente límite de paso |
+| `error` | no se pudo medir | sigue y avisa una vez |
+
+`opencode api` corta la salida cuando escribe a una tubería (llegaban 57 KB de 388 KB), así que el
+script la redirige a un archivo temporal. Sale siempre con 0 para no frenar el flujo. Solo pagina
+hacia atrás, hasta la última compactación, si la ventana alcanza el umbral.
+
 ## 7. Mapa de archivos
 
 ### Modificados
@@ -305,11 +351,11 @@ Con esto, la verificación completa pasó de **200–280 s a 41 s**. Detalle, me
 | `.opencode/instructions/memory.instructions.md` | Punteros `prd`/`rfc`, `state` compacto, `pending_question` |
 | `.opencode/.gitignore` | `runs/` |
 | `.opencode/README.md` | Scripts y `runs/` |
-| `opencode.json` | `compaction.buffer: 800000` |
+| `opencode.json` | `compaction.buffer: 800000` (revertido: ver A7) |
 
 ### Nuevos
 
-`.opencode/scripts/bash/schedule.mjs`, `mark-tasks.sh`, `scope-check.sh` y `verify.sh`; y este documento.
+`.opencode/scripts/bash/schedule.mjs`, `mark-tasks.sh`, `scope-check.sh`, `verify.sh` y `context-check.mjs` (posterior, ver A7); y este documento.
 
 ### No tocados
 
@@ -320,7 +366,7 @@ Con esto, la verificación completa pasó de **200–280 s a 41 s**. Detalle, me
 | Riesgo / pendiente | Detalle |
 |---|---|
 | Sin medición real | Todas las cifras de §3 son simulación. Hay que medir una ejecución nueva. |
-| `compaction.buffer` | No verificado que se aplique en la versión instalada de OpenCode. |
+| `compaction.buffer` | Se aplicaba, y con modelos de menos de 800k provocaba un bucle de compactación. Se quitó (A7). |
 | `clarify` en subagente | Hay que comprobar que `preguntas_abiertas` llega bien formado y que la reanudación por `sessionID` funciona. |
 | Unidades `!` | El orquestador debe declarar los `writes` antes de lanzarlas; si no, la ola propia pierde paralelismo. |
 | `sddorch.md` a 16,6K | Por debajo del objetivo de 14K. Opciones: mover detalle a un archivo de lectura condicional (ahorro ~1,5–1,7K, pero añade una lectura). |
