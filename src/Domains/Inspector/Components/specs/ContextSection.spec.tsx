@@ -174,6 +174,35 @@ describe('ContextSection · FR-016 (ventana, salida, evolución y compactaciones
     expect(section.getByText(/completed/)).toBeInTheDocument();
   });
 
+  it('avisa de un posible bucle de compactación', () => {
+    render(
+      <ContextSection
+        context={context({
+          compactions: [{ id: 'c1', at: 30, status: 'completed', reason: 'auto' }],
+        })}
+        compactionLoop={{ compactions: 238, steps: 240 }}
+      />,
+    );
+
+    const notice = screen.getByRole('status');
+    expect(within(notice).getByText('Posible bucle de compactación')).toBeInTheDocument();
+    expect(
+      within(notice).getByText(/238 compactaciones en 240 pasos/),
+    ).toBeInTheDocument();
+  });
+
+  it('sin bucle no muestra el aviso', () => {
+    render(
+      <ContextSection
+        context={context({
+          compactions: [{ id: 'c1', at: 30, status: 'completed', reason: 'auto' }],
+        })}
+      />,
+    );
+
+    expect(screen.queryByText('Posible bucle de compactación')).not.toBeInTheDocument();
+  });
+
   it('etiqueta la compactación manual', () => {
     render(
       <ContextSection

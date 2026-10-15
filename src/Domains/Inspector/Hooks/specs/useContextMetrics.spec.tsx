@@ -4,7 +4,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import type { ModelInfo } from '@opencode/client';
 import type { TSessionMessage } from '@app/Infrastructure/Services/opencodeClient';
-import type { TGraphNode } from '@app/Domains/Graph/Graph.entity';
+import type {
+  TGraphNode,
+  TNodeContextMetrics,
+} from '@app/Domains/Graph/Graph.entity';
 import { EMPTY_METRICS } from '@app/Domains/Graph/Graph.entity';
 import { queryKeys } from '../../../queryKeys';
 import { useContextMetrics } from '../useContextMetrics';
@@ -198,5 +201,45 @@ describe('useContextMetrics · uso de la ventana frente al límite del modelo', 
     ]);
 
     expect(result.current.usage).toBeNull();
+  });
+});
+
+describe('useContextMetrics · bucle de compactación', () => {
+  const withCompactions = (
+    growthTimes: number[],
+    compactionTimes: number[],
+  ): TGraphNode['data']['context'] => ({
+    ...(contextWithWindow(16_000) as TNodeContextMetrics),
+    growth: growthTimes.map((startedAt, index) => ({
+      stepId: `a${index}`,
+      startedAt,
+      windowTokens: 16_000,
+    })),
+    compactions: compactionTimes.map((at, index) => ({
+      id: `c${index}`,
+      at,
+      status: 'completed' as const,
+      reason: 'auto' as const,
+    })),
+  });
+
+  it('detecta compactaciones tras casi cada respuesta', () => {
+    const inspected = node('child', {
+      context: withCompactions([15, 25, 35], [10, 20, 30, 40]),
+    });
+
+    const { result } = renderMetrics(inspected, null);
+
+    expect(result.current.compactionLoop).toEqual({ compactions: 4, steps: 3 });
+  });
+
+  it('sin compactaciones seguidas no informa bucle', () => {
+    const inspected = node('child', {
+      context: withCompactions([11, 12, 13, 21, 22, 23], [10, 20, 30]),
+    });
+
+    const { result } = renderMetrics(inspected, null);
+
+    expect(result.current.compactionLoop).toBeNull();
   });
 });

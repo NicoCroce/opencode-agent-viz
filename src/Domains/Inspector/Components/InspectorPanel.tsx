@@ -208,6 +208,7 @@ export const InspectorPanel = ({
         tokens={metrics.tokens}
         compactionEffect={contextMetrics.compactionEffect}
         usage={contextMetrics.usage}
+        compactionLoop={contextMetrics.compactionLoop}
         isError={isError}
         isLoading={isLoading}
       >
