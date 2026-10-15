@@ -12,7 +12,9 @@ export const isToolPart = (part: TContentPart): part is TToolPart =>
 
 /**
  * Deriva el histórico de ejecuciones de herramientas a partir de los mensajes
- * de la sesión, preservando el orden de aparición.
+ * de la sesión, preservando el orden de aparición. El inicio es `time.ran`
+ * (arranque real de la ejecución); `time.created` marca cuando el modelo empieza
+ * a escribir la llamada y solo se usa si el servidor no reporta `ran`.
  */
 export const toolsFromMessages = (
   messages: TSessionMessage[],
@@ -21,7 +23,7 @@ export const toolsFromMessages = (
     parts.filter(isToolPart).map((part) => ({
       name: part.name,
       status: part.state.status,
-      startedAt: part.time.created,
+      startedAt: part.time.ran ?? part.time.created,
       endedAt: part.time.completed,
     })),
   );
