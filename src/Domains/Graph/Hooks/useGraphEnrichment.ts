@@ -5,7 +5,6 @@ import type { TSessionMessage } from '@app/Infrastructure/Services/opencodeClien
 import { queryKeys } from '../../queryKeys';
 import { useGetSessionStatus } from '../../Sessions/Sessions.service';
 import type { TGraphModel } from '../Graph.entity';
-import { deriveAgentMedians } from '../lib/agentLatencyMedians';
 import { buildEnrichmentPlan } from '../lib/buildEnrichmentPlan';
 import { enrichNodeData, readNodeEnrichmentInput } from '../lib/enrichNodeData';
 import {
@@ -18,6 +17,7 @@ import { loadNodeContent } from '../lib/loadNodeContent';
 import { chunkLoadPlan } from '../lib/loadPriority';
 import { mergeEnrichedNodes } from '../lib/mergeEnrichedNodes';
 import { DEFAULT_ANOMALY_THRESHOLD } from '../lib/metrics/anomalyThreshold';
+import { deriveModelPaces } from '../lib/metrics/modelPace';
 import { collectReadyIds } from '../lib/readyNodeIds';
 
 /**
@@ -26,7 +26,7 @@ import { collectReadyIds } from '../lib/readyNodeIds';
  * `buildEnrichmentPlan`; escribe en las **mismas claves** que parchea
  * `eventReducer` (FR-009, R6) y marca `enrichment: 'ready'` los nodos cargados.
  *
- * El cómputo puro vive en `lib/`: `collectReadyIds` (T024), `deriveAgentMedians`
+ * El cómputo puro vive en `lib/`: `collectReadyIds` (T024), `deriveModelPaces`
  * (T025) y `mergeEnrichedNodes` (T026); aquí quedan el estado de progreso, la
  * orquestación de lotes y la fusión de cada nodo (`enrichNodeData`). Un cambio
  * de `ids`/`structure` reinicia el plan en vuelo sin bloquear al nuevo (L6).
@@ -79,21 +79,20 @@ export const useGraphEnrichment = (
     [structure, ids, readyIds],
   );
 
-  // Mediana de `totalMs` por agente (FR-020/FR-012), memoizada por identidad de
-  // la estructura/ready set: respaldo de los nodos con pocas muestras propias.
-  const agentMedianByAgent = useMemo(() => {
-    const entries: Array<{ agent: string; messages: TSessionMessage[] }> = [];
+  // Ritmo de generación por modelo con todos los nodos listos (FR-020),
+  // memoizado por identidad de la estructura/ready set: es la referencia para
+  // decidir si una respuesta tardó más de lo esperado para sus tokens.
+  const paces = useMemo(() => {
+    const lists: TSessionMessage[][] = [];
     for (const node of structure.nodes) {
       if (!readyIds.has(node.id)) continue;
-      entries.push({
-        agent: node.data.agentName,
-        messages:
-          queryClient.getQueryData<TSessionMessage[]>(
-            queryKeys.sessions.messages(node.id),
-          ) ?? [],
-      });
+      lists.push(
+        queryClient.getQueryData<TSessionMessage[]>(
+          queryKeys.sessions.messages(node.id),
+        ) ?? [],
+      );
     }
-    return deriveAgentMedians(entries);
+    return deriveModelPaces(lists);
   }, [structure.nodes, readyIds, queryClient]);
 
   // Un turno de idle por lote; al cambiar `plan` el turno en vuelo se cancela y
@@ -138,7 +137,7 @@ export const useGraphEnrichment = (
         sessionStatus: statuses[node.id],
         now,
         threshold,
-        agentMedianMs: agentMedianByAgent[node.data.agentName] ?? null,
+        paces,
       }),
     );
   }, [
@@ -148,7 +147,7 @@ export const useGraphEnrichment = (
     queryClient,
     now,
     threshold,
-    agentMedianByAgent,
+    paces,
   ]);
 };
 

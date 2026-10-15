@@ -11,6 +11,7 @@ import type {
   TExecutionSignal,
   TGraphNode,
   TGraphNodeData,
+  TModelPace,
 } from '../Graph.entity';
 import { deriveMetricBase, resolveMetrics } from './deriveMetrics';
 import { deriveContextBreakdown } from './metrics/contextBreakdown';
@@ -74,15 +75,14 @@ export interface TEnrichNodeDataInput extends TNodeEnrichmentInput {
   now: number;
   /**
    * Umbral de anomalía de latencia vigente (FR-022). Opcional: sin él se usa el
-   * default de `latency-anomaly-contract` §4.
+   * default de `latency-anomaly-contract` §5.
    */
   threshold?: number;
   /**
-   * Mediana de `totalMs` del mismo agente (FR-020): referencia de respaldo
-   * cuando el nodo tiene menos de `MIN_SAMPLES` muestras propias. `null` si el
-   * agente tampoco tiene historial.
+   * Ritmo de generación por modelo, estimado con todo el grafo (FR-020;
+   * `deriveModelPaces`): referencia para decidir si una respuesta es lenta.
    */
-  agentMedianMs?: number | null;
+  paces?: Record<string, TModelPace>;
 }
 
 /**
@@ -100,7 +100,7 @@ export const enrichNodeData = ({
   signal,
   now,
   threshold,
-  agentMedianMs,
+  paces,
 }: TEnrichNodeDataInput): TGraphNodeData => {
   const { id } = node;
   const base = deriveMetricBase(messages);
@@ -138,14 +138,14 @@ export const enrichNodeData = ({
     metrics,
     // Métricas de contexto (FR-001/FR-016/FR-018; research R3): desglose +
     // ventana/caché + evolución + compactaciones + serie de latencia con
-    // anomalías. Memoizable por identidad de `messages`; la referencia
-    // (nodo/agente) y el umbral vienen del modelo.
+    // anomalías. Memoizable por identidad de `messages`; el ritmo por modelo
+    // y el umbral vienen del grafo.
     context: {
       breakdown,
       window: deriveContextWindow(metrics, breakdown.windowTokens),
       growth: deriveContextGrowth(messages),
       compactions: deriveContextCompactions(messages),
-      latency: deriveLatency(messages, { threshold, agentMedianMs }),
+      latency: deriveLatency(messages, { threshold, paces }),
       provisional: isActiveStatus(status),
     },
     currentTool: base.currentTool,

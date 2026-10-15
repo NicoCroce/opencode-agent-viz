@@ -53,7 +53,10 @@ Visible cuando el nodo participa de un grupo (`speedup !== null`): tamaño, tiem
 
 ## 4. Sección Latencia (FR-019, FR-023)
 
-Serie de `generationMs` y `totalMs`, mediana de referencia (nodo/agente) y lista de anomalías con magnitud (`ratio`), referencia (`referenceMs`) y origen (`reference`).
+Reparto del tiempo del nodo (modelo, herramientas, subagentes y usuario), ritmo esperado de cada
+modelo, umbral de lentitud, respuestas con su desglose y lista de respuestas lentas con magnitud
+(`ratio`), exceso (`excessMs`) y lo esperado (`expectedMs`). Detalle en
+`latency-anomaly-contract.md` §6, que reemplaza la serie contra la mediana del nodo/agente.
 
 > **Superseded (`014-inspector-detail-tabs`, FR-010).** El desplegable "Avanzado" ya no existe: el
 > listado de respuestas medidas y el de anomalías se montan en la **pestaña Latencia** del tablist de
@@ -85,6 +88,6 @@ Cada apartado y la sección completa representan explícitamente: **error** (`Em
 | S3 | Cada apartado tiene los 4 estados | spec de `ContextSection` |
 | S4 | El aporte al padre navega al nodo padre | spec de `useContextMetrics`/`ContextSection` |
 | S5 | Sección Paralelismo visible solo con grupo y con etiqueta provisional | spec de `ParallelismSection` |
-| S6 | Latencia lista anomalías con magnitud y referencia | spec de `LatencySection` |
+| S6 | Latencia muestra el desglose y lista las respuestas lentas con magnitud y lo esperado | spec de `LatencySection` |
 | S7 | El footer del nodo muestra in/out sin romper `cardHeight` | spec `AgentNodeFooter`/`cardHeight` |
 | S8 | Control de padre accesible por teclado | spec a11y |

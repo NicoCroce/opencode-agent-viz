@@ -9,16 +9,16 @@ import {
 } from '../metrics/anomalyThreshold';
 
 describe('clampThreshold · L7 (FR-022)', () => {
-  it('el default es 0.4 (±40%)', () => {
-    expect(DEFAULT_ANOMALY_THRESHOLD).toBe(0.4);
+  it('el default es 1 (el doble de lo esperado)', () => {
+    expect(DEFAULT_ANOMALY_THRESHOLD).toBe(1);
   });
 
-  it('acota al rango (0.05, 0.95)', () => {
+  it('acota al rango [0.25, 3]', () => {
     expect(clampThreshold(0.5)).toBe(0.5);
-    expect(clampThreshold(0)).toBe(0.05);
-    expect(clampThreshold(-1)).toBe(0.05);
-    expect(clampThreshold(1)).toBe(0.95);
-    expect(clampThreshold(2)).toBe(0.95);
+    expect(clampThreshold(0)).toBe(0.25);
+    expect(clampThreshold(-1)).toBe(0.25);
+    expect(clampThreshold(3)).toBe(3);
+    expect(clampThreshold(5)).toBe(3);
   });
 
   it('cae al default con valores no finitos', () => {
@@ -41,7 +41,13 @@ describe('persistencia del umbral', () => {
     expect(readStoredThreshold()).toBe(0.6);
 
     writeStoredThreshold(5);
-    expect(readStoredThreshold()).toBe(0.95);
-    expect(localStorage.getItem(ANOMALY_THRESHOLD_STORAGE_KEY)).toBe('0.95');
+    expect(readStoredThreshold()).toBe(3);
+    expect(localStorage.getItem(ANOMALY_THRESHOLD_STORAGE_KEY)).toBe('3');
+  });
+
+  it('ignora el valor guardado con el criterio anterior (clave nueva)', () => {
+    localStorage.setItem('opencode-agent-viz:anomaly-threshold', '0.4');
+    expect(ANOMALY_THRESHOLD_STORAGE_KEY).not.toBe('opencode-agent-viz:anomaly-threshold');
+    expect(readStoredThreshold()).toBe(DEFAULT_ANOMALY_THRESHOLD);
   });
 });

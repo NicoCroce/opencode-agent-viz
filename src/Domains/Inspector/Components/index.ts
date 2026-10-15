@@ -17,5 +17,6 @@ export * from './ContextGrowth';
 export * from './ContextSectionSkeleton';
 export * from './ParallelismSection';
 export * from './ParentImpactRow';
+export * from './LatencySampleRow';
 export * from './LatencySection';
 export * from './InspectorSectionTabs';

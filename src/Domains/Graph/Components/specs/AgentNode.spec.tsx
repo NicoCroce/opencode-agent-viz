@@ -5,6 +5,11 @@ import type { ComponentProps } from 'react';
 import { render, screen } from '@testing-library/react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { NODE_STATUS_COLOR, NODE_STATUS_LABEL } from '@app/Application/Helpers';
+import {
+  latencyAnomaly,
+  latencyReport,
+  latencySample,
+} from '@app/test/latencyFixtures';
 import { AgentNode } from '../AgentNode';
 import {
   EMPTY_NODE_FOCUS,
@@ -396,20 +401,10 @@ describe('AgentNode — anomalía de latencia (T044, FR-023)', () => {
             hitRate: null,
             costPerKToken: null,
           },
-          latency: {
-            samples: [{ stepId: 's1', startedAt: 0, generationMs: 10, totalMs: 100 }],
-            medianMs: 100,
-            reference: 'node',
-            anomalies: [
-              {
-                stepId: 's1',
-                ratio: 3,
-                direction: 'slow',
-                referenceMs: 100,
-                reference: 'node',
-              },
-            ],
-          },
+          latency: latencyReport({
+            samples: [latencySample({ stepId: 's1' })],
+            anomalies: [latencyAnomaly({ stepId: 's1', ratio: 3 })],
+          }),
           provisional: false,
         },
       }),
@@ -417,7 +412,7 @@ describe('AgentNode — anomalía de latencia (T044, FR-023)', () => {
 
     expect(
       screen.getByTestId('node-latency-mark'),
-    ).toHaveAccessibleName('Respuesta lenta');
+    ).toHaveAccessibleName('Respuesta lenta: ×3.0 lo esperado para sus tokens');
   });
 
   it('no muestra la marca cuando no hay anomalías', () => {

@@ -1,4 +1,4 @@
-import { cn } from '@app/Application/lib/utils';
+import { formatSpeedup } from '@app/Application/Helpers';
 import type { TLatencyAnomaly, TLatencyReport } from '../Graph.entity';
 
 interface AgentNodeLatencyMarkProps {
@@ -7,10 +7,10 @@ interface AgentNodeLatencyMarkProps {
 }
 
 /**
- * Última muestra del nodo, si su latencia es anómala (FR-023). La marca refleja
- * la respuesta **más reciente** (contrato `latency-anomaly-contract` §5/L8): una
- * anomalía pasada ya corregida no deja el nodo marcado. `null` si no hay serie,
- * muestras, anomalías o si la última muestra entró en la banda.
+ * Última muestra del nodo, si fue lenta (FR-023). La marca refleja la respuesta
+ * **más reciente** (contrato `latency-anomaly-contract` §6/L8): una anomalía
+ * pasada ya corregida no deja el nodo marcado. `null` si no hay serie,
+ * muestras, anomalías o si la última muestra tardó lo esperado.
  */
 export const lastLatencyAnomaly = (
   latency: TLatencyReport | null,
@@ -26,12 +26,11 @@ export const lastLatencyAnomaly = (
 };
 
 /**
- * Marca de anomalía de latencia del nodo (FR-021/FR-023;
- * `latency-anomaly-contract` §5). Compacta, va en el cluster del encabezado
- * junto al badge de aceleración y **no añade filas** al card (`cardHeight`).
- * La dirección se distingue por texto (`lenta`/`rápida`) además del color, y la
- * etiqueta accesible completa ("Respuesta lenta"/"Respuesta rápida") viaja en
- * `aria-label`/`title`: la información no depende solo del color (a11y).
+ * Marca de respuesta lenta del nodo (FR-021/FR-023;
+ * `latency-anomaly-contract` §6): el modelo tardó más de lo esperado para los
+ * tokens que generó. Compacta, va en el cluster del encabezado junto al badge
+ * de aceleración y **no añade filas** al card (`cardHeight`). El texto «lenta»
+ * acompaña al color y la etiqueta accesible lleva la magnitud (a11y).
  */
 export const AgentNodeLatencyMark = ({
   latency,
@@ -39,8 +38,9 @@ export const AgentNodeLatencyMark = ({
   const anomaly = lastLatencyAnomaly(latency);
   if (!anomaly) return null;
 
-  const slow = anomaly.direction === 'slow';
-  const label = slow ? 'Respuesta lenta' : 'Respuesta rápida';
+  const label = `Respuesta lenta: ${formatSpeedup(
+    anomaly.ratio,
+  )} lo esperado para sus tokens`;
 
   return (
     <span
@@ -48,14 +48,9 @@ export const AgentNodeLatencyMark = ({
       aria-label={label}
       title={label}
       data-testid="node-latency-mark"
-      className={cn(
-        'rounded-flat border px-1 font-mono text-[10px] leading-4',
-        slow
-          ? 'border-status-error/80 text-status-error'
-          : 'border-status-waiting/80 text-status-waiting',
-      )}
+      className="rounded-flat border border-status-error/80 px-1 font-mono text-[10px] leading-4 text-status-error"
     >
-      {slow ? '▲ lenta' : '▼ rápida'}
+      ▲ lenta
     </span>
   );
 };
