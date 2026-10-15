@@ -212,7 +212,7 @@ Duplicates across *Interaction*, *Auto mode*, *Flow* and *How you run a phase* w
 #### B6. One-time preflight and `tsc` per wave
 
 - **Preflight:** a `general` runs the preliminary steps of `speckit.implement.md` (hooks, prerequisites, checklist gate, `ignore` files) **once per phase**, not once per unit. A pending decision arrives as `preguntas_abiertas`.
-- **`verify.sh tsc` after each wave:** `lint` and `tsc` only ran at the end, which caused two fixes after `code-review`. The next wave does not start until `tsc` passes.
+- **`verify.sh --changed tsc test` after each wave:** `lint` and `tsc` only ran at the end, which caused two fixes after `code-review`. The next wave does not start until `tsc` and the affected specs pass. (It used to be `verify.sh tsc`; see [Verification speed-up](12-verification-speedup.md#24---changed).)
 
 ## 5. What was NOT done and why
 
@@ -279,10 +279,16 @@ Marks `[X]` by ID and returns "marked / already / not found". Exit 1 if any ID d
 ### 6.4 `verify.sh`
 
 ```bash
-.opencode/scripts/bash/verify.sh [--log-dir <dir>] [lint tsc test build]
+.opencode/scripts/bash/verify.sh [--log-dir <dir>] [--changed] [lint tsc test build]
 ```
 
-With no arguments it runs `lint`, `tsc`, `test` and `build`, without stopping at the first failure. It shows PASS/FAIL, duration and, on failure, the first error lines.
+With no arguments it runs `lint`, `tsc`, `test` and `build` **in parallel**, without stopping at the first failure. It shows PASS/FAIL, duration and, on failure, the first error lines, always in the order `lint`, `tsc`, `test`, `build`.
+
+- **`--changed`:** `test` runs only the specs affected by uncommitted changes. It is for iterating (e.g. after each wave); the `verify` phase runs everything without the flag.
+- **`VERIFY_TEST_WORKERS=N`:** overrides the 4-worker Vitest cap defined in `vitest.config.ts`.
+- **`build` without duplicate `tsc`:** `pnpm build` already runs `tsc`; when `tsc` is in the list, `build` runs only `vite build`.
+
+With this, the full verification went from **200–280 s to 41 s**. Details, measurements and limits in [Verification speed-up](12-verification-speedup.md).
 
 ## 7. File map
 

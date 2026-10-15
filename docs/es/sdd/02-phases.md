@@ -155,9 +155,13 @@ los archivos modificados. `REJECTED` solo por incumplimientos de estándares
 documentados.
 
 ### `verify` — fase propia de SddOrch
-Ejecuta en orden los `VERIFY_COMMANDS` (`pnpm lint`, `pnpm tsc`, `pnpm test`,
-`pnpm build`) y resume. Si algo falla, se pregunta: corregir, continuar
-igualmente o detener.
+Ejecuta los `VERIFY_COMMANDS` (`pnpm lint`, `pnpm tsc`, `pnpm test`,
+`pnpm build`) **en paralelo** con `verify.sh` y resume en el orden
+`lint`, `tsc`, `test`, `build`. Si algo falla, se pregunta: corregir, continuar
+igualmente o detener. Durante `implement`, tras cada ola, se usa
+`verify.sh --changed tsc test` (solo los specs afectados); esta fase corre
+todo, sin el flag. Mediciones en
+[Optimización de la verificación](12-optimizacion-verificacion.md).
 
 ### `release` — fase propia de SddOrch
 Con `sddorch-release`: (1) modo `commits`, (2) modo `pr-detail`; (3) modo

@@ -108,6 +108,8 @@ Crear `opencodeClient.ts` con:
 ### 7. Tests
 
 - Carpeta `specs/` junto al código (NO mezclados con .tsx).
+- Entorno de ejecución: los `*.spec.ts` corren en **`node`** (`vitest.config.ts`); los `*.spec.tsx`, en `jsdom`. Un `.spec.ts` que use `document`, `window` o `localStorage` debe empezar con `// @vitest-environment jsdom`; si no, falla con `window is not defined`.
+- Vitest usa el pool `threads` con 4 workers. `pnpm test` ya lo aplica; `verify.sh` lo sobrescribe con `VERIFY_TEST_WORKERS`. Detalle en `docs/es/sdd/12-optimizacion-verificacion.md`.
 - Tests de lógica pura: reductor de eventos, `buildGraph()`, queries.
 - Tests de hooks: usando `renderWithProviders`. Acepta `queryClient` propio (`createTestQueryClient({ gcTime: Infinity })` si el spec revalida contra caché sembrada) y `seed(queryClient)`, que siembra la caché ANTES de renderizar.
 - Radix en jsdom: `src/test/setup.ts` instala los polyfills de puntero y `scrollIntoView` (`src/test/radix.ts`); con `Select`/`AlertDialog` usa `setupRadixUser()` y espera el foco con `findBy…`/`waitFor`.

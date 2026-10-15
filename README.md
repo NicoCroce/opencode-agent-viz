@@ -49,6 +49,7 @@ Guía completa en [Producto → Visión general](docs/es/product/01-overview.md)
 | [Roles del descubrimiento](docs/es/sdd/09-roles.md) | Las seis disciplinas: propósito, agente y skills |
 | [FAQ](docs/es/sdd/10-faq.md) | Dudas frecuentes del modelo |
 | [Optimización del contexto](docs/es/sdd/11-optimizacion-contexto.md) | Etapas A y B: qué se cambió en SddOrch, por qué, tablas de reducción y cómo medirlo |
+| [Optimización de la verificación](docs/es/sdd/12-optimizacion-verificacion.md) | `verify.sh` y Vitest: de 200–280 s a 41 s, con mediciones, límites de workers y cómo reproducirlas |
 
 **English mirror:** [docs/en/](docs/en/) — [product](docs/en/product/01-overview.md) · [sdd](docs/en/sdd/01-overview.md).
 

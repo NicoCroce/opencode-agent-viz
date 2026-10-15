@@ -49,6 +49,7 @@ Full guide in [Product → Overview](docs/en/product/01-overview.md) and
 | [Discovery roles](docs/en/sdd/09-roles.md) | The six disciplines: purpose, agent, and skills |
 | [FAQ](docs/en/sdd/10-faq.md) | Frequent questions about the model |
 | [Context optimization](docs/en/sdd/11-context-optimization.md) | Stages A and B: what changed in SddOrch, why, reduction tables and how to measure it |
+| [Verification speed-up](docs/en/sdd/12-verification-speedup.md) | `verify.sh` and Vitest: from 200–280 s to 41 s, with measurements, worker limits and how to reproduce them |
 
 **Spanish mirror:** [docs/es/](docs/es/) — [product](docs/es/product/01-overview.md) · [sdd](docs/es/sdd/01-overview.md).
 

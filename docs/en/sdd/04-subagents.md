@@ -116,6 +116,13 @@ In a render loop the stack usually ends in a TanStack Query cache subscription
 (`useCachedQueryData`/`useQuery`) that also wakes up on
 `observerOptionsUpdated`, not just on data changes.
 
+> **Note:** `vitest.config.ts` sets `pool: 'threads'` with 4 workers. The recipe
+> (`--pool=forks --poolOptions.forks.singleFork`) passes its flags on the CLI,
+> which take precedence over the config; it was run against the new config on a
+> scoped spec and works. A `.spec.ts` runs in
+> `node`; if the hang depends on the DOM, check that it declares
+> `// @vitest-environment jsdom` ([details](12-verification-speedup.md#8-convention-for-spec-authors)).
+
 ## Scope rules (apply to every subagent)
 
 1. It does **only** what the prompt asks.

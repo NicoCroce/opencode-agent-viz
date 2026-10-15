@@ -152,9 +152,13 @@ The `sddorch-reviewer` loads the `code-reviewer` skill and applies its checklist
 to the modified files. `REJECTED` only for documented standard violations.
 
 ### `verify` — SddOrch's own phase
-Runs the `VERIFY_COMMANDS` in order (`pnpm lint`, `pnpm tsc`, `pnpm test`,
-`pnpm build`) and summarizes. If something fails, it asks: fix, continue
-anyway, or stop.
+Runs the `VERIFY_COMMANDS` (`pnpm lint`, `pnpm tsc`, `pnpm test`,
+`pnpm build`) **in parallel** with `verify.sh` and summarizes in the order
+`lint`, `tsc`, `test`, `build`. If something fails, it asks: fix, continue
+anyway, or stop. During `implement`, after each wave,
+`verify.sh --changed tsc test` is used (only the affected specs); this phase
+runs everything, without the flag. Measurements in
+[Verification speed-up](12-verification-speedup.md).
 
 ### `release` — SddOrch's own phase
 With `sddorch-release`: (1) `commits` mode, (2) `pr-detail` mode; (3) `open-pr`

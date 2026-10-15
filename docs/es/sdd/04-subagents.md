@@ -116,6 +116,13 @@ En un bucle de render la pila suele terminar en una suscripción a la caché de
 TanStack Query (`useCachedQueryData`/`useQuery`) que se despierta también con
 `observerOptionsUpdated`, no solo con cambios de dato.
 
+> **Nota:** `vitest.config.ts` fija `pool: 'threads'` con 4 workers. La receta
+> (`--pool=forks --poolOptions.forks.singleFork`) pasa los flags por CLI, que
+> tienen prioridad sobre la configuración; se ejecutó con la configuración nueva
+> y un spec acotado y funciona. Un spec `.spec.ts` corre
+> en `node`; si el cuelgue depende del DOM, comprueba que declare
+> `// @vitest-environment jsdom` ([detalle](12-optimizacion-verificacion.md#8-convención-para-quien-escribe-specs)).
+
 ## Reglas de alcance (aplican a todo subagente)
 
 1. Hace **solo** lo que pide el prompt; no amplía el alcance.

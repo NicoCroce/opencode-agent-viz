@@ -212,7 +212,7 @@ Se eliminaron duplicados entre *Interacción*, *Modo Auto*, *Flujo* y *Cómo eje
 #### B6. Preflight único y `tsc` por ola
 
 - **Preflight:** un `general` ejecuta los pasos previos de `speckit.implement.md` (hooks, prerrequisitos, gate de checklists, archivos `ignore`) **una vez por fase**, no una por unidad. Una decisión pendiente llega como `preguntas_abiertas`.
-- **`verify.sh tsc` tras cada ola:** `lint` y `tsc` solo corrían al final, lo que provocó dos arreglos tras el `code-review`. La ola siguiente no empieza hasta que `tsc` pase.
+- **`verify.sh --changed tsc test` tras cada ola:** `lint` y `tsc` solo corrían al final, lo que provocó dos arreglos tras el `code-review`. La ola siguiente no empieza hasta que `tsc` y los specs afectados pasen. (Antes era `verify.sh tsc`; ver [Optimización de la verificación](12-optimizacion-verificacion.md#24---changed).)
 
 ## 5. Qué NO se hizo y por qué
 
@@ -279,10 +279,16 @@ Marca `[X]` por ID y devuelve «marcadas / ya estaban / no encontradas». Exit 1
 ### 6.4 `verify.sh`
 
 ```bash
-.opencode/scripts/bash/verify.sh [--log-dir <dir>] [lint tsc test build]
+.opencode/scripts/bash/verify.sh [--log-dir <dir>] [--changed] [lint tsc test build]
 ```
 
-Sin argumentos corre `lint`, `tsc`, `test` y `build`, sin detenerse en el primer fallo. Muestra PASS/FAIL, duración y, si falla, las primeras líneas de error.
+Sin argumentos corre `lint`, `tsc`, `test` y `build` **en paralelo**, sin detenerse en el primer fallo. Muestra PASS/FAIL, duración y, si falla, las primeras líneas de error, siempre en el orden `lint`, `tsc`, `test`, `build`.
+
+- **`--changed`:** `test` corre solo los specs afectados por los cambios sin commitear. Es para iterar (p. ej. tras cada ola); la fase `verify` corre todo sin el flag.
+- **`VERIFY_TEST_WORKERS=N`:** sobrescribe el tope de 4 workers de Vitest definido en `vitest.config.ts`.
+- **`build` sin `tsc` duplicado:** `pnpm build` ya ejecuta `tsc`; si `tsc` está en la lista, `build` corre solo `vite build`.
+
+Con esto, la verificación completa pasó de **200–280 s a 41 s**. Detalle, mediciones y límites en [Optimización de la verificación](12-optimizacion-verificacion.md).
 
 ## 7. Mapa de archivos
 
