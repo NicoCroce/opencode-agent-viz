@@ -174,7 +174,7 @@ Sin worktrees: todos comparten el árbol.
 3. Al terminar la ola: `scope-check.sh check <base.tsv> --per-unit <Uxx.md…>` (todas las unidades de la ola). Además de los archivos fuera de alcance, avisa de una unidad `SIN CAMBIOS` (trabajo omitido en silencio) y de archivos `RECLAMADO POR n UNIDADES` (error de `schedule`). Si hay archivos fuera de alcance o avisos, esa unidad falla; en Auto, frena. Una unidad que vuelve con **respuesta vacía o sin bloque del contrato** no cuenta como fallo: trátala como `UNVERIFIED`, corre `scope-check.sh check` y las specs acotadas de sus `writes` para confirmar el trabajo, y solo relánzala una vez si esa verificación falla.
 4. Una llamada a `mark-tasks.sh` con las tareas `DONE`; guarda el `state`.
 5. Añade los `cambios_de_contrato` de cada hijo a `.opencode/runs/<feature>/cambios_de_contrato.md`. Sus `Decisiones` solo pasan a `decision/<slug>` si afectan a otras unidades.
-6. `.opencode/scripts/bash/verify.sh tsc` tras cada ola; si falla, no empieza la siguiente hasta arreglarlo.
+6. `.opencode/scripts/bash/verify.sh --changed tsc test` tras cada ola (corre solo los specs afectados; la verificación completa queda para la fase **verify**); si falla, no empieza la siguiente hasta arreglarlo.
 7. **Fallos**: la ola se completa; reintenta una vez cada unidad fallida con el error como contexto; si sigue, marca bloqueadas las dependientes. Plan: pregunta cómo seguir. Auto: frena y vuelve a Plan. Si falla una tarea sin `[P]`, detén el flujo.
 8. Sin `git add` ni `commit` durante `implement`.
 
