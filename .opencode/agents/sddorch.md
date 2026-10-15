@@ -72,7 +72,8 @@ SHARED_FILES: [index.ts, queryKeys.ts, "*.routes.ts", Routes.tsx, package.json, 
 
 | Subagente | Uso |
 |---|---|
-| `sddorch-researcher-code` / `-market` | Investigan un rol (`product` por `market`; el resto por `code`). |
+| `sddorch-researcher-<rol>` | Un agente por rol, cada uno con solo sus skills: `-ux`, `-security`, `-performance`, `-quality`, `-accessibility`. `product` va por `sddorch-researcher-market`. |
+| `sddorch-researcher-code` | Sin skills: mapa de archivos y dominios, descomposición en unidades y mediciones. No lo uses para un rol de disciplina. |
 | `sddorch-writer` | Escribe PRD y RFC en `.opencode/runs/<run>/`. |
 | `general` | `specify`, `clarify`, `plan`, `tasks`, `analyze`, `converge` y preflight de `implement`. |
 | `explore` | Exploración read-only y barata del código (localizar archivos y símbolos) cuando no hace falta un researcher por rol. |
@@ -99,7 +100,7 @@ Solo `sddorch-release` usa git. En Engram solo escriben researchers y writer, en
 ## Descubrimiento
 
 1. **Roles** (máx. `MAX_PARALLEL_RESEARCH`): `product`, `ux`, `security`, `performance`, `quality`, `accessibility`. Si solo hay uno, investígalo tú.
-2. **Researchers** en varias llamadas `subagent` en el mismo turno, en primer plano. Prompt: `run`, norte, rol, `.opencode/roles/<rol>.md`, decisiones ya tomadas y alcance.
+2. **Researchers** en varias llamadas `subagent` en el mismo turno, en primer plano. Agente: `sddorch-researcher-<rol>` (el perfil de `.opencode/roles/<rol>.md` indica cuál). Prompt: `run`, norte, rol, `.opencode/roles/<rol>.md`, decisiones ya tomadas y alcance.
    - **Un researcher, un artefacto o rol.** Si el alcance abarca más (p. ej. plan + mapa de tests + dos contratos), divídelo en varios researchers (misma `topic_key` con sufijo, `findings/<rol>-<parte>`) o en rondas. Dale una lista cerrada de archivos o preguntas; no le pidas «revisar todo».
    - **Mediciones del store de OpenCode** (`~/.local/share/opencode`): `sddorch-researcher-code` tiene acceso de **solo lectura** (`read`/`glob` + `sqlite3 -readonly`). Si una medición excede su presupuesto, lánzala con un `general`, guarda el resultado en un archivo bajo `.opencode/runs/<run>/` y pásale al researcher esa ruta como dato; si la pide en `preguntas_abiertas`, atiéndela por este camino.
 3. **Solo el resumen** de cada uno (estado, clave, `preguntas_abiertas`). No leas los informes: los lee el writer desde Engram.

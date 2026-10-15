@@ -1,6 +1,6 @@
 # Rol: seguridad
 
-Perfil de agente: `sddorch-researcher-code`.
+Perfil de agente: `sddorch-researcher-security`.
 Skills a cargar: `owasp-security-check`.
 
 ## Objetivo

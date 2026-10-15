@@ -10,7 +10,7 @@ Configuración para OpenCode V2 (`https://opencode.ai/v2/docs/`).
 
 - **agents/** — Agentes en Markdown (frontmatter V2: `mode`, `permissions`, `steps`)
   - `sddorch.md` — Orquestador Spec-Kit (primary)
-  - `sddorch-researcher-code`, `-researcher-market`, `-writer` — Descubrimiento (investigan por rol y redactan PRD y RFC)
+  - `sddorch-researcher-ux|security|performance|quality|accessibility|market` (uno por rol, cada uno con solo sus skills), `-researcher-code` (sin skills; mapa y mediciones) y `-writer` — Descubrimiento (investigan por rol y redactan PRD y RFC)
   - `sddorch-implementer`, `-reviewer`, `-tester`, `-release` — Implementación, revisión, tests y cierre
 - **commands/** — Comandos `speckit.*` (instalados por Spec-Kit, no editar)
 - **instructions/**

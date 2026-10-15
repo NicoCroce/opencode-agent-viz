@@ -133,7 +133,8 @@ dependencies, and resolving an inconsistency that changes the request's scope.
 
 | Subagent | Role | Writes code |
 |---|---|---|
-| `sddorch-researcher-code` | Investigates a technical role (UX, security, performance, quality, accessibility) with repo access | No |
+| `sddorch-researcher-ux` / `-security` / `-performance` / `-quality` / `-accessibility` | Investigates one technical role with repo access; each agent sees only its role's skills | No |
+| `sddorch-researcher-code` | File and domain mapping and measurements; no skills | No |
 | `sddorch-researcher-market` | Investigates product (and marketing or legal) with web access and no code access | No |
 | `sddorch-writer` | Writes the PRD and RFC from the reports in Engram | No |
 | `general` | Runs the `plan`, `tasks`, `analyze`, `converge` commands | Per command |

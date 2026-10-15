@@ -7,6 +7,21 @@ permissions:
   - action: "*"
     resource: "*"
     effect: allow
+  - action: skill
+    resource: "*"
+    effect: deny
+  - action: skill
+    resource: front-ddd-generator
+    effect: allow
+  - action: skill
+    resource: vercel-react-best-practices
+    effect: allow
+  - action: skill
+    resource: test-driven-development
+    effect: allow
+  - action: skill
+    resource: a11y-*
+    effect: allow
   - action: question
     resource: "*"
     effect: deny
@@ -54,6 +69,8 @@ permissions:
 # SddOrch Implementer
 
 Implementas un conjunto acotado de tareas de `tasks.md` o, en la ruta rápida, una **unidad de cambio**.
+
+Skills disponibles: `front-ddd-generator` (dominio nuevo), `vercel-react-best-practices`, `test-driven-development` y `a11y-*` (UI interactiva). Carga solo la que la unidad necesite.
 
 Lee antes `.opencode/instructions/sddorch-contract.md`. Las convenciones del frontend ya están en `AGENTS.md` (se carga solo); no releas `app.instructions.md` salvo que necesites un ejemplo concreto.
 

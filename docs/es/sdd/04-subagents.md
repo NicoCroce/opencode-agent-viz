@@ -9,7 +9,7 @@ formato.
 | Subagente | Modo | Rol | Permisos clave | Presupuesto |
 |---|---|---|---|---|
 | `sddorch` | primary | Orquestador: descubre, planifica, delega, verifica, escribe memoria | Todo salvo `subagent` genérico y ediciones a Spec-Kit | — |
-| `sddorch-researcher-code` | subagent | Investiga un rol técnico con acceso al repo | Solo lectura + skills de su rol + Engram (su clave) + web acotada + store en solo lectura (`sqlite3 -readonly`) | 60 pasos |
+| `sddorch-researcher-<rol>` (`-ux`, `-security`, `-performance`, `-quality`, `-accessibility`) | subagent | Investiga un rol técnico con acceso al repo | Solo lectura + **solo las skills de su rol** + Engram (su clave) + web acotada + store en solo lectura (`sqlite3 -readonly`) | 60 pasos |
 | `sddorch-researcher-market` | subagent | Investiga producto/marketing/legal con web y sin código | Documentación del proyecto + skills `pm-*` + Engram (su clave) + web abierta | 40 pasos |
 | `sddorch-writer` | subagent | Redacta PRD y RFC desde los informes en Engram | Templates + constitución + Engram (`prd`/`rfc`) | 30 pasos |
 | `general` | subagent | Ejecuta comandos `plan`, `tasks`, `analyze`, `converge` | General | — |
@@ -29,8 +29,8 @@ formato.
 
 El diseño de permisos es una capa de seguridad, no un detalle:
 
-- **`sddorch-researcher-code`** no puede escribir archivos. Solo `read`,
-  `glob`, `grep`, consultas `git` y **solo las skills de su rol**. `*.env*` está
+- **`sddorch-researcher-<rol>`** y **`-code`** no pueden escribir archivos. Solo `read`,
+  `glob`, `grep`, consultas `git` y **solo las skills de su rol** (`-code` no tiene ninguna). `*.env*` está
   denegado. Acceso web limitado a dominios técnicos (web.dev, owasp.org, MDN,
   W3C, React, Chrome). Puede leer el store de OpenCode
   (`~/.local/share/opencode`) en **solo lectura** y consultarlo con
@@ -46,9 +46,11 @@ El diseño de permisos es una capa de seguridad, no un detalle:
   consultar Engram (norte y decisiones) y ejecutar `pnpm tsc`/`lint`/`test` para
   verificar una afirmación concreta.
 - **`sddorch-implementer`** tiene git denegado (`add`, `commit`, `push`,
-  `stash`, `checkout`, `reset`, `rebase`) y no puede tocar `tasks.md`.
+  `stash`, `checkout`, `reset`, `rebase`) y no puede tocar `tasks.md`. Solo ve las skills
+  `front-ddd-generator`, `vercel-react-best-practices`, `test-driven-development` y `a11y-*`.
 - **`sddorch-tester`** puede editar **solo** en `src/*/specs/*` y
-  `src/*/__fixtures__/*` (los *specs de test*, no la carpeta `specs/` de Spec-Kit).
+  `src/*/__fixtures__/*` (los *specs de test*, no la carpeta `specs/` de Spec-Kit). Solo ve
+  `test-generator` y `test-driven-development`.
 - **`sddorch-release`** es el **único** que hace `git add` y `git commit`; puede
   crear o cambiar de rama (`git switch`) y consultar Engram. `git push` está
   denegado; el push lo hace únicamente el script de PR.

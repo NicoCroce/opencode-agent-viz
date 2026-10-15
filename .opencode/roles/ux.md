@@ -1,6 +1,6 @@
 # Rol: UX / diseño
 
-Perfil de agente: `sddorch-researcher-code`.
+Perfil de agente: `sddorch-researcher-ux`.
 Skills a cargar: `interface-design`, `frontend-design`.
 
 ## Objetivo

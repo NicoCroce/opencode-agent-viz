@@ -35,11 +35,11 @@ entregable y restricciones:
 | Rol | Agente | Skills |
 |---|---|---|
 | `product` | `sddorch-researcher-market` | `pm-problem-statement`, `pm-jobs-to-be-done` |
-| `ux` | `sddorch-researcher-code` | `interface-design`, `frontend-design` |
-| `security` | `sddorch-researcher-code` | `owasp-security-check` |
-| `performance` | `sddorch-researcher-code` | `vercel-react-best-practices` |
-| `quality` | `sddorch-researcher-code` | `test-generator`, `test-driven-development` |
-| `accessibility` | `sddorch-researcher-code` | `a11y-*` |
+| `ux` | `sddorch-researcher-ux` | `interface-design`, `frontend-design` |
+| `security` | `sddorch-researcher-security` | `owasp-security-check` |
+| `performance` | `sddorch-researcher-performance` | `vercel-react-best-practices` |
+| `quality` | `sddorch-researcher-quality` | `test-generator`, `test-driven-development` |
+| `accessibility` | `sddorch-researcher-accessibility` | `a11y-*` |
 
 Detalle de cada rol en [`09-roles.md`](09-roles.md).
 
@@ -47,7 +47,8 @@ Detalle de cada rol en [`09-roles.md`](09-roles.md).
 
 | Subagente | Acceso | Para qué |
 |---|---|---|
-| `sddorch-researcher-code` | Repo (solo lectura) + web acotada a dominios técnicos | Roles técnicos |
+| `sddorch-researcher-ux` / `-security` / `-performance` / `-quality` / `-accessibility` | Repo (solo lectura) + web acotada a dominios técnicos + **solo las skills de su rol** | Un rol técnico cada uno |
+| `sddorch-researcher-code` | Igual, sin skills | Mapa de archivos y dominios, mediciones |
 | `sddorch-researcher-market` | Web libre + documentación del proyecto (sin código) | `product` (y marketing/legal en nivel 2) |
 
 Reglas clave de ambos:

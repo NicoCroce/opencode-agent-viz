@@ -1,6 +1,6 @@
 # Rol: calidad / testabilidad
 
-Perfil de agente: `sddorch-researcher-code`.
+Perfil de agente: `sddorch-researcher-quality`.
 Skills a cargar: `test-generator`, `test-driven-development`.
 
 ## Objetivo

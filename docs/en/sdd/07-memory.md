@@ -25,7 +25,7 @@ prior hangs off `<run>`. When it is created, it is saved in `state`.
 | Agent | May write |
 |---|---|
 | `sddorch` (orchestrator) | `north`, `state`, `decision/<slug>`, `units`, `run`, `harness-signal/*` |
-| `sddorch-researcher-code` / `-market` | only its `findings/<role>` |
+| `sddorch-researcher-<role>` (`-ux`, `-security`, `-performance`, `-quality`, `-accessibility`, `-market`) / `-code` | only its `findings/<role>` |
 | `sddorch-writer` | only `prd`, `rfc`, and `recon-discarded` |
 | Other subagents | nothing |
 

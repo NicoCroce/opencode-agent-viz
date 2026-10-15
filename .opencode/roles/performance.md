@@ -1,6 +1,6 @@
 # Rol: rendimiento / observabilidad
 
-Perfil de agente: `sddorch-researcher-code`.
+Perfil de agente: `sddorch-researcher-performance`.
 Skills a cargar: `vercel-react-best-practices`.
 
 ## Objetivo
