@@ -121,32 +121,50 @@ Se incorpora a `TSessionSummary` (`Inspector.entity.ts`) y a la barra de resumen
 
 ## 5. Velocidad de respuesta y anomalías (US5)
 
+> **Revisión (feat/latency-accuracy)**: cada muestra trae el desglose del tiempo y la referencia
+> pasó de la mediana del total del nodo/agente al ritmo de generación de cada modelo. Se elimina la
+> anomalía por rapidez. Detalle y motivo en `contracts/latency-anomaly-contract.md`.
+
 ### 5.1 `TLatencySample`
 | Campo | Tipo | Regla |
 |---|---|---|
 | `stepId` | `string` | `id` del mensaje assistant |
 | `startedAt` | `number` | `time.created` |
-| `ttftMs` | `number \| null` | `streamed − created`; `null` sin `streamed` |
+| `model` | `string \| null` | `providerID/id`; `null` si no se reporta |
+| `firstOutputMs` | `number \| null` | primer razonamiento o herramienta con hora − `created`; `null` sin ninguno |
+| `generationMs` | `number \| null` | `streamed − created` (tiempo de generación; `streamed` es el fin del stream, no el primer token); `null` sin `streamed`. Antes `ttftMs` |
 | `totalMs` | `number \| null` | `completed − created`; `null` sin `completed` |
+| `toolMs` | `number` | unión de `[ran ?? created, completed]` de las herramientas comunes |
+| `subagentMs` | `number` | ídem, de `subagent`/`task` |
+| `humanMs` | `number` | ídem, de `question` |
+| `topTool` | `string \| null` | herramienta común con más tiempo sumado |
+| `outputTokens` | `number \| null` | `tokens.output + tokens.reasoning`; `null` sin tokens |
+| `expectedMs` | `number \| null` | `max(500, baseMs + msPerToken × outputTokens)`; `null` sin ritmo o sin tokens |
 
-### 5.2 `TLatencyAnomaly`
+### 5.2 `TModelPace`
 | Campo | Tipo | Regla |
 |---|---|---|
-| `stepId` | `string` | muestra anómala |
-| `ratio` | `number` | `totalMs / referencia` |
-| `direction` | `'slow' \| 'fast'` | `slow` si `ratio > 1 + threshold`; `fast` si `ratio < 1 − threshold` |
-| `referenceMs` | `number` | mediana usada |
-| `reference` | `'node' \| 'agent'` | origen de la mediana |
+| `model` | `string` | `providerID/id` |
+| `baseMs` | `number` | ordenada del ajuste; nunca negativa |
+| `msPerToken` | `number` | pendiente del ajuste; `0` si no es positiva (entonces `baseMs` es la mediana) |
+| `samples` | `number` | respuestas del modelo en el grafo (≥ `MIN_PACE_SAMPLES` = 8) |
 
-### 5.3 `TLatencyReport`
+### 5.3 `TLatencyAnomaly`
+| Campo | Tipo | Regla |
+|---|---|---|
+| `stepId` | `string` | respuesta lenta |
+| `ratio` | `number` | `generationMs / expectedMs` |
+| `expectedMs` | `number` | generación esperada |
+| `excessMs` | `number` | `generationMs − expectedMs` (≥ `MIN_EXCESS_MS` = 5000) |
+
+### 5.4 `TLatencyReport`
 | Campo | Tipo | Regla |
 |---|---|---|
 | `samples` | `TLatencySample[]` | orden por `startedAt` ascendente |
-| `medianMs` | `number \| null` | mediana de `totalMs` con datos |
-| `reference` | `'node' \| 'agent' \| null` | de dónde salió `medianMs` |
-| `anomalies` | `TLatencyAnomaly[]` | sin baseline o con < `MIN_SAMPLES`, vacío |
+| `paces` | `TModelPace[]` | ritmo de los modelos del nodo que tienen datos suficientes |
+| `anomalies` | `TLatencyAnomaly[]` | vacío si ningún modelo del nodo tiene ritmo |
 
-### 5.4 `TAnomalyThreshold`
+### 5.5 `TAnomalyThreshold`
 Configuración de vista persistida en `localStorage`.
 
 | Campo | Tipo | Regla |
@@ -175,7 +193,7 @@ Calculado **bajo demanda** en el hook del Inspector (R5); **no** viaja en el mod
 
 En `lib/reconcile/comparators.ts`:
 
-- `sameContext(a, b)`: compara `provisional` y, con igualdad de valor, `breakdown` (buckets: categoría/chars/tokens/pct), `window` (campos) y `latency` (samples + anomalies).
+- `sameContext(a, b)`: compara `provisional` y, con igualdad de valor, `breakdown` (buckets: categoría/chars/tokens/pct), `window` (campos) y `latency` (samples con todo su desglose, paces y anomalies).
 - `sameSpeedup(a, b)`: compara `groupId`, `size`, `speedup`, `efficiency`, `provisional`.
 - `sameNodeData` **debe** añadir `sameContext(a.context, b.context)` y `sameSpeedup(a.speedup, b.speedup)`. Sin esto, el nodo no se reemplaza y los valores quedan congelados (AGENTS §11).
 
@@ -185,4 +203,4 @@ En `lib/reconcile/comparators.ts`:
 
 - **Provisional → cerrado**: mientras el nodo está activo (`isActiveStatus`), `context.provisional` y `speedup.provisional` son `true`; al cerrarse los tiempos, se recalcula a `false`. Nunca regresa de cerrado a provisional dentro de la misma visita.
 - **Sin datos → datos**: `context` pasa de `null`/ausente a un objeto cuando el enriquecimiento carga los mensajes del nodo (`enrichment: 'pending' → 'ready'`). Un refetch por evento no lo degrada.
-- **Sin baseline → anomalía**: con menos de `MIN_SAMPLES` muestras o sin mediana de agente, `anomalies` es vacío; al acumular muestras, la detección se activa.
+- **Sin ritmo → anomalía**: mientras el modelo tenga menos de `MIN_PACE_SAMPLES` respuestas en el grafo, `anomalies` es vacío; al cargar más nodos, la detección se activa.

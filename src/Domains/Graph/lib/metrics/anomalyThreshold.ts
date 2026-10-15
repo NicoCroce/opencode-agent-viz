@@ -1,6 +1,6 @@
 /**
  * Re-exporta el umbral de anomalía desde `Application` (capa base). El contrato
- * `latency-anomaly-contract` §4 sitúa estas constantes aquí; la definición vive
+ * `latency-anomaly-contract` §5 sitúa estas constantes aquí; la definición vive
  * en `Application/Helpers/anomalyThreshold` para que el grafo y el panel de
  * detalle compartan una sola fuente sin acoplarse entre dominios.
  */

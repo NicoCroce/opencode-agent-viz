@@ -26,7 +26,7 @@ así que todo lo previo cuelga de `<run>`. Cuando se crea, se guarda en el
 | Agente | Puede escribir |
 |---|---|
 | `sddorch` (orquestador) | `north`, `state`, `decision/<slug>`, `units`, `run`, `harness-signal/*` |
-| `sddorch-researcher-code` / `-market` | solo su `findings/<rol>` |
+| `sddorch-researcher-<rol>` (`-ux`, `-security`, `-performance`, `-quality`, `-accessibility`, `-market`) / `-code` | solo su `findings/<rol>` |
 | `sddorch-writer` | solo `prd`, `rfc` y `recon-discarded` |
 | Resto de subagentes | nada |
 

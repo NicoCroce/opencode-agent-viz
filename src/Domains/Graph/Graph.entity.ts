@@ -193,31 +193,78 @@ export interface TCompactionEffect {
   after: number | null;
 }
 
-/** Una respuesta del agente medida en el tiempo (FR-018). */
+/**
+ * Una respuesta del agente medida en el tiempo, con el desglose de en qué se
+ * fue ese tiempo (FR-018). Los tramos de herramientas, subagentes y espera
+ * humana son la unión de intervalos `[ran ?? created, completed]`, así que las
+ * llamadas en paralelo no se cuentan dos veces.
+ */
 export interface TLatencySample {
   stepId: string;
   startedAt: number;
-  /** Tiempo hasta el primer token (`streamed − created`); `null` sin datos. */
-  ttftMs: number | null;
+  /** `providerID/id` del modelo que respondió; `null` si no se reporta. */
+  model: string | null;
+  /**
+   * Hasta la primera salida con hora (razonamiento o herramienta). Aproxima el
+   * primer token: el texto no trae hora. `null` sin ninguna salida con hora.
+   */
+  firstOutputMs: number | null;
+  /**
+   * Tiempo de generación del modelo (`streamed − created`): `streamed` es el
+   * fin del stream, no el primer token. `null` sin datos.
+   */
+  generationMs: number | null;
   /** Latencia total (`completed − created`); `null` sin datos. */
   totalMs: number | null;
+  /** Ejecución de herramientas, sin subagentes ni preguntas al usuario. */
+  toolMs: number;
+  /** Espera a subagentes (`subagent`/`task`). */
+  subagentMs: number;
+  /** Espera a que el usuario conteste (`question`). */
+  humanMs: number;
+  /** Herramienta que más tiempo ejecutó en la respuesta; `null` sin ninguna. */
+  topTool: string | null;
+  /** Tokens generados (salida + razonamiento); `null` si no se reportan. */
+  outputTokens: number | null;
+  /**
+   * Generación esperada para el modelo y los tokens de la respuesta
+   * (`TModelPace`); `null` sin ritmo del modelo o sin tokens.
+   */
+  expectedMs: number | null;
 }
 
-/** Desviación de una respuesta respecto de su referencia (FR-021). */
+/**
+ * Ritmo de generación de un modelo estimado con las respuestas del grafo:
+ * `generationMs ≈ baseMs + msPerToken × tokens`.
+ */
+export interface TModelPace {
+  /** `providerID/id`. */
+  model: string;
+  baseMs: number;
+  msPerToken: number;
+  /** Respuestas del modelo con las que se estimó. */
+  samples: number;
+}
+
+/**
+ * Respuesta cuya generación tardó más de lo esperado para sus tokens (FR-021).
+ * Solo cuenta el tiempo del modelo: las esperas de herramientas, subagentes y
+ * del usuario se muestran en el desglose, no se marcan.
+ */
 export interface TLatencyAnomaly {
   stepId: string;
+  /** `generationMs / expectedMs`. */
   ratio: number;
-  /** `slow` = más lenta que la banda; `fast` = más rápida (rapidez anómala). */
-  direction: 'slow' | 'fast';
-  referenceMs: number;
-  reference: 'node' | 'agent';
+  expectedMs: number;
+  /** `generationMs − expectedMs`. */
+  excessMs: number;
 }
 
-/** Serie de latencia de un agente con su referencia y anomalías (FR-018..FR-023). */
+/** Serie de latencia de un agente con sus referencias y anomalías (FR-018..FR-023). */
 export interface TLatencyReport {
   samples: TLatencySample[];
-  medianMs: number | null;
-  reference: 'node' | 'agent' | null;
+  /** Ritmo de los modelos que usó el nodo y tienen datos suficientes. */
+  paces: TModelPace[];
   anomalies: TLatencyAnomaly[];
 }
 

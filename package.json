@@ -7,7 +7,7 @@
     "start": "sh scripts/start.sh",
     "dev": "vite",
     "build": "tsc && vite build",
-    "lint": "eslint .",
+    "lint": "eslint . --cache --cache-location node_modules/.cache/eslint/",
     "preview": "vite preview",
     "tsc": "tsc --project tsconfig.json",
     "tsc:node": "tsc --project tsconfig.node.json --noEmit --composite false",

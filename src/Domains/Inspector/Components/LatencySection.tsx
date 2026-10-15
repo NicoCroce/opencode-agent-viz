@@ -4,40 +4,31 @@ import {
   SectionFrame,
   SectionHeading,
 } from '@app/Application/Components/Molecules';
-import {
-  formatDuration,
-  formatPercent,
-  formatSpeedup,
-} from '@app/Application/Helpers';
+import { formatPercent, formatSpeedup } from '@app/Application/Helpers';
 import { formatClock } from '@app/Application/Helpers/format/clock';
-import { cn } from '@app/Application/lib/utils';
 import type {
   TLatencyAnomaly,
   TLatencyReport,
-  TLatencySample,
 } from '@app/Domains/Graph/Graph.entity';
+import {
+  LATENCY_PART_LABEL,
+  NO_PACE_LABEL,
+  THRESHOLD_HINT,
+  describePace,
+  formatLatency,
+  summarizeLatency,
+} from '../lib/latencyBreakdown';
+import { LatencySampleRow } from './LatencySampleRow';
 
-/** Etiquetas legibles del origen de la referencia (FR-020). */
-const REFERENCE_LABEL: Record<'node' | 'agent', string> = {
-  node: 'mediana del nodo',
-  agent: 'mediana del agente',
-};
-
-/** Etiquetas legibles de la dirección de la anomalía (FR-021). */
-const DIRECTION_LABEL: Record<'slow' | 'fast', string> = {
-  slow: 'Lenta',
-  fast: 'Rápida',
-};
-
-/** Rango del control de umbral, en puntos porcentuales (contrato §4). */
-const THRESHOLD_MIN_PCT = 5;
-const THRESHOLD_MAX_PCT = 95;
-const THRESHOLD_STEP_PCT = 5;
+/** Rango del control de umbral, en puntos porcentuales sobre lo esperado (`latency-anomaly-contract` §5). */
+const THRESHOLD_MIN_PCT = 25;
+const THRESHOLD_MAX_PCT = 300;
+const THRESHOLD_STEP_PCT = 25;
 
 interface LatencySectionProps {
   /** Serie de latencia del nodo; `null`/vacía hasta el enriquecimiento (US5). */
   latency: TLatencyReport | null;
-  /** Umbral vigente (±fracción) (FR-022). */
+  /** Umbral vigente: fracción sobre lo esperado (1 = el doble) (FR-022). */
   threshold: number;
   /** Cambia el umbral; el hook lo acota y persiste antes de propagarlo. */
   onThresholdChange: (value: number) => void;
@@ -46,12 +37,12 @@ interface LatencySectionProps {
 }
 
 /**
- * Apartado **Latencia** del panel de contexto (FR-018..FR-023;
- * `contracts/context-panel-contract.md` §4). Muestra la serie de TTFT y latencia
- * total por respuesta, la mediana de referencia (nodo o agente) y la lista de
- * anomalías con su magnitud (`ratio`), la referencia usada y su origen. Incluye
- * el control de umbral configurable (FR-022) y resuelve los cuatro estados de
- * pantalla vía `SectionFrame`. Presentación pura: el umbral llega por props.
+ * Apartado **Latencia** del panel de detalle (FR-018..FR-023;
+ * `contracts/context-panel-contract.md` §4). Explica en qué se fue el tiempo del
+ * nodo (modelo, herramientas, subagentes, usuario), el ritmo esperado de cada
+ * modelo, el umbral de lentitud y cada respuesta con su desglose. Resuelve los
+ * cuatro estados de pantalla vía `SectionFrame`. Presentación pura: el umbral
+ * llega por props.
  */
 export const LatencySection = ({
   latency,
@@ -60,12 +51,22 @@ export const LatencySection = ({
   isError = false,
   isLoading = false,
 }: LatencySectionProps) => {
-  const reference = latency?.reference ?? null;
-  const referenceMs = latency?.medianMs ?? null;
+  const samples = latency?.samples ?? [];
+  const paces = latency?.paces ?? [];
+  const anomalies = latency?.anomalies ?? [];
+  const shares = summarizeLatency(samples);
   const thresholdPct = Math.round(threshold * 100);
+  const factor = formatSpeedup(1 + threshold);
 
   const anomalyByStep = new Map<string, TLatencyAnomaly>(
-    (latency?.anomalies ?? []).map((anomaly) => [anomaly.stepId, anomaly]),
+    anomalies.map((anomaly) => [anomaly.stepId, anomaly]),
+  );
+  // Las anomalías salen de las muestras: cada una tiene su posición y su hora.
+  const stepInfo = new Map(
+    samples.map((sample, index) => [
+      sample.stepId,
+      `#${index + 1} · ${formatClock(sample.startedAt)}`,
+    ]),
   );
 
   return (
@@ -73,22 +74,37 @@ export const LatencySection = ({
       title="Latencia"
       isError={isError}
       isLoading={isLoading}
-      isEmpty={!latency || latency.samples.length === 0}
+      isEmpty={samples.length === 0}
       emptyLabel="Sin respuestas medidas"
       data-testid="latency-section"
     >
       <Container space="small">
+        {shares.length > 0 ? (
+          <Container space="none" className="gap-0.5">
+            <SectionHeading>Reparto del tiempo</SectionHeading>
+            {shares.map((share) => (
+              <DetailRow
+                key={share.kind}
+                label={LATENCY_PART_LABEL[share.kind]}
+                value={`${formatLatency(share.ms)} · ${formatPercent(share.pct, 0)}`}
+              />
+            ))}
+          </Container>
+        ) : null}
+
         <Container space="none" className="gap-0.5">
-          <DetailRow
-            label="Referencia"
-            value={
-              referenceMs === null
-                ? null
-                : `${formatDuration(referenceMs)}${
-                    reference ? ` · ${REFERENCE_LABEL[reference]}` : ''
-                  }`
-            }
-          />
+          <SectionHeading>Ritmo esperado del modelo</SectionHeading>
+          {paces.length > 0 ? (
+            paces.map((pace) => (
+              <DetailRow
+                key={pace.model}
+                label={pace.model}
+                value={describePace(pace)}
+              />
+            ))
+          ) : (
+            <p className="text-[11px] text-muted-foreground">{NO_PACE_LABEL}</p>
+          )}
         </Container>
 
         <Container space="small">
@@ -96,7 +112,7 @@ export const LatencySection = ({
             htmlFor="anomaly-threshold"
             className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
           >
-            Umbral de anomalía
+            Umbral de lentitud
           </label>
           <Container row align="center" space="small">
             {/*
@@ -114,66 +130,38 @@ export const LatencySection = ({
               onChange={(event) =>
                 onThresholdChange(Number(event.target.value) / 100)
               }
-              aria-label={`Umbral de anomalía ±${thresholdPct}%`}
+              aria-label={`Umbral de lentitud: ${factor} lo esperado`}
+              aria-describedby="anomaly-threshold-hint"
               className="h-6 w-full cursor-pointer accent-primary"
             />
             <span className="shrink-0 font-mono text-[11px] tabular-nums text-foreground">
-              {`±${formatPercent(thresholdPct, 0)}`}
+              {factor}
             </span>
           </Container>
+          <p
+            id="anomaly-threshold-hint"
+            className="text-[10px] leading-4 text-muted-foreground"
+          >
+            {THRESHOLD_HINT}
+          </p>
         </Container>
 
-        <Container space="none" className="gap-0.5" role="list">
+        <Container space="none" className="gap-1" role="list">
           <SectionHeading>Respuestas</SectionHeading>
-          {(latency?.samples ?? []).map((sample: TLatencySample, index) => {
-            const anomaly = anomalyByStep.get(sample.stepId);
-            return (
-              <Container
-                key={sample.stepId}
-                row
-                align="center"
-                justify="between"
-                space="small"
-                role="listitem"
-                className="min-w-0 gap-2 font-mono text-[11px] tabular-nums"
-              >
-                <span className="min-w-0 truncate text-muted-foreground">
-                  {`#${index + 1} · ${formatClock(sample.startedAt)}`}
-                </span>
-                <Container
-                  row
-                  align="center"
-                  space="small"
-                  className="shrink-0 gap-2"
-                >
-                  <span className="text-foreground/80">
-                    {`TTFT ${formatDuration(sample.ttftMs)}`}
-                  </span>
-                  <span className="text-foreground">
-                    {`total ${formatDuration(sample.totalMs)}`}
-                  </span>
-                  {anomaly ? (
-                    <span
-                      className={cn(
-                        'rounded-flat border px-1 text-[10px]',
-                        anomaly.direction === 'slow'
-                          ? 'border-status-error/80 text-status-error'
-                          : 'border-status-waiting/80 text-status-waiting',
-                      )}
-                    >
-                      {DIRECTION_LABEL[anomaly.direction]}
-                    </span>
-                  ) : null}
-                </Container>
-              </Container>
-            );
-          })}
+          {samples.map((sample, index) => (
+            <LatencySampleRow
+              key={sample.stepId}
+              sample={sample}
+              position={index + 1}
+              anomaly={anomalyByStep.get(sample.stepId) ?? null}
+            />
+          ))}
         </Container>
 
-        {latency && latency.anomalies.length > 0 ? (
+        {anomalies.length > 0 ? (
           <Container space="none" className="gap-0.5" role="list">
-            <SectionHeading>Anomalías</SectionHeading>
-            {latency.anomalies.map((anomaly) => (
+            <SectionHeading>Respuestas lentas</SectionHeading>
+            {anomalies.map((anomaly) => (
               <Container
                 key={anomaly.stepId}
                 row
@@ -183,20 +171,13 @@ export const LatencySection = ({
                 role="listitem"
                 className="min-w-0 gap-2 font-mono text-[11px] tabular-nums"
               >
-                <span
-                  className={cn(
-                    'min-w-0 truncate',
-                    anomaly.direction === 'slow'
-                      ? 'text-status-error'
-                      : 'text-status-waiting',
-                  )}
-                >
-                  {DIRECTION_LABEL[anomaly.direction]}
+                <span className="min-w-0 truncate text-status-error">
+                  {stepInfo.get(anomaly.stepId)}
                 </span>
                 <span className="shrink-0 text-foreground">
-                  {`${formatSpeedup(anomaly.ratio)} · ${formatDuration(
-                    anomaly.referenceMs,
-                  )} · ${REFERENCE_LABEL[anomaly.reference]}`}
+                  {`${formatSpeedup(anomaly.ratio)} · +${formatLatency(
+                    anomaly.excessMs,
+                  )} sobre ${formatLatency(anomaly.expectedMs)}`}
                 </span>
               </Container>
             ))}

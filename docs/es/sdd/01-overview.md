@@ -135,7 +135,8 @@ resolver una inconsistencia que cambie el alcance del pedido.
 
 | Subagente | Rol | Escribe código |
 |---|---|---|
-| `sddorch-researcher-code` | Investiga un rol técnico (UX, seguridad, rendimiento, calidad, accesibilidad) con acceso al repo | No |
+| `sddorch-researcher-ux` / `-security` / `-performance` / `-quality` / `-accessibility` | Investiga un rol técnico con acceso al repo; cada agente ve solo las skills de su rol | No |
+| `sddorch-researcher-code` | Mapa de archivos y dominios y mediciones; sin skills | No |
 | `sddorch-researcher-market` | Investiga producto (y marketing o legal) con web y sin acceso al código | No |
 | `sddorch-writer` | Redacta el PRD y el RFC desde los informes en Engram | No |
 | `general` | Ejecuta los comandos `plan`, `tasks`, `analyze`, `converge` | Según comando |

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * Reglas de los helpers nuevos del arnés de integración
  * (`src/Infrastructure/specs/integration/harness.tsx`, U02 del chore de

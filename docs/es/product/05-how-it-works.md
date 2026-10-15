@@ -92,9 +92,9 @@ Tailwind 4 · shadcn/ui (Radix) · lucide-react · sonner · React Flow
 |---|---|
 | `pnpm dev` | Dev server (Vite) |
 | `pnpm build` | Build de producción |
-| `pnpm lint` | ESLint |
-| `pnpm tsc` | Chequeo de tipos |
-| `pnpm test` | Vitest |
+| `pnpm lint` | ESLint (con caché en `node_modules/.cache`) |
+| `pnpm tsc` | Chequeo de tipos (incremental) |
+| `pnpm test` | Vitest (pool `threads`, 4 workers; los `.spec.ts` corren en `node`) |
 | `pnpm test:watch` | Modo watch |
 | `pnpm test:coverage` | Cobertura |
 | `pnpm test:live` | Test de integración contra el background service |

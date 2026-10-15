@@ -32,6 +32,7 @@ import { STORE_KEY } from '@app/Application/Hooks';
 import { DEFAULT_ANOMALY_THRESHOLD } from '@app/Application/Helpers/anomalyThreshold';
 import { queryKeys } from '@app/Domains/queryKeys';
 import { InspectorPanel } from '@app/Domains/Inspector/Components/InspectorPanel';
+import { latencyAnomaly, latencySample } from '@app/test/latencyFixtures';
 import { renderWithProviders } from '@app/test/renderWithProviders';
 import { setupRadixUser } from '@app/test/radix';
 import {
@@ -97,8 +98,9 @@ const buildNode = (
 
 /**
  * Contexto del nodo con dos respuestas medidas y una anomalía (`s1`, lenta):
- * `s2` queda dentro de la banda, de modo que un filtro por anomalías dejaría de
- * listarla y la guardia de "no filtra" tendría contenido que comprobar.
+ * `s2` tarda lo esperado (su demora es de herramientas), de modo que un filtro
+ * por anomalías dejaría de listarla y la guardia de "no filtra" tendría
+ * contenido que comprobar.
  */
 const latencyContext = (): TGraphNode['data']['context'] => ({
   breakdown: {
@@ -116,20 +118,25 @@ const latencyContext = (): TGraphNode['data']['context'] => ({
   },
   latency: {
     samples: [
-      { stepId: 's1', startedAt: START, ttftMs: 120, totalMs: 800 },
-      { stepId: 's2', startedAt: START + MINUTE, ttftMs: 90, totalMs: 600 },
-    ],
-    medianMs: 500,
-    reference: 'node',
-    anomalies: [
-      {
+      latencySample({
         stepId: 's1',
-        ratio: 1.6,
-        direction: 'slow',
-        referenceMs: 500,
-        reference: 'node',
-      },
+        startedAt: START,
+        generationMs: 12_000,
+        totalMs: 12_500,
+        outputTokens: 400,
+        expectedMs: 5000,
+      }),
+      latencySample({
+        stepId: 's2',
+        startedAt: START + MINUTE,
+        generationMs: 4000,
+        totalMs: 34_000,
+        toolMs: 30_000,
+        topTool: 'shell',
+      }),
     ],
+    paces: [{ model: 'p/m', baseMs: 1000, msPerToken: 10, samples: 20 }],
+    anomalies: [latencyAnomaly({ stepId: 's1', ratio: 2.4, expectedMs: 5000, excessMs: 7000 })],
   },
   provisional: false,
 });
@@ -175,35 +182,39 @@ beforeEach(() => {
 });
 
 describe('InspectorPanel — cadena contexto/latencia → pestaña Latencia (§5, FR-009)', () => {
-  it('muestra la sección completa: referencia de umbral, control del umbral y respuestas con anomalías', async () => {
+  it('muestra la sección completa: reparto, ritmo del modelo, umbral y respuestas lentas', async () => {
     renderPanel(buildNode(SESSION_ID, latencyContext()));
 
     const section = await openLatencyTab();
 
-    // Referencia de umbral con su mediana y su origen (FR-020).
-    expect(within(section).getByText('Referencia')).toBeInTheDocument();
+    // Reparto del tiempo del nodo (modelo 16 s, herramientas 30 s).
+    expect(within(section).getByText('Reparto del tiempo')).toBeInTheDocument();
+    expect(within(section).getByText('16s · 35%')).toBeInTheDocument();
+    expect(within(section).getByText('30s · 65%')).toBeInTheDocument();
+
+    // Ritmo esperado del modelo, la referencia de la detección (FR-020).
+    expect(within(section).getByText('Ritmo esperado del modelo')).toBeInTheDocument();
     expect(
-      within(section).getByText('500ms · mediana del nodo'),
+      within(section).getByText('1.0s + 10.0 ms/tok · 20 resp.'),
     ).toBeInTheDocument();
 
-    // Control del umbral (FR-022): etiqueta, valor por defecto (±40 %) y rango.
-    expect(within(section).getByText('Umbral de anomalía')).toBeInTheDocument();
+    // Control del umbral (FR-022): valor por defecto, el doble de lo esperado.
+    expect(within(section).getByText('Umbral de lentitud')).toBeInTheDocument();
     const slider = within(section).getByRole('slider');
-    expect(slider).toHaveAttribute('aria-label', 'Umbral de anomalía ±40%');
-    expect(slider).toHaveValue('40');
+    expect(slider).toHaveAttribute('aria-label', 'Umbral de lentitud: ×2.0 lo esperado');
+    expect(slider).toHaveValue('100');
     expect(slider).not.toBeDisabled();
 
-    // Listado de respuestas medidas: la serie completa (dos respuestas).
+    // Respuestas con su desglose: la causa principal va primero.
     expect(within(section).getByText('Respuestas')).toBeInTheDocument();
-    expect(within(section).getByText('TTFT 120ms')).toBeInTheDocument();
-    expect(within(section).getByText('total 800ms')).toBeInTheDocument();
-    expect(within(section).getByText('TTFT 90ms')).toBeInTheDocument();
-    expect(within(section).getByText('total 600ms')).toBeInTheDocument();
+    expect(within(section).getByText('total 12s')).toBeInTheDocument();
+    expect(within(section).getByText('total 34s')).toBeInTheDocument();
+    expect(within(section).getByText('herramientas 30s (shell)')).toBeInTheDocument();
 
-    // Anomalías con su magnitud y la referencia usada (FR-021).
-    expect(within(section).getByText('Anomalías')).toBeInTheDocument();
+    // Respuestas lentas con su magnitud y lo esperado (FR-021/FR-023).
+    expect(within(section).getByText('Respuestas lentas')).toBeInTheDocument();
     expect(
-      within(section).getByText('×1.6 · 500ms · mediana del nodo'),
+      within(section).getByText('×2.4 · +7.0s sobre 5.0s'),
     ).toBeInTheDocument();
   });
 
@@ -212,8 +223,8 @@ describe('InspectorPanel — cadena contexto/latencia → pestaña Latencia (§5
 
     const section = await openLatencyTab();
 
-    // Dos listas (Respuestas + Anomalías) y las tres filas: la respuesta no
-    // anómala (`s2`) sigue listada, así que la anomalía no filtró el listado.
+    // Dos listas (Respuestas + Respuestas lentas) y las tres filas: la respuesta
+    // no lenta (`s2`) sigue listada, así que la anomalía no filtró el listado.
     expect(within(section).getAllByRole('list')).toHaveLength(2);
     expect(within(section).getAllByRole('listitem')).toHaveLength(3);
 
@@ -222,7 +233,7 @@ describe('InspectorPanel — cadena contexto/latencia → pestaña Latencia (§5
     const slider = within(section).getByRole('slider');
     expect(slider).not.toBeDisabled();
 
-    fireEvent.change(slider, { target: { value: '60' } });
+    fireEvent.change(slider, { target: { value: '200' } });
 
     await waitFor(() =>
       expect(screen.getByTestId(LATENCY_SECTION_TEST_ID)).toBeInTheDocument(),
@@ -230,10 +241,10 @@ describe('InspectorPanel — cadena contexto/latencia → pestaña Latencia (§5
     await waitFor(() =>
       expect(within(section).getByRole('slider')).toHaveAttribute(
         'aria-label',
-        'Umbral de anomalía ±60%',
+        'Umbral de lentitud: ×3.0 lo esperado',
       ),
     );
-    expect(within(section).getByText('±60%')).toBeInTheDocument();
+    expect(within(section).getByText('×3.0')).toBeInTheDocument();
   });
 
   it('con la fuente de contexto en 404 muestra error en Latencia y nunca el vacío falso', async () => {

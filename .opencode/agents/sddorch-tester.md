@@ -7,6 +7,15 @@ permissions:
   - action: "*"
     resource: "*"
     effect: allow
+  - action: skill
+    resource: "*"
+    effect: deny
+  - action: skill
+    resource: test-generator
+    effect: allow
+  - action: skill
+    resource: test-driven-development
+    effect: allow
   - action: question
     resource: "*"
     effect: deny

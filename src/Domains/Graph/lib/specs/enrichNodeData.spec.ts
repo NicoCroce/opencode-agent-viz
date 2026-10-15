@@ -27,16 +27,30 @@ const node = (overrides: Partial<TGraphNodeData> = {}): TGraphNode => ({
   },
 });
 
-/** Respuesta assistant con `streamed`/`completed` a partir de un `totalMs`. */
-const response = (id: string, created: number, totalMs: number) =>
+/** Respuesta assistant que genera durante `generationMs` y termina 100 ms después. */
+const response = (id: string, created: number, generationMs: number) =>
   assistantMessage({
     id,
-    time: { created, streamed: created + 50, completed: created + totalMs },
+    time: {
+      created,
+      streamed: created + generationMs,
+      completed: created + generationMs + 100,
+    },
   });
+
+/** Ritmo del modelo de `assistantMessage` (5 tokens ⇒ 1050 ms esperados). */
+const PACES = {
+  'opencode/deepseek': {
+    model: 'opencode/deepseek',
+    baseMs: 1000,
+    msPerToken: 10,
+    samples: 20,
+  },
+};
 
 const enrich = (
   messages: ReturnType<typeof assistantMessage>[],
-  options: { threshold?: number; agentMedianMs?: number | null } = {},
+  options: { threshold?: number; paces?: typeof PACES } = {},
 ) =>
   enrichNodeData({
     node: node(),
@@ -50,57 +64,63 @@ const enrich = (
   });
 
 describe('enrichNodeData — latencia (T042, FR-018..FR-023)', () => {
-  it('puebla context.latency con la serie y la mediana del nodo', () => {
+  it('puebla context.latency con la serie y su desglose', () => {
     const data = enrich([
-      response('a1', 0, 1000),
-      response('a2', 1000, 1100),
-      response('a3', 2000, 1200),
+      response('a1', 0, 900),
+      response('a2', 1000, 1000),
+      response('a3', 2000, 1100),
     ]);
 
     expect(data.context?.latency?.samples).toHaveLength(3);
-    expect(data.context?.latency?.samples[0]).toEqual({
+    expect(data.context?.latency?.samples[0]).toMatchObject({
       stepId: 'a1',
       startedAt: 0,
-      ttftMs: 50,
+      model: 'opencode/deepseek',
+      generationMs: 900,
       totalMs: 1000,
+      outputTokens: 5,
     });
-    expect(data.context?.latency?.medianMs).toBe(1100);
-    expect(data.context?.latency?.reference).toBe('node');
     expect(data.context?.latency?.anomalies).toEqual([]);
   });
 
-  it('usa la mediana del agente cuando el nodo no tiene historial propio', () => {
-    const data = enrich([response('a1', 0, 3000)], { agentMedianMs: 1000 });
+  it('sin ritmo del modelo no hay esperado ni anomalías', () => {
+    const data = enrich([response('a1', 0, 60_000)]);
 
-    expect(data.context?.latency?.reference).toBe('agent');
-    expect(data.context?.latency?.medianMs).toBe(1000);
+    expect(data.context?.latency?.paces).toEqual([]);
+    expect(data.context?.latency?.samples[0].expectedMs).toBeNull();
+    expect(data.context?.latency?.anomalies).toEqual([]);
+  });
+
+  it('marca lenta la respuesta que tarda mucho más de lo esperado para sus tokens', () => {
+    const data = enrich([response('a1', 0, 12_000)], { paces: PACES });
+
+    expect(data.context?.latency?.paces).toEqual([PACES['opencode/deepseek']]);
+    expect(data.context?.latency?.samples[0].expectedMs).toBe(1050);
     expect(data.context?.latency?.anomalies).toHaveLength(1);
     expect(data.context?.latency?.anomalies[0]).toMatchObject({
       stepId: 'a1',
-      direction: 'slow',
-      reference: 'agent',
+      expectedMs: 1050,
+      excessMs: 10_950,
     });
   });
 
   it('recalcula las anomalías según el umbral (FR-022)', () => {
-    const slow = enrich([response('a1', 0, 1500)], {
-      agentMedianMs: 1000,
-      threshold: 0.4,
-    });
-    expect(slow.context?.latency?.anomalies).toHaveLength(1);
+    // 7,1 s sobre 1,05 s esperados: ×6,8.
+    const strict = enrich([response('a1', 0, 7100)], { paces: PACES, threshold: 1 });
+    expect(strict.context?.latency?.anomalies).toHaveLength(1);
 
-    const tolerant = enrich([response('a1', 0, 1500)], {
-      agentMedianMs: 1000,
-      threshold: 0.9,
-    });
-    expect(tolerant.context?.latency?.anomalies).toEqual([]);
+    const tolerant = enrich([response('a1', 0, 7100)], { paces: PACES, threshold: 3 });
+    expect(tolerant.context?.latency?.anomalies).toHaveLength(1);
+
+    const notEnough = enrich([response('a1', 0, 4000)], { paces: PACES, threshold: 1 });
+    expect(notEnough.context?.latency?.anomalies).toEqual([]);
   });
 
   it('sin mensajes, la serie queda vacía y sin anomalías', () => {
     const data = enrich([]);
 
     expect(data.context?.latency?.samples).toEqual([]);
-    expect(data.context?.latency?.medianMs).toBeNull();
+    expect(data.context?.latency?.paces).toEqual([]);
     expect(data.context?.latency?.anomalies).toEqual([]);
   });
 });

@@ -8,6 +8,11 @@ import type {
 } from '@opencode/client';
 import { STORE_KEY } from '@app/Application/Hooks/useGlobalStore';
 import type { TSessionMessage } from '@app/Infrastructure/Services/opencodeClient';
+import {
+  latencyAnomaly,
+  latencyReport,
+  latencySample,
+} from '@app/test/latencyFixtures';
 import { renderWithProviders } from '@app/test/renderWithProviders';
 import { setupRadixUser } from '@app/test/radix';
 import {
@@ -208,20 +213,10 @@ const latencyNode: TGraphNode = {
         hitRate: null,
         costPerKToken: null,
       },
-      latency: {
-        samples: [{ stepId: 's1', startedAt: 1000, ttftMs: 120, totalMs: 800 }],
-        medianMs: 500,
-        reference: 'node',
-        anomalies: [
-          {
-            stepId: 's1',
-            ratio: 1.6,
-            direction: 'slow',
-            referenceMs: 500,
-            reference: 'node',
-          },
-        ],
-      },
+      latency: latencyReport({
+        samples: [latencySample({ stepId: 's1', startedAt: 1000, generationMs: 12_000 })],
+        anomalies: [latencyAnomaly({ stepId: 's1' })],
+      }),
       provisional: false,
     },
   },
@@ -715,15 +710,15 @@ describe('InspectorPanel', () => {
 
     // La latencia no vive en el resumen continuo ni en las otras pestañas.
     expect(screen.queryByTestId('latency-section')).not.toBeInTheDocument();
-    expect(screen.queryByText('Anomalías')).not.toBeInTheDocument();
+    expect(screen.queryByText('Respuestas lentas')).not.toBeInTheDocument();
 
     await clickTab(user, 'Latencia');
 
     const latency = await screen.findByTestId('latency-section');
     expect(latency).toHaveTextContent('Latencia');
     expect(within(latency).getByText('Respuestas')).toBeInTheDocument();
-    expect(within(latency).getByText('Anomalías')).toBeInTheDocument();
-    expect(within(latency).getByText('Umbral de anomalía')).toBeInTheDocument();
+    expect(within(latency).getByText('Respuestas lentas')).toBeInTheDocument();
+    expect(within(latency).getByText('Umbral de lentitud')).toBeInTheDocument();
   });
 
   it('wires the anomaly threshold of Latencia to the shared store (FR-022)', async () => {
@@ -732,23 +727,23 @@ describe('InspectorPanel', () => {
       <InspectorPanel node={latencyNode} />,
       {
         seed: (client) =>
-          client.setQueryData([STORE_KEY.anomalyThreshold], 0.4),
+          client.setQueryData([STORE_KEY.anomalyThreshold], 0.5),
       },
     );
 
     await clickTab(user, 'Latencia');
 
     // El umbral llega por prop desde el store (no se inventa en el panel).
-    expect(propsOf(sectionProps.latency)).toMatchObject({ threshold: 0.4 });
-    const control = await screen.findByLabelText('Umbral de anomalía ±40%');
+    expect(propsOf(sectionProps.latency)).toMatchObject({ threshold: 0.5 });
+    const control = await screen.findByLabelText('Umbral de lentitud: ×1.5 lo esperado');
 
-    fireEvent.change(control, { target: { value: '60' } });
+    fireEvent.change(control, { target: { value: '200' } });
 
     await waitFor(() =>
-      expect(queryClient.getQueryData([STORE_KEY.anomalyThreshold])).toBe(0.6),
+      expect(queryClient.getQueryData([STORE_KEY.anomalyThreshold])).toBe(2),
     );
     expect(
-      screen.getByLabelText('Umbral de anomalía ±60%'),
+      screen.getByLabelText('Umbral de lentitud: ×3.0 lo esperado'),
     ).toBeInTheDocument();
   });
 

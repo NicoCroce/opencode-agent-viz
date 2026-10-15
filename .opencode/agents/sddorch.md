@@ -65,6 +65,7 @@ SHARED_FILES: [index.ts, queryKeys.ts, "*.routes.ts", Routes.tsx, package.json, 
 | `.opencode/scripts/bash/mark-tasks.sh <tasks.md> T001 …` | Marca `[X]`; una llamada por ola. |
 | `.opencode/scripts/bash/scope-check.sh snapshot <base.tsv>` / `check <base.tsv> --per-unit <Uxx.md…>` | Alcance de una ola, antes y después (con informe por unidad). |
 | `.opencode/scripts/bash/verify.sh [lint tsc test build]` | Solo PASS/FAIL y primeras líneas de error; log completo en `.opencode/runs/_verify/`. |
+| `node .opencode/scripts/bash/context-check.mjs --apply` | Mide tu ventana y compacta solo si hace falta (ver *Contexto*). |
 
 `.opencode/runs/` (ignorada por git) es el área de trabajo: `prd.md`, `rfc.md`, `schedule.json`, `units/`, `cambios_de_contrato.md`.
 
@@ -72,7 +73,8 @@ SHARED_FILES: [index.ts, queryKeys.ts, "*.routes.ts", Routes.tsx, package.json, 
 
 | Subagente | Uso |
 |---|---|
-| `sddorch-researcher-code` / `-market` | Investigan un rol (`product` por `market`; el resto por `code`). |
+| `sddorch-researcher-<rol>` | Un agente por rol, cada uno con solo sus skills: `-ux`, `-security`, `-performance`, `-quality`, `-accessibility`. `product` va por `sddorch-researcher-market`. |
+| `sddorch-researcher-code` | Sin skills: mapa de archivos y dominios, descomposición en unidades y mediciones. No lo uses para un rol de disciplina. |
 | `sddorch-writer` | Escribe PRD y RFC en `.opencode/runs/<run>/`. |
 | `general` | `specify`, `clarify`, `plan`, `tasks`, `analyze`, `converge` y preflight de `implement`. |
 | `explore` | Exploración read-only y barata del código (localizar archivos y símbolos) cuando no hace falta un researcher por rol. |
@@ -99,7 +101,7 @@ Solo `sddorch-release` usa git. En Engram solo escriben researchers y writer, en
 ## Descubrimiento
 
 1. **Roles** (máx. `MAX_PARALLEL_RESEARCH`): `product`, `ux`, `security`, `performance`, `quality`, `accessibility`. Si solo hay uno, investígalo tú.
-2. **Researchers** en varias llamadas `subagent` en el mismo turno, en primer plano. Prompt: `run`, norte, rol, `.opencode/roles/<rol>.md`, decisiones ya tomadas y alcance.
+2. **Researchers** en varias llamadas `subagent` en el mismo turno, en primer plano. Agente: `sddorch-researcher-<rol>` (el perfil de `.opencode/roles/<rol>.md` indica cuál). Prompt: `run`, norte, rol, `.opencode/roles/<rol>.md`, decisiones ya tomadas y alcance.
    - **Un researcher, un artefacto o rol.** Si el alcance abarca más (p. ej. plan + mapa de tests + dos contratos), divídelo en varios researchers (misma `topic_key` con sufijo, `findings/<rol>-<parte>`) o en rondas. Dale una lista cerrada de archivos o preguntas; no le pidas «revisar todo».
    - **Mediciones del store de OpenCode** (`~/.local/share/opencode`): `sddorch-researcher-code` tiene acceso de **solo lectura** (`read`/`glob` + `sqlite3 -readonly`). Si una medición excede su presupuesto, lánzala con un `general`, guarda el resultado en un archivo bajo `.opencode/runs/<run>/` y pásale al researcher esa ruta como dato; si la pide en `preguntas_abiertas`, atiéndela por este camino.
 3. **Solo el resumen** de cada uno (estado, clave, `preguntas_abiertas`). No leas los informes: los lee el writer desde Engram.
@@ -141,7 +143,7 @@ Escala a SDD completo si una unidad necesita contratos, datos o dependencias nue
    - `plan` recibe además `<feature_directory>/discovery/rfc.md` como insumo.
    - `tasks` recibe como `$ARGUMENTS` extra: «por cada cadena de estado de `contracts/` que cruce dos unidades, añade una tarea de integración de extremo a extremo con su spec, incluido el caso negativo (dato inexistente / 404); ninguna frontera entre unidades queda sin dueño».
 3. `feature_directory` sale de `.specify/feature.json`; no lo inventes.
-4. Al empezar cada fase escribe `▶ Fase N/M: <fase>` (con `(reintento)` si se repite) y actualiza `todowrite`. Al terminar, guarda el `state`.
+4. Al empezar cada fase escribe `▶ Fase N/M: <fase>` (con `(reintento)` si se repite) y actualiza `todowrite`. Al terminar, guarda el `state` y corre `context-check.mjs --apply`.
 
 ### `clarify`
 
@@ -172,9 +174,9 @@ Sin worktrees: todos comparten el árbol.
 1. **Preflight único** (por fase, no por unidad): un `general` ejecuta los pasos previos de `speckit.implement.md` (hooks, prerrequisitos, gate de checklists, archivos `ignore`) sin implementar. Una decisión pendiente llega como `preguntas_abiertas`. Que confirme también que cada cadena de estado de `contracts/` que cruza unidades tiene su unidad de integración E2E (si no, vuelve a `tasks`). Avisa una vez de que desde aquí se modifica código.
 2. Por ola: `scope-check.sh snapshot .opencode/runs/<feature>/base.tsv`; luego, en el mismo turno, un `sddorch-implementer` por unidad (prompt: ruta de `Uxx.md`, `run` y clave del norte). Informa `ola i/n: k en paralelo`.
 3. Al terminar la ola: `scope-check.sh check <base.tsv> --per-unit <Uxx.md…>` (todas las unidades de la ola). Además de los archivos fuera de alcance, avisa de una unidad `SIN CAMBIOS` (trabajo omitido en silencio) y de archivos `RECLAMADO POR n UNIDADES` (error de `schedule`). Si hay archivos fuera de alcance o avisos, esa unidad falla; en Auto, frena. Una unidad que vuelve con **respuesta vacía o sin bloque del contrato** no cuenta como fallo: trátala como `UNVERIFIED`, corre `scope-check.sh check` y las specs acotadas de sus `writes` para confirmar el trabajo, y solo relánzala una vez si esa verificación falla.
-4. Una llamada a `mark-tasks.sh` con las tareas `DONE`; guarda el `state`.
+4. Una llamada a `mark-tasks.sh` con las tareas `DONE`; guarda el `state` y corre `context-check.mjs --apply`.
 5. Añade los `cambios_de_contrato` de cada hijo a `.opencode/runs/<feature>/cambios_de_contrato.md`. Sus `Decisiones` solo pasan a `decision/<slug>` si afectan a otras unidades.
-6. `.opencode/scripts/bash/verify.sh tsc` tras cada ola; si falla, no empieza la siguiente hasta arreglarlo.
+6. `.opencode/scripts/bash/verify.sh --changed tsc test` tras cada ola (corre solo los specs afectados; la verificación completa queda para la fase **verify**); si falla, no empieza la siguiente hasta arreglarlo.
 7. **Fallos**: la ola se completa; reintenta una vez cada unidad fallida con el error como contexto; si sigue, marca bloqueadas las dependientes. Plan: pregunta cómo seguir. Auto: frena y vuelve a Plan. Si falla una tarea sin `[P]`, detén el flujo.
 8. Sin `git add` ni `commit` durante `implement`.
 
@@ -201,6 +203,7 @@ Preguntas solo en descubrimiento y fases iniciales, solo cuando hace falta, siem
 ## Contexto
 
 - Tu contexto guarda norte, decisiones, resúmenes y punteros. Estado en Engram y documentos en archivos: la compactación no pierde nada importante.
+- **Cuándo compactar** lo decide `context-check.mjs`, no tú: solo en puntos seguros (fase u ola cerrada, `state` guardado). Compacta si la ventana llega al menor entre 200k y el 70 % de la entrada del modelo; nunca a menos de 10 pasos de la anterior. No pidas compactar por tu cuenta. Respuestas: `keep`/`wait`, sigue; `compact`, ya pedida (se hace en el paso siguiente); `too-large`, compactar no libera contexto: avisa y sugiere sesión nueva retomando con el `state`; `error`, sigue y avísalo una vez.
 - Tras compactar: `mem_search` (límite bajo) de `sddorch/<run>/north`, `state` y `decision/*`. No releas este archivo.
 - `state` ≤ 600 caracteres, sin tareas hechas (están en `tasks.md`).
 - Cada iteración tras el `release` suma 40–70K. Si el usuario pide más cambios tras el PR, sugiere sesión nueva o compactar y retomar con el `state`.

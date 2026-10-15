@@ -9,6 +9,7 @@ import type {
   TNodeEffort,
   TNodeSpeedup,
 } from '../../Graph.entity';
+import { latencyReport, latencySample } from '@app/test/latencyFixtures';
 import { EMPTY_METRICS } from '../../Graph.entity';
 import { reconcileGraphModel } from '../reconcileGraph';
 import {
@@ -540,17 +541,36 @@ describe('reconcileGraphModel · contexto y speedup en la identidad de nodo', ()
         sameContext(
           makeContext(),
           makeContext({
-            latency: {
-              samples: [
-                { stepId: 's1', startedAt: 1, ttftMs: 10, totalMs: 20 },
-              ],
-              medianMs: 20,
-              reference: 'node',
-              anomalies: [],
-            },
+            latency: latencyReport({
+              samples: [latencySample({ stepId: 's1', startedAt: 1 })],
+            }),
           }),
         ),
       ).toBe(false);
+    });
+
+    it('detecta cambios del desglose de una respuesta y del ritmo del modelo', () => {
+      const base = latencyReport({ samples: [latencySample()] });
+      const withTools = latencyReport({
+        samples: [latencySample({ toolMs: 3000, topTool: 'shell' })],
+      });
+      const withPace = latencyReport({
+        samples: [latencySample()],
+        paces: [{ model: 'p/m', baseMs: 1000, msPerToken: 10, samples: 9 }],
+      });
+
+      expect(
+        sameContext(makeContext({ latency: base }), makeContext({ latency: withTools })),
+      ).toBe(false);
+      expect(
+        sameContext(makeContext({ latency: base }), makeContext({ latency: withPace })),
+      ).toBe(false);
+      expect(
+        sameContext(
+          makeContext({ latency: base }),
+          makeContext({ latency: latencyReport({ samples: [latencySample()] }) }),
+        ),
+      ).toBe(true);
     });
 
     it('detecta cambios de la evolución (growth)', () => {

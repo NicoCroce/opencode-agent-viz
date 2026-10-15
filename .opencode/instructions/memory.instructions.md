@@ -19,7 +19,7 @@ Pasa **punteros, no contenido**. Los informes largos viven en Engram; el orquest
 | Agente | Puede escribir |
 |---|---|
 | `sddorch` (orquestador) | `north`, `state`, `decision/<slug>`, `run`, `harness-signal/*` |
-| `sddorch-researcher-code` / `-market` | solo su `findings/<rol>` |
+| `sddorch-researcher-<rol>` (`-ux`, `-security`, `-performance`, `-quality`, `-accessibility`, `-market`) / `-code` | solo su `findings/<rol>` |
 | `sddorch-writer` | solo `prd`, `rfc` y `recon-discarded` (más los archivos `.opencode/runs/<run>/prd.md` y `rfc.md`) |
 | Resto de subagentes | nada |
 

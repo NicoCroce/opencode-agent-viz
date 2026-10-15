@@ -151,6 +151,20 @@ Un usuario que sigue una ejecución en vivo quiere ver **cómo varía la velocid
 
 **Velocidad de respuesta y anomalías (US5)**
 
+> **Revisión (feat/latency-accuracy)**: FR-018, FR-020, FR-021 y SC-006 se revisaron tras medir el
+> criterio original con 18.741 respuestas reales: marcaba el 56 % de las respuestas, sobre todo la
+> respuesta final de cada agente (genera más tokens) y esperas que no son del modelo. Criterio
+> vigente, detallado en `contracts/latency-anomaly-contract.md`:
+>
+> - **FR-018**: por respuesta se mide la generación del modelo (`streamed` es el fin del stream, no
+>   el primer token), la primera salida con hora, el total y el desglose en herramientas,
+>   subagentes y espera del usuario.
+> - **FR-020**: la referencia es lo esperado para el modelo y los tokens generados, con un ritmo por
+>   modelo estimado sobre todo el grafo; ya no la mediana del nodo o del agente.
+> - **FR-021**: solo se marca la lentitud del modelo (más de `(1 + umbral) ×` lo esperado y al menos
+>   5 s de exceso). La rapidez y las esperas ajenas al modelo no se marcan.
+> - **FR-022**: el umbral por defecto es el doble de lo esperado, configurable entre ×1,25 y ×4.
+
 - **FR-018**: El visor MUST medir, por cada respuesta del agente, el tiempo hasta el primer token y la latencia total, y construir con ellos una serie temporal por agente.
 - **FR-019**: El visor MUST mostrar cómo evoluciona la velocidad de respuesta a lo largo de la ejecución del agente.
 - **FR-020**: El visor MUST detectar anomalías comparando cada respuesta contra la mediana histórica del propio nodo y, cuando el nodo no tenga historial, contra la mediana del mismo agente.
@@ -175,7 +189,7 @@ Un usuario que sigue una ejecución en vivo quiere ver **cómo varía la velocid
 - **SC-003**: El factor de aceleración mostrado coincide con la relación entre el tiempo en serie y el tiempo real del grupo, verificable con datos de duración conocidos.
 - **SC-004**: Un usuario obtiene el aporte de un nodo al contexto de su padre en un máximo de 2 interacciones desde el grafo.
 - **SC-005**: Toda la información de contexto de un agente es accesible sin salir del panel de detalle.
-- **SC-006**: El visor marca una anomalía de latencia ante cualquier desviación respecto de la mediana de referencia que supere el umbral, tanto por lentitud como por rapidez.
+- **SC-006**: El visor marca una anomalía de latencia ante cualquier desviación respecto de la mediana de referencia que supere el umbral, tanto por lentitud como por rapidez. *(Revisado: se marca la generación que supera el umbral sobre lo esperado para sus tokens y lo excede en al menos 5 s; la rapidez no se marca.)*
 - **SC-007**: Ninguna métrica de contexto presenta un valor inventado: ante ausencia de datos muestra el estado "no disponible" en lugar de cero.
 
 ## Assumptions

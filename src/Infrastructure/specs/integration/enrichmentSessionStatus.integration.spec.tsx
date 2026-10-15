@@ -249,9 +249,8 @@ describe('integración U6↔U5 — estado de sesión → nodo (T030)', () => {
     expect(childNode?.data.retry).toBeNull();
     expect(childNode?.data.interruptReason).toBeNull();
     expect(childNode?.data.metrics.retryCount).toBe(0);
-    // Sin señal y sin mediana de agente de referencia: ni baseline ni anomalías.
-    expect(childNode?.data.context?.latency?.medianMs).toBeNull();
-    expect(childNode?.data.context?.latency?.reference).toBeNull();
+    // Sin respuestas no hay ritmo de modelo de referencia ni anomalías.
+    expect(childNode?.data.context?.latency?.paces).toEqual([]);
     expect(childNode?.data.context?.latency?.anomalies).toEqual([]);
   });
 }, INTEGRATION_TIMEOUT_MS);

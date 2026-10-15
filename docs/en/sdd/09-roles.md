@@ -7,11 +7,11 @@ constraints, and declares which **skills** its researcher must load.
 | Role | Agent | Skills | Objective |
 |---|---|---|---|
 | `product` | `sddorch-researcher-market` | `pm-problem-statement`, `pm-jobs-to-be-done` | Clarify what problem the request solves, for whom, and how success will be known |
-| `ux` | `sddorch-researcher-code` | `interface-design`, `frontend-design` | How the change should look and behave, reusing what exists |
-| `security` | `sddorch-researcher-code` | `owasp-security-check` | Security and privacy risks the change introduces or touches |
-| `performance` | `sddorch-researcher-code` | `vercel-react-best-practices` | Impact on real-time performance and on diagnosability |
-| `quality` | `sddorch-researcher-code` | `test-generator`, `test-driven-development` | How the change will be verified and where it can break what exists |
-| `accessibility` | `sddorch-researcher-code` | `a11y-*` | That the change can be used with keyboard, screen reader, and good contrast |
+| `ux` | `sddorch-researcher-ux` | `interface-design`, `frontend-design` | How the change should look and behave, reusing what exists |
+| `security` | `sddorch-researcher-security` | `owasp-security-check` | Security and privacy risks the change introduces or touches |
+| `performance` | `sddorch-researcher-performance` | `vercel-react-best-practices` | Impact on real-time performance and on diagnosability |
+| `quality` | `sddorch-researcher-quality` | `test-generator`, `test-driven-development` | How the change will be verified and where it can break what exists |
+| `accessibility` | `sddorch-researcher-accessibility` | `a11y-*` | That the change can be used with keyboard, screen reader, and good contrast |
 
 ## What each role answers
 

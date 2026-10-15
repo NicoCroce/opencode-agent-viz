@@ -2,40 +2,71 @@ import { Container } from '@app/Application/Components';
 import { formatTokens } from '@app/Application/Helpers';
 import { prefersReducedMotion } from '@app/Application/Helpers/prefersReducedMotion';
 import { cn } from '@app/Application/lib/utils';
-import type { TContextGrowthPoint } from '@app/Domains/Graph/Graph.entity';
-
-/** Sistema de coordenadas del sparkline (se escala con `preserveAspectRatio`). */
-const VIEW_WIDTH = 100;
-const VIEW_HEIGHT = 24;
+import type {
+  TContextCompaction,
+  TContextGrowthPoint,
+} from '@app/Domains/Graph/Graph.entity';
+import {
+  buildGrowthChart,
+  GROWTH_VIEW_HEIGHT,
+  GROWTH_VIEW_WIDTH,
+} from '../lib/contextGrowthChart';
 
 interface ContextGrowthProps {
   /** Serie temporal del contexto, ordenada por `startedAt` (FR-016). */
   points: TContextGrowthPoint[];
+  /** Compactaciones de la sesión, en orden temporal; se marcan sobre la línea. */
+  compactions?: TContextCompaction[];
+  /** Límite de contexto del modelo; `null` si el catálogo no lo trae. */
+  limitTokens?: number | null;
 }
 
 /**
- * Sparkline de la evolución del contexto por paso (FR-016;
- * `contracts/context-panel-contract.md` §2). Presentación pura: recibe la serie
- * ya derivada. El SVG es **una imagen atómica** (`role="img"`) con una etiqueta
- * que resume la tendencia; el valor inicial/final y el número de pasos se
- * repiten como texto visible, de modo que la información no depende del trazo.
- * El dibujo animado se omite con `prefers-reduced-motion` (a11y): la línea queda
- * completa y estática.
+ * Gráfico de la evolución del contexto por paso (FR-016;
+ * `contracts/context-panel-contract.md` §2). Presentación pura. El eje Y empieza
+ * en 0 y llega al límite del modelo si se conoce (línea punteada); cada
+ * compactación es una muesca vertical. El SVG es **una imagen atómica**
+ * (`role="img"`) cuya etiqueta resume la serie; el resumen se repite como texto
+ * visible, así la información no depende del dibujo. La aparición se anima con
+ * un recorte que se abre de izquierda a derecha y se omite con
+ * `prefers-reduced-motion`.
  */
-export const ContextGrowth = ({ points }: ContextGrowthProps) => {
+export const ContextGrowth = ({
+  points,
+  compactions = [],
+  limitTokens = null,
+}: ContextGrowthProps) => {
   if (points.length === 0) return null;
 
-  const values = points.map((point) => point.windowTokens);
-  const first = values[0];
-  const last = values[values.length - 1];
+  const first = points[0].windowTokens;
+  const last = points[points.length - 1].windowTokens;
   const stepWord = points.length === 1 ? 'paso' : 'pasos';
-  const summary = `Evolución del contexto: ${points.length} ${stepWord}, de ${formatTokens(
-    first,
-  )} a ${formatTokens(last)} tokens`;
+  const compactionText =
+    compactions.length === 0
+      ? null
+      : `${compactions.length} ${
+          compactions.length === 1 ? 'compactación' : 'compactaciones'
+        }`;
+  const limitText =
+    limitTokens === null ? null : `límite ${formatTokens(limitTokens)}`;
 
-  const caption = `${formatTokens(first)} → ${formatTokens(last)} tok · ${
-    points.length
-  } ${stepWord}`;
+  const summary = [
+    `Evolución del contexto: ${points.length} ${stepWord}, de ${formatTokens(
+      first,
+    )} a ${formatTokens(last)} tokens`,
+    compactionText,
+    limitText,
+  ]
+    .filter(Boolean)
+    .join(', ');
+  const caption = [
+    `${formatTokens(first)} → ${formatTokens(last)} tok`,
+    `${points.length} ${stepWord}`,
+    compactionText,
+    limitText,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   if (points.length === 1) {
     return (
@@ -54,18 +85,7 @@ export const ContextGrowth = ({ points }: ContextGrowthProps) => {
     );
   }
 
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
-  const stepX = VIEW_WIDTH / (points.length - 1);
-  const coordinates = points
-    .map((point, index) => {
-      const x = index * stepX;
-      const y = VIEW_HEIGHT - ((point.windowTokens - min) / span) * VIEW_HEIGHT;
-      return `${x.toFixed(2)},${y.toFixed(2)}`;
-    })
-    .join(' ');
-
+  const chart = buildGrowthChart(points, compactions, limitTokens);
   const reduceMotion = prefersReducedMotion();
 
   return (
@@ -76,18 +96,51 @@ export const ContextGrowth = ({ points }: ContextGrowthProps) => {
       <svg
         role="img"
         aria-label={summary}
-        viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
+        viewBox={`0 0 ${GROWTH_VIEW_WIDTH} ${GROWTH_VIEW_HEIGHT}`}
         preserveAspectRatio="none"
-        className="h-6 w-full text-primary"
+        className={cn(
+          'h-12 w-full text-primary',
+          !reduceMotion && 'growth-reveal',
+        )}
       >
+        {chart.limitY !== null ? (
+          <line
+            data-testid="context-growth-limit"
+            x1={0}
+            x2={GROWTH_VIEW_WIDTH}
+            y1={chart.limitY}
+            y2={chart.limitY}
+            className="text-muted-foreground"
+            stroke="currentColor"
+            strokeWidth={1}
+            strokeDasharray="3 3"
+            vectorEffect="non-scaling-stroke"
+          />
+        ) : null}
+        {chart.marks.map((mark) => (
+          <line
+            key={mark.id}
+            data-testid="context-growth-compaction"
+            x1={mark.x}
+            x2={mark.x}
+            y1={0}
+            y2={GROWTH_VIEW_HEIGHT}
+            className={cn(
+              mark.failed ? 'text-status-error' : 'text-status-waiting',
+            )}
+            stroke="currentColor"
+            strokeOpacity={0.6}
+            strokeWidth={1}
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
         <polyline
-          points={coordinates}
-          pathLength={1}
+          points={chart.line}
           fill="none"
           stroke="currentColor"
           strokeWidth={1.5}
+          strokeLinejoin="round"
           vectorEffect="non-scaling-stroke"
-          className={cn(!reduceMotion && 'growth-draw')}
         />
       </svg>
       <span className="font-mono text-[11px] tabular-nums text-muted-foreground">

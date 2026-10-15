@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Container } from '@app/Application/Components';
 import { DetailRow, SectionFrame } from '@app/Application/Components/Molecules';
+import { Alert } from '@app/Application/Components/Molecules/Alert';
 import {
   formatPercent,
   formatTokens,
@@ -13,8 +14,11 @@ import type {
   TTokenUsage,
 } from '@app/Domains/Graph/Graph.entity';
 import { ContextCompositionBar } from './ContextCompositionBar';
+import type { TContextUsage } from '../Inspector.entity';
+import type { TCompactionLoop } from '../lib/compactionLoop';
 import { ContextGrowth } from './ContextGrowth';
 import { ContextSectionSkeleton } from './ContextSectionSkeleton';
+import { ContextWindowUsage } from './ContextWindowUsage';
 
 /** Etiqueta legible del motivo de una compactación (FR-016). */
 const COMPACTION_REASON_LABEL: Record<TContextCompactionReason, string> = {
@@ -29,6 +33,10 @@ interface ContextSectionProps {
   tokens?: TTokenUsage | null;
   /** Efecto de la última compactación sobre la ventana (FR-016). */
   compactionEffect?: TCompactionEffect | null;
+  /** Uso de la ventana frente al límite del modelo; `null` si no se conoce. */
+  usage?: TContextUsage | null;
+  /** Racha de compactaciones casi consecutivas; `null` si no hay bucle. */
+  compactionLoop?: TCompactionLoop | null;
   isError?: boolean;
   isLoading?: boolean;
   /**
@@ -65,6 +73,8 @@ export const ContextSection = ({
   context,
   tokens = null,
   compactionEffect = null,
+  usage = null,
+  compactionLoop = null,
   isError = false,
   isLoading = false,
   children,
@@ -109,9 +119,9 @@ export const ContextSection = ({
         ) : null}
 
         <Container space="none" className="gap-0.5">
-          <DetailRow
-            label="Ventana de contexto"
-            value={formatTokens(window?.windowTokens ?? null)}
+          <ContextWindowUsage
+            windowTokens={window?.windowTokens ?? null}
+            usage={usage}
           />
           <DetailRow
             label="Caché (lectura)"
@@ -140,7 +150,11 @@ export const ContextSection = ({
           />
         </Container>
 
-        <ContextGrowth points={growth} />
+        <ContextGrowth
+          points={growth}
+          compactions={compactions}
+          limitTokens={usage?.limitTokens ?? null}
+        />
 
         <Container space="none" className="gap-0.5">
           <DetailRow label="Salida (respuesta)" value={formatTokens(output)} />
@@ -152,6 +166,18 @@ export const ContextSection = ({
         </Container>
 
         <Container space="none" className="gap-0.5">
+          {compactionLoop ? (
+            <Alert
+              variant="warning"
+              role="status"
+              title="Posible bucle de compactación"
+              message={`${compactionLoop.compactions} compactaciones en ${
+                compactionLoop.steps
+              } ${
+                compactionLoop.steps === 1 ? 'paso' : 'pasos'
+              }: compactar no libera contexto. Suele deberse a un compaction.buffer mayor que el límite del modelo.`}
+            />
+          ) : null}
           {compactions.length === 0 ? (
             <p className="text-xs text-muted-foreground">Sin compactaciones</p>
           ) : (

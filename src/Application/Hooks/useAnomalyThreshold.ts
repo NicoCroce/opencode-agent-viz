@@ -6,7 +6,7 @@ import {
 import { STORE_KEY, useGlobalStore } from './useGlobalStore';
 
 export interface TAnomalyThreshold {
-  /** Umbral vigente (±fracción), acotado a `(0.05, 0.95)`. */
+  /** Umbral vigente (fracción sobre lo esperado), acotado a `[0.25, 3]`. */
   threshold: number;
   /** Cambia y persiste el umbral (FR-022); el valor se acota antes de guardar. */
   setThreshold: (value: number) => void;
@@ -14,7 +14,7 @@ export interface TAnomalyThreshold {
 
 /**
  * Preferencia de vista del umbral de anomalía de latencia (FR-022;
- * `latency-anomaly-contract` §4). Vive en el **store global** (TanStack Query,
+ * `latency-anomaly-contract` §5). Vive en el **store global** (TanStack Query,
  * patrón de `useGlobalStore`) porque la comparten dos capas que no deben
  * acoplarse: el enriquecimiento del grafo (marca en el nodo) y la sección de
  * latencia del detalle. El valor se persiste en `localStorage` a través de los

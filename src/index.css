@@ -224,22 +224,22 @@ html {
   animation-delay: 0.3s;
 }
 
-/* Trazo de entrada de la sparkline de contexto (FR-016). El estado base es la
-   línea completa; sin animación —p. ej. con `prefers-reduced-motion`, que
-   neutraliza las animaciones globalmente— la línea queda estática y legible. */
-@keyframes growth-draw {
+/* Entrada del gráfico de evolución del contexto (FR-016): un recorte que se
+   abre de izquierda a derecha. No usa `stroke-dasharray` porque, con
+   `vector-effect: non-scaling-stroke` y `preserveAspectRatio="none"`, el guion
+   se mide antes de estirar el SVG y deja huecos en la línea. El estado base es
+   el gráfico completo: sin animación queda estático y legible. */
+@keyframes growth-reveal {
   from {
-    stroke-dashoffset: 1;
+    clip-path: inset(0 100% 0 0);
   }
   to {
-    stroke-dashoffset: 0;
+    clip-path: inset(0 0 0 0);
   }
 }
 
-.growth-draw {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  animation: growth-draw 600ms ease-out forwards;
+.growth-reveal {
+  animation: growth-reveal 600ms ease-out;
 }
 
 :focus-visible {

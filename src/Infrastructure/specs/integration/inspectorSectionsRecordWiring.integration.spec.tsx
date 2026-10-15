@@ -47,6 +47,7 @@ import {
 import { InspectorPanel } from '@app/Domains/Inspector/Components/InspectorPanel';
 import { STORE_KEY } from '@app/Application/Hooks';
 import { queryKeys } from '@app/Domains/queryKeys';
+import { latencyReport, latencySample } from '@app/test/latencyFixtures';
 import { renderWithProviders } from '@app/test/renderWithProviders';
 import { setupRadixUser } from '@app/test/radix';
 import {
@@ -304,15 +305,12 @@ const QUESTION_ENTRIES: TQuestionEntry[] = [
   },
 ];
 
-const LATENCY_REPORT: TLatencyReport = {
+const LATENCY_REPORT: TLatencyReport = latencyReport({
   samples: [
-    { stepId: 's1', startedAt: 1000, ttftMs: 120, totalMs: 800 },
-    { stepId: 's2', startedAt: 2000, ttftMs: 150, totalMs: 900 },
+    latencySample({ stepId: 's1', startedAt: 1000, generationMs: 120, totalMs: 800 }),
+    latencySample({ stepId: 's2', startedAt: 2000, generationMs: 150, totalMs: 900 }),
   ],
-  medianMs: 850,
-  reference: 'node',
-  anomalies: [],
-};
+});
 
 /** Umbral literal sembrado en el store global (`useAnomalyThreshold`). */
 const SEEDED_THRESHOLD = 0.25;

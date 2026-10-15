@@ -174,6 +174,35 @@ describe('ContextSection · FR-016 (ventana, salida, evolución y compactaciones
     expect(section.getByText(/completed/)).toBeInTheDocument();
   });
 
+  it('avisa de un posible bucle de compactación', () => {
+    render(
+      <ContextSection
+        context={context({
+          compactions: [{ id: 'c1', at: 30, status: 'completed', reason: 'auto' }],
+        })}
+        compactionLoop={{ compactions: 238, steps: 240 }}
+      />,
+    );
+
+    const notice = screen.getByRole('status');
+    expect(within(notice).getByText('Posible bucle de compactación')).toBeInTheDocument();
+    expect(
+      within(notice).getByText(/238 compactaciones en 240 pasos/),
+    ).toBeInTheDocument();
+  });
+
+  it('sin bucle no muestra el aviso', () => {
+    render(
+      <ContextSection
+        context={context({
+          compactions: [{ id: 'c1', at: 30, status: 'completed', reason: 'auto' }],
+        })}
+      />,
+    );
+
+    expect(screen.queryByText('Posible bucle de compactación')).not.toBeInTheDocument();
+  });
+
   it('etiqueta la compactación manual', () => {
     render(
       <ContextSection
@@ -205,5 +234,50 @@ describe('ContextSection · FR-016 (ventana, salida, evolución y compactaciones
 
     expect(withinSection().getByText('Efecto')).toBeInTheDocument();
     expect(withinSection().getAllByText('—').length).toBeGreaterThan(0);
+  });
+});
+
+describe('ContextSection · uso de la ventana del modelo', () => {
+  it('con el límite del modelo muestra el total, el porcentaje y la barra de uso', () => {
+    render(
+      <ContextSection
+        context={context({
+          window: { ...context().window, windowTokens: 45_200 },
+        })}
+        usage={{ usedTokens: 45_200, limitTokens: 200_000, ratio: 0.226 }}
+      />,
+    );
+
+    expect(screen.getByText('45.2k de 200.0k')).toBeInTheDocument();
+    expect(screen.getByText('Uso de la ventana')).toBeInTheDocument();
+    expect(screen.getByText('23%')).toBeInTheDocument();
+    const meter = screen.getByRole('meter', {
+      name: 'Uso de la ventana de contexto',
+    });
+    expect(meter).toHaveAttribute('aria-valuenow', '23');
+    expect(meter).toHaveAttribute(
+      'aria-valuetext',
+      '23%: 45.2k de 200.0k tokens',
+    );
+  });
+
+  it('por encima del límite muestra el porcentaje real y la barra llena', () => {
+    render(
+      <ContextSection
+        context={context()}
+        usage={{ usedTokens: 210_000, limitTokens: 200_000, ratio: 1.05 }}
+      />,
+    );
+
+    expect(screen.getByText('105%')).toBeInTheDocument();
+    expect(screen.getByRole('meter')).toHaveAttribute('aria-valuenow', '100');
+  });
+
+  it('sin límite conocido muestra solo los tokens usados, sin porcentaje', () => {
+    render(<ContextSection context={context()} usage={null} />);
+
+    expect(screen.getByText('Ventana de contexto')).toBeInTheDocument();
+    expect(screen.queryByText('Uso de la ventana')).not.toBeInTheDocument();
+    expect(screen.queryByRole('meter')).not.toBeInTheDocument();
   });
 });

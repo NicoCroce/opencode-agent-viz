@@ -11,6 +11,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    environmentMatchGlobs: [['src/**/*.spec.ts', 'node']],
+    // 4 workers = núcleos de rendimiento de un M1; más allá el beneficio es marginal.
+    pool: 'threads',
+    poolOptions: { threads: { minThreads: 1, maxThreads: 4 } },
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     coverage: {

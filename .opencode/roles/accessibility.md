@@ -1,6 +1,6 @@
 # Rol: accesibilidad
 
-Perfil de agente: `sddorch-researcher-code`.
+Perfil de agente: `sddorch-researcher-accessibility`.
 Skills a cargar: `a11y-ACCESSIBILITY-general`, `a11y-charts-graphs`, `a11y-svg`, `a11y-keyboard`, `a11y-color-contrast`.
 
 ## Objetivo

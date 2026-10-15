@@ -49,6 +49,7 @@ Full guide in [Product → Overview](docs/en/product/01-overview.md) and
 | [Discovery roles](docs/en/sdd/09-roles.md) | The six disciplines: purpose, agent, and skills |
 | [FAQ](docs/en/sdd/10-faq.md) | Frequent questions about the model |
 | [Context optimization](docs/en/sdd/11-context-optimization.md) | Stages A and B: what changed in SddOrch, why, reduction tables and how to measure it |
+| [Verification speed-up](docs/en/sdd/12-verification-speedup.md) | `verify.sh` and Vitest: from 200–280 s to 41 s, with measurements, worker limits and how to reproduce them |
 
 **Spanish mirror:** [docs/es/](docs/es/) — [product](docs/es/product/01-overview.md) · [sdd](docs/es/sdd/01-overview.md).
 
@@ -61,7 +62,7 @@ Full guide in [Product → Overview](docs/en/product/01-overview.md) and
 | [app.instructions.md](.opencode/instructions/app.instructions.md) | Extended reference with examples for the frontend conventions (not auto-loaded; the essentials live in `AGENTS.md`) |
 | [memory.instructions.md](.opencode/instructions/memory.instructions.md) | SddOrch memory rules in Engram |
 | [sddorch-contract.md](.opencode/instructions/sddorch-contract.md) | Subagent response contract |
-| Agents: [sddorch](.opencode/agents/sddorch.md) · [researcher-code](.opencode/agents/sddorch-researcher-code.md) · [researcher-market](.opencode/agents/sddorch-researcher-market.md) · [writer](.opencode/agents/sddorch-writer.md) · [implementer](.opencode/agents/sddorch-implementer.md) · [reviewer](.opencode/agents/sddorch-reviewer.md) · [tester](.opencode/agents/sddorch-tester.md) · [release](.opencode/agents/sddorch-release.md) | Definition of each agent and its permissions |
+| Agents: [sddorch](.opencode/agents/sddorch.md) · [researcher-code](.opencode/agents/sddorch-researcher-code.md) · researcher-`ux`/`security`/`performance`/`quality`/`accessibility` · [researcher-market](.opencode/agents/sddorch-researcher-market.md) · [writer](.opencode/agents/sddorch-writer.md) · [implementer](.opencode/agents/sddorch-implementer.md) · [reviewer](.opencode/agents/sddorch-reviewer.md) · [tester](.opencode/agents/sddorch-tester.md) · [release](.opencode/agents/sddorch-release.md) | Definition of each agent and its permissions |
 | Roles: [`.opencode/roles/`](.opencode/roles/) | Discipline profiles (product, ux, security, performance, quality, accessibility) |
 | Templates: [`.opencode/templates/discovery/`](.opencode/templates/discovery/) | PRD and RFC templates |
 | [Skills](.opencode/skills/README.md) | Own: [front-ddd-generator](.opencode/skills/front-ddd-generator/SKILL.md) · [test-generator](.opencode/skills/test-generator/SKILL.md) · [code-reviewer](.opencode/skills/code-reviewer/SKILL.md) · [commit-conventions](.opencode/skills/commit-conventions/SKILL.md) · [pr-detail](.opencode/skills/pr-detail/SKILL.md) · [progress-tracker](.opencode/skills/progress-tracker/SKILL.md). Third-party: `vercel-react-best-practices`, `owasp-security-check`, `test-driven-development`, `a11y-*`, `pm-*` (see index) | Reusable harness guides |
@@ -110,7 +111,7 @@ proposals, and SDK data capture.
 | **Auto mode** | Execution without gates; it only stops on a real blocker. | [SDD → Overview](docs/en/sdd/01-overview.md) |
 | **Discovery** | Pre-Spec-Kit stage: researchers by role + writer produce the PRD and RFC. | [Discovery](docs/en/sdd/03-discovery.md) |
 | **Role** | Discovery discipline: product, ux, security, performance, quality, accessibility. | [Roles](docs/en/sdd/09-roles.md) |
-| **`sddorch-researcher-code`** | Read-only subagent that investigates a technical role with repo access. | [Discovery](docs/en/sdd/03-discovery.md) |
+| **`sddorch-researcher-<role>`** | Read-only subagents, one per technical role (`-ux`, `-security`, `-performance`, `-quality`, `-accessibility`), each with only its role's skills; `-code` does mapping and measurements with no skills. | [Discovery](docs/en/sdd/03-discovery.md) |
 | **`sddorch-researcher-market`** | Subagent that investigates product with web access and no code access. | [Discovery](docs/en/sdd/03-discovery.md) |
 | **`sddorch-writer`** | Subagent that writes the PRD and RFC from the reports in Engram. | [Discovery](docs/en/sdd/03-discovery.md) |
 | **North star** | 5-8-line document (problem, objective, non-goals, constraints) every agent receives. | [Discovery](docs/en/sdd/03-discovery.md) |

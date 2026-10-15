@@ -10,7 +10,7 @@ Configuración para OpenCode V2 (`https://opencode.ai/v2/docs/`).
 
 - **agents/** — Agentes en Markdown (frontmatter V2: `mode`, `permissions`, `steps`)
   - `sddorch.md` — Orquestador Spec-Kit (primary)
-  - `sddorch-researcher-code`, `-researcher-market`, `-writer` — Descubrimiento (investigan por rol y redactan PRD y RFC)
+  - `sddorch-researcher-ux|security|performance|quality|accessibility|market` (uno por rol, cada uno con solo sus skills), `-researcher-code` (sin skills; mapa y mediciones) y `-writer` — Descubrimiento (investigan por rol y redactan PRD y RFC)
   - `sddorch-implementer`, `-reviewer`, `-tester`, `-release` — Implementación, revisión, tests y cierre
 - **commands/** — Comandos `speckit.*` (instalados por Spec-Kit, no editar)
 - **instructions/**
@@ -20,7 +20,7 @@ Configuración para OpenCode V2 (`https://opencode.ai/v2/docs/`).
 - **roles/** — Perfil de cada rol de investigación (producto, ux, seguridad, rendimiento, calidad, accesibilidad)
 - **templates/discovery/** — Plantillas de PRD y RFC
 - **skills/** — Propias y de terceros; ver `skills/README.md` (procedencia y licencias)
-- **scripts/bash/** — `open-pr.sh` (push + PR), `run-timeout.sh`, y los de SddOrch: `schedule.mjs` (olas), `mark-tasks.sh`, `scope-check.sh`, `verify.sh`. El área de trabajo de cada ejecución es `runs/` (ignorada por git)
+- **scripts/bash/** — `open-pr.sh` (push + PR), `run-timeout.sh`, y los de SddOrch: `schedule.mjs` (olas), `mark-tasks.sh`, `scope-check.sh`, `context-check.mjs` (mide la ventana del orquestador y compacta solo si hace falta; reemplaza a `compaction.buffer`), `verify.sh` (lint/tsc/test/build en paralelo; `--changed` para correr solo los specs afectados; `VERIFY_TEST_WORKERS` para el tope de workers de Vitest, 4 por defecto; ver `docs/es/sdd/12-optimizacion-verificacion.md`). El área de trabajo de cada ejecución es `runs/` (ignorada por git)
 
 ## Configuración
 

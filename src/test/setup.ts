@@ -1,14 +1,24 @@
-import '@testing-library/jest-dom';
-import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
-import { installRadixPolyfills } from './radix';
 
-installRadixPolyfills();
+// Los specs `.spec.ts` corren en `node` (ver vitest.config.ts): las piezas de DOM
+// solo se cargan cuando el entorno es jsdom, para no pagar su costo en cada archivo.
+const hasDom = typeof document !== 'undefined';
+
+if (hasDom) {
+  await import('@testing-library/jest-dom/vitest');
+  const { cleanup } = await import('@testing-library/react');
+  const { installRadixPolyfills } = await import('./radix');
+
+  installRadixPolyfills();
+
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+}
 
 afterEach(() => {
-  cleanup();
-  localStorage.clear();
-  sessionStorage.clear();
   vi.restoreAllMocks();
   vi.clearAllMocks();
 });

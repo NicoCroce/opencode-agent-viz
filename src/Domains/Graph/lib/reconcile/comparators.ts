@@ -11,6 +11,7 @@ import type {
   TLatencyAnomaly,
   TLatencyReport,
   TLatencySample,
+  TModelPace,
   TNodeContextMetrics,
   TNodeEffort,
   TNodeMetrics,
@@ -140,15 +141,28 @@ const sameContextWindow = (a: TContextWindow, b: TContextWindow): boolean =>
 const sameLatencySample = (a: TLatencySample, b: TLatencySample): boolean =>
   a.stepId === b.stepId &&
   a.startedAt === b.startedAt &&
-  a.ttftMs === b.ttftMs &&
-  a.totalMs === b.totalMs;
+  a.model === b.model &&
+  a.firstOutputMs === b.firstOutputMs &&
+  a.generationMs === b.generationMs &&
+  a.totalMs === b.totalMs &&
+  a.toolMs === b.toolMs &&
+  a.subagentMs === b.subagentMs &&
+  a.humanMs === b.humanMs &&
+  a.topTool === b.topTool &&
+  a.outputTokens === b.outputTokens &&
+  a.expectedMs === b.expectedMs;
+
+const sameModelPace = (a: TModelPace, b: TModelPace): boolean =>
+  a.model === b.model &&
+  a.baseMs === b.baseMs &&
+  a.msPerToken === b.msPerToken &&
+  a.samples === b.samples;
 
 const sameLatencyAnomaly = (a: TLatencyAnomaly, b: TLatencyAnomaly): boolean =>
   a.stepId === b.stepId &&
   a.ratio === b.ratio &&
-  a.direction === b.direction &&
-  a.referenceMs === b.referenceMs &&
-  a.reference === b.reference;
+  a.expectedMs === b.expectedMs &&
+  a.excessMs === b.excessMs;
 
 const sameLatency = (
   a: TLatencyReport | null | undefined,
@@ -159,8 +173,10 @@ const sameLatency = (
   const latencyB = b ?? null;
   if (latencyA === null || latencyB === null) return latencyA === latencyB;
   return (
-    latencyA.medianMs === latencyB.medianMs &&
-    latencyA.reference === latencyB.reference &&
+    latencyA.paces.length === latencyB.paces.length &&
+    latencyA.paces.every((pace, index) =>
+      sameModelPace(pace, latencyB.paces[index]),
+    ) &&
     latencyA.samples.length === latencyB.samples.length &&
     latencyA.samples.every((sample, index) =>
       sameLatencySample(sample, latencyB.samples[index]),

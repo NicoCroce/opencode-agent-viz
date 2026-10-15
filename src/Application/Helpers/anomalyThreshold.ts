@@ -1,27 +1,31 @@
 /**
- * Umbral de anomalía de latencia (FR-022; `latency-anomaly-contract` §4). La
- * detección es bidireccional: una muestra se marca cuando su `totalMs` se sale
- * de `[1 − threshold, 1 + threshold]` respecto de la mediana de referencia.
+ * Umbral de anomalía de latencia (FR-022; `latency-anomaly-contract` §5). Una
+ * respuesta se marca lenta cuando su generación supera `(1 + threshold) ×` lo
+ * esperado para su modelo y sus tokens (y el exceso llega a `MIN_EXCESS_MS`).
  *
  * Vive en `Application` (capa base) porque es una **preferencia de vista**
  * compartida por el grafo (marca en el nodo) y el panel de detalle (sección de
  * latencia): así ninguna de las dos capas importa a la otra.
  */
 
-/** Umbral por defecto: ±40 % (research R7). */
-export const DEFAULT_ANOMALY_THRESHOLD = 0.4;
-
-/** Clave de `localStorage` del umbral configurable (patrón de `useInspectorPanel`). */
-export const ANOMALY_THRESHOLD_STORAGE_KEY = 'opencode-agent-viz:anomaly-threshold';
-
-/** Límite inferior del rango válido. */
-export const MIN_ANOMALY_THRESHOLD = 0.05;
-
-/** Límite superior del rango válido. */
-export const MAX_ANOMALY_THRESHOLD = 0.95;
+/** Umbral por defecto: +100 %, el doble de lo esperado. */
+export const DEFAULT_ANOMALY_THRESHOLD = 1;
 
 /**
- * Acota el umbral a `(0.05, 0.95)` y cae al default ante un valor no finito
+ * Clave de `localStorage` del umbral configurable (patrón de `useInspectorPanel`).
+ * Es nueva porque el umbral cambió de significado: antes era ±fracción sobre la
+ * mediana del total; un valor guardado con el criterio anterior no aplica.
+ */
+export const ANOMALY_THRESHOLD_STORAGE_KEY = 'opencode-agent-viz:latency-threshold';
+
+/** Límite inferior del rango válido: +25 %. */
+export const MIN_ANOMALY_THRESHOLD = 0.25;
+
+/** Límite superior del rango válido: +300 % (4× lo esperado). */
+export const MAX_ANOMALY_THRESHOLD = 3;
+
+/**
+ * Acota el umbral a `[0.25, 3]` y cae al default ante un valor no finito
  * (`NaN`/`Infinity`). Función pura (Principio V).
  */
 export const clampThreshold = (value: number): number =>

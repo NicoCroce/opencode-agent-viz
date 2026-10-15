@@ -49,7 +49,7 @@ describe('useAnomalyThreshold · FR-022', () => {
     expect(localStorage.getItem(ANOMALY_THRESHOLD_STORAGE_KEY)).toBe('0.7');
 
     act(() => result.current.setThreshold(5));
-    await waitFor(() => expect(result.current.threshold).toBe(0.95));
+    await waitFor(() => expect(result.current.threshold).toBe(3));
   });
 
   it('comparte el umbral entre consumidores (store global)', async () => {
