@@ -19,6 +19,12 @@ interface WorkspaceViewProps {
   chat: ReactNode;
   /** Overlay del histórico (`HistoryOverlay`), montado en ambas presentaciones. */
   history: ReactNode;
+  /**
+   * Overlay del panel de eficiencia (contrato overlay §2). Viaja como slot para
+   * que la página sea la única que conoce el disparador, el estado de apertura y
+   * los datos; aquí solo se monta junto a `history` en ambas presentaciones.
+   */
+  efficiency?: ReactNode;
   /** Estado de vista del panel de detalle (`useInspectorPanel`, US5/US6). */
   panel: TUseInspectorPanelResult;
   /**
@@ -35,8 +41,8 @@ interface WorkspaceViewProps {
 
 /**
  * Vista del workspace: componente **presentacional puro**, sin lógica de datos
- * ni acceso al SDK/Query. Recibe los cinco slots ya construidos (`sessions`,
- * `graph`, `inspector`, `chat`, `history`) más el estado de vista (`panel`,
+ * ni acceso al SDK/Query. Recibe los slots ya construidos (`sessions`, `graph`,
+ * `inspector`, `chat`, `history`, `efficiency`) más el estado de vista (`panel`,
  * `attentionCount`, `isMobile`, `tab`, `onChangeTab`) y compone el provider de
  * atención del chat con `WorkspaceLayout`, con **exactamente** las mismas props
  * que antes montaba `WorkspacePage` (FR-005, contrato de superficie congelada).
@@ -53,6 +59,7 @@ export const WorkspaceView = ({
   inspector,
   chat,
   history,
+  efficiency,
   panel,
   attentionCount,
   isMobile,
@@ -69,6 +76,7 @@ export const WorkspaceView = ({
       inspector={inspector}
       chat={chat}
       history={history}
+      efficiency={efficiency}
       inspectorWidth={panel.width}
       isResizing={panel.isResizing}
       onResizeStart={panel.startResize}

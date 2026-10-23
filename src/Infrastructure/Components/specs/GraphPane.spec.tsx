@@ -332,6 +332,106 @@ describe('GraphPane — aviso de truncamiento (T028, US4, FR-006, SC-009)', () =
 });
 
 /**
+ * Entrada al análisis de eficiencia (T034, US1, FR-001/FR-047; contrato overlay
+ * §1): el botón vive en la cabecera **antes** de `Seguir`, se anuncia como
+ * `aria-haspopup="dialog"` y entrega el disparador real (`currentTarget`) para
+ * que el overlay devuelva el foco al cerrar. Solo se monta con nodos (sin sesión
+ * no hay nada que analizar) y en móvil se reduce a icono con nombre accesible.
+ */
+describe('GraphPane — entrada al panel de eficiencia (T034, US1, FR-001/FR-047)', () => {
+  const renderEfficiencyPane = (
+    overrides: Partial<PaneGraphResult> = {},
+    props: {
+      isMobile?: boolean;
+      onOpenEfficiency?: (trigger: HTMLElement) => void;
+    } = {},
+  ) => {
+    const onOpenEfficiency = props.onOpenEfficiency ?? vi.fn();
+
+    const view = renderWithProviders(
+      <GraphPane
+        graph={makeGraph({
+          graph: { nodes: [ROOT_NODE], edges: [] },
+          ...overrides,
+        })}
+        summary={null}
+        follow={makeFollow()}
+        selectedNodeId={null}
+        onSelectNode={vi.fn()}
+        onClearSelection={vi.fn()}
+        onOpenHistory={vi.fn()}
+        rootId="root-1"
+        isMobile={props.isMobile}
+        onOpenEfficiency={onOpenEfficiency}
+      />,
+    );
+
+    return { ...view, onOpenEfficiency };
+  };
+
+  it('pinta `Eficiencia` antes de `Seguir` en la cabecera', () => {
+    renderEfficiencyPane();
+
+    const efficiency = screen.getByRole('button', { name: 'Eficiencia' });
+    const follow = screen.getByRole('button', { name: 'Seguir' });
+
+    expect(
+      efficiency.compareDocumentPosition(follow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('se anuncia como disparador de diálogo y entrega el `currentTarget`', () => {
+    const onOpenEfficiency = vi.fn();
+    renderEfficiencyPane({}, { onOpenEfficiency });
+
+    const button = screen.getByRole('button', { name: 'Eficiencia' });
+    expect(button).toHaveAttribute('aria-haspopup', 'dialog');
+
+    fireEvent.click(button);
+
+    expect(onOpenEfficiency).toHaveBeenCalledTimes(1);
+    // El overlay guarda el disparador real (no el evento) para devolver el foco.
+    expect(onOpenEfficiency).toHaveBeenCalledWith(button);
+  });
+
+  it('sin nodos no monta la entrada: no hay sesión que analizar', () => {
+    renderEfficiencyPane({ graph: { nodes: [], edges: [] } });
+
+    expect(
+      screen.queryByRole('button', { name: 'Eficiencia' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /análisis de eficiencia/i }),
+    ).not.toBeInTheDocument();
+    // La cabecera sigue ofreciendo `Seguir`: solo se retira la entrada nueva.
+    expect(screen.getByRole('button', { name: 'Seguir' })).toBeInTheDocument();
+  });
+
+  it('en móvil queda solo el icono, con `aria-label` como nombre accesible', () => {
+    renderEfficiencyPane({}, { isMobile: true });
+
+    const button = screen.getByRole('button', {
+      name: 'Abrir análisis de eficiencia',
+    });
+
+    expect(button).toHaveAttribute('aria-haspopup', 'dialog');
+    // Sin texto visible: el nombre accesible lo aporta el `aria-label`.
+    expect(button.textContent?.trim()).toBe('');
+    expect(button.querySelector('svg')).not.toBeNull();
+  });
+
+  it('en escritorio conserva el texto visible y no duplica la etiqueta', () => {
+    renderEfficiencyPane();
+
+    const button = screen.getByRole('button', { name: 'Eficiencia' });
+
+    expect(button).toHaveTextContent('Eficiencia');
+    expect(button).not.toHaveAttribute('aria-label');
+  });
+});
+
+/**
  * Acotación del aviso al **directorio abierto** (review 1, amarillo 4): el
  * listado de raíces truncado de **otro** proyecto no debe marcar "vista parcial"
  * al abrir uno completo. El corte del listado se lee de la caché por el

@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
+import { faChartLine } from '@fortawesome/free-solid-svg-icons';
 import {
   Button,
   Container,
@@ -46,6 +47,17 @@ interface GraphPaneProps {
    * `AgentGraph` para el realce por contexto, sin tocar `data` ni re-layoutar.
    */
   attentionNodeIds?: ReadonlySet<string>;
+  /**
+   * Abre el panel de eficiencia con el **disparador real** (contrato overlay
+   * §1): el overlay guarda la referencia para devolverle el foco al cerrar
+   * (FR-005). Opcional para no romper consumos/tests que solo miran el grafo.
+   */
+  onOpenEfficiency?: (trigger: HTMLElement) => void;
+  /**
+   * Presentación móvil: el botón `Eficiencia` queda en solo icono y su
+   * `aria-label` aporta el nombre accesible (contrato overlay §1).
+   */
+  isMobile?: boolean;
 }
 
 /**
@@ -79,6 +91,8 @@ export const GraphPane = ({
   onOpenHistory,
   rootId,
   attentionNodeIds,
+  onOpenEfficiency,
+  isMobile = false,
 }: GraphPaneProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -125,13 +139,33 @@ export const GraphPane = ({
           </span>
           {summary ? <SessionSummaryBar summary={summary} /> : null}
         </Container>
-        <Button
-          variant="outline"
-          onClick={follow.toggle}
-          aria-pressed={follow.enabled}
-        >
-          {follow.enabled ? 'Siguiendo' : 'Seguir'}
-        </Button>
+        <Container row space="small" align="center" className="shrink-0">
+          {/*
+            Entrada al análisis de eficiencia (contrato overlay §1): solo con al
+            menos un nodo, porque sin sesión no hay nada que analizar. Va
+            **antes** de `Seguir` para no desplazar el control existente y en
+            móvil se reduce a icono con nombre accesible.
+          */}
+          {graph.graph.nodes.length > 0 ? (
+            <Button
+              variant="outline"
+              icon={faChartLine}
+              showIcon
+              aria-haspopup="dialog"
+              aria-label={isMobile ? 'Abrir análisis de eficiencia' : undefined}
+              onClick={(event) => onOpenEfficiency?.(event.currentTarget)}
+            >
+              {isMobile ? null : 'Eficiencia'}
+            </Button>
+          ) : null}
+          <Button
+            variant="outline"
+            onClick={follow.toggle}
+            aria-pressed={follow.enabled}
+          >
+            {follow.enabled ? 'Siguiendo' : 'Seguir'}
+          </Button>
+        </Container>
       </Container>
       {isTruncated ? (
         <GraphTruncationBanner className="shrink-0 rounded-none border-x-0 border-t-0" />

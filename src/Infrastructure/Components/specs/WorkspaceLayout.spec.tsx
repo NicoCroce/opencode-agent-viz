@@ -51,7 +51,13 @@ const renderDesktop = (
   return { ...view, onChangeTab, onResizeStart, onResizeKey };
 };
 
-const MobileHarness = ({ chat }: { chat?: ReactNode }) => {
+const MobileHarness = ({
+  chat,
+  efficiency,
+}: {
+  chat?: ReactNode;
+  efficiency?: ReactNode;
+}) => {
   const [tab, setTab] = useState<TWorkspaceTab>('graph');
 
   return (
@@ -64,6 +70,7 @@ const MobileHarness = ({ chat }: { chat?: ReactNode }) => {
       inspector={<div data-testid="inspector-node" />}
       chat={chat ?? <div data-testid="chat-node" />}
       history={<div data-testid="history-node" />}
+      efficiency={efficiency}
       inspectorWidth={INSPECTOR_DEFAULT_WIDTH}
       isResizing={false}
       onResizeStart={vi.fn()}
@@ -112,6 +119,45 @@ describe('WorkspaceLayout — escritorio (FR-008/FR-014)', () => {
     expect(column).toHaveAttribute('data-fullscreen', 'true');
     expect(column).toHaveClass('bg-surface-0');
     expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+  });
+});
+
+describe('WorkspaceLayout — overlay de eficiencia (T034, FR-006/FR-047)', () => {
+  it('monta el slot `efficiency` en escritorio y conserva las tres columnas y el histórico', () => {
+    renderDesktop({ efficiency: <div data-testid="efficiency-node" /> });
+
+    expect(screen.getByTestId('efficiency-node')).toBeInTheDocument();
+    expect(screen.getByTestId('history-node')).toBeInTheDocument();
+    // Las tres columnas siguen intactas: es una capa, no una columna.
+    expect(screen.getByTestId('sessions-node')).toBeInTheDocument();
+    expect(screen.getByTestId('graph-node')).toBeInTheDocument();
+    expect(screen.getByTestId('inspector-node')).toBeInTheDocument();
+    expect(screen.getByRole('separator')).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+  });
+
+  it('monta el slot `efficiency` en móvil junto al histórico, sin tocar el tablist', () => {
+    render(
+      <MobileHarness efficiency={<div data-testid="efficiency-node" />} />,
+    );
+
+    expect(screen.getByTestId('efficiency-node')).toBeInTheDocument();
+    expect(screen.getByTestId('history-node')).toBeInTheDocument();
+    expect(
+      screen.getByRole('tablist', { name: 'Vistas del workspace' }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('tab')).toHaveLength(4);
+  });
+
+  it('sin slot no monta nada extra y conserva el histórico en ambas presentaciones', () => {
+    const desktop = renderDesktop();
+    expect(screen.queryByTestId('efficiency-node')).not.toBeInTheDocument();
+    expect(screen.getByTestId('history-node')).toBeInTheDocument();
+    desktop.unmount();
+
+    render(<MobileHarness />);
+    expect(screen.queryByTestId('efficiency-node')).not.toBeInTheDocument();
+    expect(screen.getByTestId('history-node')).toBeInTheDocument();
   });
 });
 
