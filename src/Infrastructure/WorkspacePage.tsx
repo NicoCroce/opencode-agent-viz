@@ -19,6 +19,7 @@ import { useSessionAttention } from '@app/Domains/Chat/Hooks/useSessionAttention
 import { useAttentionNotifications } from '@app/Domains/Chat/Hooks/useAttentionNotifications';
 import { useHistory } from '@app/Domains/History';
 import { queryKeys } from '@app/Domains/queryKeys';
+import { EfficiencyOverlay } from './Components/EfficiencyOverlay';
 import { GraphPane } from './Components/GraphPane';
 import { HistoryOverlay } from './Components/HistoryOverlay';
 import { InspectorPane } from './Components/InspectorPane';
@@ -29,11 +30,13 @@ import { useAttentionNodeIds } from './Hooks/useAttentionNodeIds';
 import { useChatPending } from './Hooks/useChatPending';
 import { useChatSelectionSeed } from './Hooks/useChatSelectionSeed';
 import { CHAT_TAB_ID, useDetailTabs } from './Hooks/useDetailTabs';
+import { useEfficiencyPanel } from './Hooks/useEfficiencyPanel';
 import { useHistoryData } from './Hooks/useHistoryData';
 import { useInspectorPanel } from './Hooks/useInspectorPanel';
 import { useSessionOpenPerf } from './Hooks/useSessionOpenPerf';
 import { useWorkspaceEscape } from './Hooks/useWorkspaceEscape';
 import { useWorkspaceSummary } from './Hooks/useWorkspaceSummary';
+import { buildEfficiencySessions } from './lib/buildEfficiencySessions';
 import type { TWorkspaceTab } from './WorkspacePage.constants';
 
 /**
@@ -160,6 +163,43 @@ export const WorkspacePage = () => {
   const { targetId, open, close, navigateTo } = useHistory();
   const reasoning = useReasoningVisibility();
 
+  // Overlay de eficiencia (contrato overlay §2): estado de vista efímero y
+  // exclusión mutua con el histórico. El mapa de sesiones del motor se deriva
+  // del grafo una sola vez por identidad (`buildEfficiencySessions`, puro).
+  const {
+    isOpen: isEfficiencyOpen,
+    openedAt: efficiencyOpenedAt,
+    open: openEfficiency,
+    close: closeEfficiency,
+    restoreFocus: restoreEfficiencyFocus,
+  } = useEfficiencyPanel({ rootSessionId: rootId });
+  const efficiencySessions = useMemo(
+    () => buildEfficiencySessions(graph.graph),
+    [graph.graph],
+  );
+  const rootNode = useMemo(
+    () =>
+      graph.graph.nodes.find((node) => node.data.sessionId === rootId) ?? null,
+    [graph.graph.nodes, rootId],
+  );
+
+  // Exclusión mutua (FR-006): solo una capa de este tipo abierta. `open` guarda
+  // el disparador real para devolverle el foco al cerrar (FR-005).
+  const handleOpenEfficiency = useCallback(
+    (trigger: HTMLElement) => {
+      close();
+      openEfficiency(trigger);
+    },
+    [close, openEfficiency],
+  );
+  const handleOpenHistory = useCallback(
+    (sessionId: string) => {
+      closeEfficiency();
+      open(sessionId);
+    },
+    [closeEfficiency, open],
+  );
+
   const historyData = useHistoryData({
     graph: graph.graph,
     targetId,
@@ -170,11 +210,14 @@ export const WorkspacePage = () => {
   });
 
   // `Escape` (chat-panel-contract §5): foco en chat → fullscreen → selección.
+  // Con el diálogo de eficiencia abierto, `Escape` pertenece a Radix: el hook no
+  // registra su listener para no limpiar la selección por debajo (FR-039).
   useWorkspaceEscape({
     isFullscreen: panel.isFullscreen,
     closeFullscreen: panel.closeFullscreen,
     clearSelection,
     selectedNodeId,
+    isDialogOpen: isEfficiencyOpen,
   });
 
   // Semilla de la selección del chat derivada del **nodo abierto** (FR-008).
@@ -219,9 +262,11 @@ export const WorkspacePage = () => {
       selectedNodeId={selectedNodeId}
       onSelectNode={selectNode}
       onClearSelection={clearSelection}
-      onOpenHistory={open}
+      onOpenHistory={handleOpenHistory}
       rootId={rootId}
       attentionNodeIds={attentionNodeIds}
+      onOpenEfficiency={handleOpenEfficiency}
+      isMobile={Boolean(isMobile)}
     />
   );
 
@@ -232,7 +277,7 @@ export const WorkspacePage = () => {
       inspectedNodeId={inspectedNodeId}
       showReasoning={reasoning.visible}
       onToggleReasoning={reasoning.toggle}
-      onOpenHistory={open}
+      onOpenHistory={handleOpenHistory}
       onSelectNode={selectNode}
       isResizing={panel.isResizing}
       isFullscreen={panel.isFullscreen}
@@ -260,6 +305,25 @@ export const WorkspacePage = () => {
     />
   );
 
+  // Slot del overlay de eficiencia (contrato overlay §2): recibe los datos ya
+  // resueltos por la página; el componente solo compone Radix + dominio.
+  const efficiencyOverlay =
+    rootId === null ? null : (
+      <EfficiencyOverlay
+        isOpen={isEfficiencyOpen}
+        rootSessionId={rootId}
+        rootTitle={rootNode?.data.title ?? null}
+        sessions={efficiencySessions}
+        rootReady={rootNode?.data.enrichment === 'ready'}
+        truncated={graph.truncated}
+        graphError={graph.isError}
+        now={efficiencyOpenedAt}
+        reference={summary?.metrics ?? null}
+        onClose={closeEfficiency}
+        onRestoreFocus={restoreEfficiencyFocus}
+      />
+    );
+
   return (
     <WorkspaceView
       sessions={sessions}
@@ -267,6 +331,7 @@ export const WorkspacePage = () => {
       inspector={inspectorPane}
       chat={chatPane}
       history={historyOverlay}
+      efficiency={efficiencyOverlay}
       panel={panel}
       attentionCount={attention.length}
       isMobile={Boolean(isMobile)}

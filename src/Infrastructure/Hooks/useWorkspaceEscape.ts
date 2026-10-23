@@ -11,6 +11,12 @@ export interface TWorkspaceEscapeParams {
   closeFullscreen: () => void;
   clearSelection: () => void;
   selectedNodeId: string | null;
+  /**
+   * Hay un diálogo modal abierto (overlay de eficiencia) que ya consume
+   * `Escape` (Radix). Con `true` el hook **no** registra su listener para no
+   * limpiar la selección del grafo por debajo (contrato overlay §2).
+   */
+  isDialogOpen?: boolean;
 }
 
 /**
@@ -23,15 +29,17 @@ export interface TWorkspaceEscapeParams {
  * 3. Si no, `clearSelection`.
  *
  * El listener es global (`window`) y se registra **solo** cuando hay fullscreen
- * o selección (`useEscapeKey(handler, isFullscreen || selectedNodeId !== null)`);
- * el predicado de foco es una única fuente (`isFocusWithinChat`) que inspecciona
- * `document.activeElement` en el momento del `keydown`.
+ * o selección (`useEscapeKey(handler, isFullscreen || selectedNodeId !== null)`)
+ * y **ningún diálogo modal está abierto**; el predicado de foco es una única
+ * fuente (`isFocusWithinChat`) que inspecciona `document.activeElement` en el
+ * momento del `keydown`.
  */
 export const useWorkspaceEscape = ({
   isFullscreen,
   closeFullscreen,
   clearSelection,
   selectedNodeId,
+  isDialogOpen = false,
 }: TWorkspaceEscapeParams): void => {
   const handleEscape = useCallback(() => {
     if (isFocusWithinChat()) return;
@@ -42,5 +50,8 @@ export const useWorkspaceEscape = ({
     clearSelection();
   }, [isFullscreen, closeFullscreen, clearSelection]);
 
-  useEscapeKey(handleEscape, isFullscreen || selectedNodeId !== null);
+  useEscapeKey(
+    handleEscape,
+    !isDialogOpen && (isFullscreen || selectedNodeId !== null),
+  );
 };

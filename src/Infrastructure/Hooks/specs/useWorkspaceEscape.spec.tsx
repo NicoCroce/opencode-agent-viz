@@ -140,6 +140,83 @@ describe('useWorkspaceEscape — precedencia (FR-009)', () => {
   });
 });
 
+describe('useWorkspaceEscape — diálogo modal abierto (contrato overlay §2)', () => {
+  it('con el diálogo abierto no registra listener: no limpia la selección ni cierra fullscreen', () => {
+    const closeFullscreen = vi.fn();
+    const clearSelection = vi.fn();
+    renderHook(() =>
+      useWorkspaceEscape(
+        params({
+          isFullscreen: true,
+          selectedNodeId: 'n1',
+          closeFullscreen,
+          clearSelection,
+          isDialogOpen: true,
+        }),
+      ),
+    );
+
+    pressEscape();
+
+    // `Escape` pertenece a Radix: la página no debe reaccionar por debajo.
+    expect(closeFullscreen).not.toHaveBeenCalled();
+    expect(clearSelection).not.toHaveBeenCalled();
+  });
+
+  it('al cerrarse el diálogo recupera la precedencia sin remontar', () => {
+    const closeFullscreen = vi.fn();
+    const clearSelection = vi.fn();
+    const { rerender } = renderHook(
+      (props: TWorkspaceEscapeParams) => useWorkspaceEscape(props),
+      {
+        initialProps: params({
+          isFullscreen: true,
+          selectedNodeId: 'n1',
+          closeFullscreen,
+          clearSelection,
+          isDialogOpen: true,
+        }),
+      },
+    );
+
+    pressEscape();
+    expect(closeFullscreen).not.toHaveBeenCalled();
+
+    rerender(
+      params({
+        isFullscreen: true,
+        selectedNodeId: 'n1',
+        closeFullscreen,
+        clearSelection,
+        isDialogOpen: false,
+      }),
+    );
+    pressEscape();
+
+    expect(closeFullscreen).toHaveBeenCalledTimes(1);
+    expect(clearSelection).not.toHaveBeenCalled();
+  });
+
+  it('con el diálogo cerrado, sin fullscreen ni selección, sigue sin escuchar', () => {
+    const closeFullscreen = vi.fn();
+    const clearSelection = vi.fn();
+    renderHook(() =>
+      useWorkspaceEscape(
+        params({
+          closeFullscreen,
+          clearSelection,
+          isDialogOpen: false,
+        }),
+      ),
+    );
+
+    pressEscape();
+
+    expect(closeFullscreen).not.toHaveBeenCalled();
+    expect(clearSelection).not.toHaveBeenCalled();
+  });
+});
+
 describe('useWorkspaceEscape — activación del listener (FR-009)', () => {
   it('sin fullscreen ni selección no escucha', () => {
     const closeFullscreen = vi.fn();
