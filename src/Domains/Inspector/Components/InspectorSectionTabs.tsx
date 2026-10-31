@@ -8,6 +8,7 @@ import {
 import {
   INSPECTOR_SECTION_TABS_ARIA_LABEL,
   INSPECTOR_SECTION_TABS_LIST_CLASSNAME,
+  INSPECTOR_SECTION_TAB_TRIGGER_CLASSNAME,
   isInspectorSectionTab,
   useInspectorSectionTabs,
   type TInspectorSectionTab,
@@ -68,7 +69,11 @@ export const InspectorSectionTabs = ({
         data-testid={INSPECTOR_SECTION_TABS_TEST_ID}
       >
         {tabs.map((item) => (
-          <TabsTrigger key={item.id} value={item.id}>
+          <TabsTrigger
+            key={item.id}
+            value={item.id}
+            className={INSPECTOR_SECTION_TAB_TRIGGER_CLASSNAME}
+          >
             {item.label}
           </TabsTrigger>
         ))}

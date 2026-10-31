@@ -9,43 +9,75 @@ import { useNodeFocus, type TNodeFocus } from './NodeFocusContext';
  */
 export const RAIL_EXIT = 16;
 
+/**
+ * Distancia del bus horizontal sobre la fila de hijos (vista "Grafo"): los
+ * hermanos comparten `targetY`, así que todos sus tramos coinciden en un bus.
+ */
+export const TREE_BUS_OFFSET = 28;
+
 export interface TInvocationEdgeData extends Record<string, unknown> {
-  /** X del riel vertical: canal a la izquierda de la columna del padre. */
-  railX: number;
+  /** X del riel vertical: canal a la izquierda de la columna del padre (Carriles). */
+  railX?: number;
+  /**
+   * Trazado: `rail` (Carriles, baja por el canal de la columna) o `tree`
+   * (Grafo, codo con bus horizontal sobre los hijos). Por defecto, `rail`.
+   */
+  routing?: 'rail' | 'tree';
 }
+
+/** Codo de árbol: baja del padre, cruza por el bus y entra al hijo desde arriba. */
+const treePath = (
+  sourceX: number,
+  sourceY: number,
+  targetX: number,
+  targetY: number,
+): string => {
+  const busY = Math.max(sourceY + RAIL_EXIT, targetY - TREE_BUS_OFFSET);
+  return [
+    `M ${sourceX} ${sourceY}`,
+    `L ${sourceX} ${busY}`,
+    `L ${targetX} ${busY}`,
+    `L ${targetX} ${targetY}`,
+  ].join(' ');
+};
 
 export type TInvocationEdge = Edge<TInvocationEdgeData, 'invocation'>;
 
-/** Reposo: gris visible (no `--border`, que se pierde en dark). */
-const REST_STROKE = 'hsl(var(--muted-foreground))';
-/** Foco (linaje) y hover: primer plano. */
-const FOCUS_STROKE = 'hsl(var(--foreground))';
+/**
+ * Reposo: hairline sólido `--edge`. Sin alfa: las aristas de un padre comparten
+ * riel y con opacidad se aclaraban al superponerse.
+ */
+const REST_STROKE = 'hsl(var(--edge))';
+/** Foco (linaje) y hover: el acento cyan, como el camino activo del diseño. */
+const FOCUS_STROKE = 'hsl(var(--accent))';
+/** Fuera del linaje: un tono sólido más oscuro (tampoco se acumula). */
+const DIMMED_STROKE = 'hsl(var(--border))';
 
 /** Reposo: sin foco ni hover (contrato de render §2). */
 const REST_STYLE: CSSProperties = {
   stroke: REST_STROKE,
-  strokeWidth: 1.25,
-  opacity: 0.45,
+  strokeWidth: 1,
+  opacity: 1,
 };
 
 /** Arista dentro del linaje del nodo seleccionado (contrato de render §2). */
 const LINEAGE_STYLE: CSSProperties = {
   stroke: FOCUS_STROKE,
-  strokeWidth: 2,
+  strokeWidth: 1.75,
   opacity: 1,
 };
 
-/** Arista fuera del linaje: se atenúa pero conserva color/tamaño por defecto. */
+/** Arista fuera del linaje: se atenúa con un tono sólido más oscuro. */
 const LINEAGE_OUTSIDE_STYLE: CSSProperties = {
-  stroke: REST_STROKE,
-  strokeWidth: 1.25,
-  opacity: 0.15,
+  stroke: DIMMED_STROKE,
+  strokeWidth: 1,
+  opacity: 1,
 };
 
 /** Hover sin foco: se trazan las relaciones directas del nodo. */
 const HOVER_STYLE: CSSProperties = {
   stroke: FOCUS_STROKE,
-  strokeWidth: 1.6,
+  strokeWidth: 1.5,
   opacity: 1,
 };
 
@@ -101,14 +133,17 @@ export const InvocationEdge = ({
 }: EdgeProps<TInvocationEdge>) => {
   const focus = useNodeFocus();
   const railX = typeof data?.railX === 'number' ? data.railX : sourceX;
-  const path = [
-    `M ${sourceX} ${sourceY}`,
-    `L ${sourceX} ${sourceY + RAIL_EXIT}`,
-    `L ${railX} ${sourceY + RAIL_EXIT}`,
-    `L ${railX} ${targetY - RAIL_EXIT}`,
-    `L ${targetX} ${targetY - RAIL_EXIT}`,
-    `L ${targetX} ${targetY}`,
-  ].join(' ');
+  const path =
+    data?.routing === 'tree'
+      ? treePath(sourceX, sourceY, targetX, targetY)
+      : [
+          `M ${sourceX} ${sourceY}`,
+          `L ${sourceX} ${sourceY + RAIL_EXIT}`,
+          `L ${railX} ${sourceY + RAIL_EXIT}`,
+          `L ${railX} ${targetY - RAIL_EXIT}`,
+          `L ${targetX} ${targetY - RAIL_EXIT}`,
+          `L ${targetX} ${targetY}`,
+        ].join(' ');
 
   const hasFocus = focus.selectedNodeId !== null || focus.hoveredNodeId !== null;
   const resolvedStyle = hasFocus

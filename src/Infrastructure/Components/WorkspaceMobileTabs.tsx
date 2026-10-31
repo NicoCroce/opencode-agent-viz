@@ -1,6 +1,7 @@
 import { createContext, useContext, useId, useRef } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import { Container } from '@app/Application/Components';
+import { cn } from '@app/Application/lib/utils';
 import { ChatAttentionBadge } from '@app/Domains/Chat';
 import { WORKSPACE_TABS, type TWorkspaceTab } from '../WorkspacePage.constants';
 
@@ -37,7 +38,9 @@ interface WorkspaceMobileTabsProps {
 }
 
 /**
- * Presentación móvil del workspace: tablist (`WORKSPACE_TABS`) + panel activo.
+ * Presentación móvil del workspace: panel activo + tablist (`WORKSPACE_TABS`)
+ * como barra de navegación inferior (pastilla cyan en el activo, objetivos
+ * táctiles de 44 px).
  * Recibe los paneles ya armados como `ReactNode` para no duplicar lógica entre
  * desktop y móvil (AGENTS §9, una sola fuente de lógica). El chat es un tab de
  * primer nivel, no una pestaña anidada: este tablist es el **único** del
@@ -98,10 +101,25 @@ export const WorkspaceMobileTabs = ({
 
   return (
     <Container space="none" className="h-full min-h-0">
+      <Container block className="min-h-0 flex-1 overflow-auto">
+        {WORKSPACE_TABS.map((item) => (
+          <Container
+            key={item}
+            block
+            id={panelId(item)}
+            role="tabpanel"
+            aria-labelledby={tabId(item)}
+            hidden={tab !== item}
+            className="h-full min-h-0"
+          >
+            {tab === item ? panels[item] : null}
+          </Container>
+        ))}
+      </Container>
       <Container
         row
         space="none"
-        className="shrink-0 border-b border-border"
+        className="shrink-0 gap-1.5 border-t border-border bg-surface-1 px-3 pb-3.5 pt-2"
         role="tablist"
         aria-label="Vistas del workspace"
       >
@@ -119,32 +137,18 @@ export const WorkspaceMobileTabs = ({
             tabIndex={tab === item ? 0 : -1}
             onClick={() => onChange(item)}
             onKeyDown={(event) => handleKeyDown(event, index)}
-            className={`flex-1 px-3 py-2 text-xs font-medium capitalize ${
+            className={cn(
+              'min-h-11 flex-1 rounded-[10px] border px-2 text-[11px] font-medium capitalize',
               tab === item
-                ? 'border-b-2 border-accent text-foreground'
-                : 'text-muted-foreground'
-            }`}
+                ? 'border-accent/30 bg-accent/10 text-accent'
+                : 'border-transparent text-muted-foreground',
+            )}
           >
             {item}
             {item === 'chat' ? (
               <ChatAttentionBadge count={chatAttention} />
             ) : null}
           </button>
-        ))}
-      </Container>
-      <Container block className="min-h-0 flex-1 overflow-auto">
-        {WORKSPACE_TABS.map((item) => (
-          <Container
-            key={item}
-            block
-            id={panelId(item)}
-            role="tabpanel"
-            aria-labelledby={tabId(item)}
-            hidden={tab !== item}
-            className="h-full min-h-0"
-          >
-            {tab === item ? panels[item] : null}
-          </Container>
         ))}
       </Container>
     </Container>

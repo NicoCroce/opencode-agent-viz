@@ -79,7 +79,7 @@ export const MultiSelectFilterPopover = ({
           {options.map((option) => (
             <label
               key={option.value}
-              className="flex cursor-pointer items-start gap-2 rounded-sm px-2 py-1.5 hover:bg-accent"
+              className="flex cursor-pointer items-start gap-2 rounded-sm px-2 py-1.5 hover:bg-accent/10"
             >
               <Checkbox
                 checked={selectedValues.has(option.value)}

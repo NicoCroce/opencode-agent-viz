@@ -8,6 +8,25 @@ import { SectionHeading } from './SectionHeading';
 /** Texto del estado vacío por defecto cuando no se aporta `empty`/`emptyLabel`. */
 const DEFAULT_EMPTY_LABEL = 'Sin datos';
 
+/**
+ * Tarjeta de sección (radio 10px, borde y `surface-1`, padding 14px). Se exporta
+ * para agrupar bloques internos de una sección con la misma receta.
+ */
+export const SECTION_CARD_CLASSNAME =
+  'rounded-[10px] border border-border bg-surface-1 p-3.5';
+
+/**
+ * Tarjeta de filas etiqueta/valor (`DetailRow`) con 6px entre filas. El `!`
+ * gana al `gap` de `space` de `Container`, que compone con `clsx`.
+ */
+export const SECTION_ROWS_CARD_CLASSNAME = `${SECTION_CARD_CLASSNAME} gap-1.5!`;
+
+/**
+ * Presentación del marco: `plain` (por defecto, sin superficie) o `card` (el
+ * encabezado y el contenido dentro de una tarjeta `SECTION_CARD_CLASSNAME`).
+ */
+export type TSectionFrameVariant = 'plain' | 'card';
+
 interface SectionFrameProps extends HTMLAttributes<HTMLDivElement> {
   /** Encabezado textual; se renderiza con `SectionHeading`. */
   title?: string;
@@ -30,6 +49,8 @@ interface SectionFrameProps extends HTMLAttributes<HTMLDivElement> {
   empty?: ReactNode;
   /** Texto del estado vacío por defecto. */
   emptyLabel?: string;
+  /** Presentación del marco (por defecto `plain`). */
+  variant?: TSectionFrameVariant;
   children?: ReactNode;
 }
 
@@ -53,6 +74,7 @@ export const SectionFrame = ({
   loading,
   empty,
   emptyLabel = DEFAULT_EMPTY_LABEL,
+  variant = 'plain',
   children,
   className,
   ...props
@@ -72,7 +94,11 @@ export const SectionFrame = ({
   }
 
   return (
-    <Container space="small" className={cn(className)} {...props}>
+    <Container
+      space="small"
+      className={cn(variant === 'card' && SECTION_CARD_CLASSNAME, className)}
+      {...props}
+    >
       {resolvedHeading}
       {content}
     </Container>

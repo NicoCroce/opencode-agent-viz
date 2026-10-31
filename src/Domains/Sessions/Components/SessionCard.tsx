@@ -2,10 +2,10 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBell } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@app/Application/lib/utils';
 import { StatusDot } from '@app/Application/Components';
-import { formatDateTimeRange } from '@app/Application/Helpers';
 import type { TSessionStatus } from '../Session.entity';
 import type { TRootSessionItem } from '../Hooks/useRootSessions';
-import { useSessionNodeStatus } from '../Hooks/useSessionNodeStatus';
+import type { useSessionNodeStatus } from '../Hooks/useSessionNodeStatus';
+import { useSessionRowView } from '../Hooks/useSessionRowView';
 
 interface SessionCardProps {
   item: TRootSessionItem;
@@ -44,9 +44,9 @@ const AttentionBadge = ({ count }: { count: number }) => {
       role="img"
       aria-label={label}
       title={label}
-      className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-flat bg-status-waiting px-1.5 py-0.5 font-mono text-[11px] font-medium text-surface-0"
+      className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-[4px] bg-status-waiting px-1.5 py-px font-mono text-[10px] font-medium text-surface-0"
     >
-      <FontAwesomeIcon icon={faBell} className="size-3" aria-hidden />
+      <FontAwesomeIcon icon={faBell} className="size-2.5" aria-hidden />
       <span aria-hidden className="tabular-nums">
         {count}
       </span>
@@ -54,6 +54,17 @@ const AttentionBadge = ({ count }: { count: number }) => {
   );
 };
 
+/** Sangría de las líneas meta: alinea con el título, tras el punto de estado. */
+const META_CLASS =
+  'truncate pl-[15px] font-mono text-[11px] tabular-nums text-muted-foreground';
+
+/**
+ * Tarjeta de sesión raíz del rail del espacio de trabajo (y del listado móvil).
+ *
+ * Seleccionada: borde de acento con tinte y anillo suave (`ring-glow`); sin
+ * seleccionar: transparente, con `surface-2` al pasar el cursor. El punto de
+ * estado lleva el halo del acento mientras la sesión está viva.
+ */
 export const SessionCard = ({
   item,
   status,
@@ -62,39 +73,38 @@ export const SessionCard = ({
   selected,
   onSelect,
 }: SessionCardProps) => {
-  const { session, agentName } = item;
-  const derivedNodeStatus = useSessionNodeStatus(status);
-  const resolvedNodeStatus = nodeStatus ?? derivedNodeStatus;
-  const timeRange = formatDateTimeRange({
-    startedAt: session.time.created,
-    endedAt: session.time.updated,
-    isRunning: status?.type === 'busy' || status?.type === 'retry',
-  });
+  const view = useSessionRowView(item, status, nodeStatus);
 
   return (
     <button
       type="button"
-      onClick={() => onSelect(session.id)}
+      onClick={() => onSelect(view.id)}
       aria-current={selected}
       className={cn(
-        'flex w-full flex-col gap-1 rounded-flat border px-3 py-2 text-left transition-colors',
+        'flex w-full flex-col gap-1 rounded-lg border px-3 py-2.5 text-left transition-colors',
         selected
-          ? 'border-accent bg-surface-2'
-          : 'border-border bg-surface-1 hover:bg-surface-2',
+          ? 'border-accent bg-accent/[0.06] ring-glow'
+          : 'border-transparent bg-transparent hover:bg-surface-2',
       )}
     >
-      <span className="flex items-center gap-2">
-        <StatusDot status={resolvedNodeStatus} />
-        <span className="truncate text-sm font-medium text-foreground">
-          {session.title}
+      <span className="flex w-full items-center gap-2">
+        <StatusDot
+          status={view.nodeStatus}
+          className={cn(view.isLive && 'glow-accent')}
+        />
+        <span
+          className={cn(
+            'min-w-0 flex-1 truncate text-[13px] font-medium',
+            selected ? 'text-foreground' : 'text-foreground/85',
+          )}
+        >
+          {view.title}
         </span>
         {attentionCount > 0 ? <AttentionBadge count={attentionCount} /> : null}
       </span>
-      <span className="truncate font-mono text-[11px] tabular-nums text-muted-foreground">
-        {timeRange}
-      </span>
-      <span className="truncate text-xs text-muted-foreground">
-        {agentName ?? 'agente no disponible'}
+      <span className={META_CLASS}>{view.timeRange}</span>
+      <span className={cn(META_CLASS, 'text-status-idle')}>
+        {view.agentLabel}
       </span>
     </button>
   );

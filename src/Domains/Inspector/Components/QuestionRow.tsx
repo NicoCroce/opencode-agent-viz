@@ -3,6 +3,7 @@ import {
   ChatPendingRequest,
   type TChatFormAnswer,
 } from '@app/Application/Components/Molecules/ChatPendingRequest';
+import { DETAIL_LIST_ROW_CLASSNAME } from '@app/Application/Components/Molecules/DetailListRow';
 import type { TQuestionEntry } from '../Inspector.entity';
 
 interface QuestionRowProps {
@@ -45,15 +46,12 @@ export const QuestionRow = ({
         question={question}
         onReplyForm={onReplyForm}
         isPending={isPending}
-        className="border-b border-border py-1 last:border-b-0"
+        className={DETAIL_LIST_ROW_CLASSNAME}
       />
     );
   }
 
   return (
-    <QuestionBlock
-      question={question}
-      className="border-b border-border py-1 last:border-b-0"
-    />
+    <QuestionBlock question={question} className={DETAIL_LIST_ROW_CLASSNAME} />
   );
 };

@@ -15,9 +15,10 @@ interface DetailRowProps {
 }
 
 /**
- * Fila etiqueta/valor de un panel de detalle: etiqueta atenuada a la izquierda
- * y dato monoespaciado alineado a la derecha. Extraída del `DetailRow` interno
- * de `Inspector/Components/ModelSection`.
+ * Fila etiqueta/valor de un panel de detalle: etiqueta atenuada (sans 12px) a la
+ * izquierda y dato monoespaciado (12px, cifras tabulares) alineado a la derecha
+ * ("datos en mono, prosa en sans"). Extraída del `DetailRow` interno de
+ * `Inspector/Components/ModelSection`.
  */
 export const DetailRow = ({ label, value, className }: DetailRowProps) => (
   <Container
@@ -27,8 +28,8 @@ export const DetailRow = ({ label, value, className }: DetailRowProps) => (
     justify="between"
     className={cn('min-w-0 gap-3!', className)}
   >
-    <span className="shrink-0 text-[11px] text-muted-foreground">{label}</span>
-    <span className="min-w-0 break-all text-right font-mono text-[11px] text-foreground">
+    <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
+    <span className="min-w-0 break-all text-right font-mono text-xs tabular-nums text-foreground">
       {value ?? UNAVAILABLE}
     </span>
   </Container>

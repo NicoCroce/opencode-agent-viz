@@ -1,6 +1,6 @@
-import { NODE_STATUS_COLOR } from '@app/Application/Helpers/nodeStatusColor';
 import { cn } from '@app/Application/lib/utils';
 import type { TNodeStatus } from '../Graph.entity';
+import { NODE_CARD_TONE } from './nodeCardTone';
 
 /**
  * Rayado diagonal plano de loop (FR-018): se conserva como firma de reintento,
@@ -21,16 +21,22 @@ export const NodeStatusRail = ({ status, active, hasLoop }: NodeStatusRailProps)
   // El rayado es la firma de loop/reintento y gana al barrido: solo un activo
   // sin rayar muestra la animación "pensando" (FR-002/FR-004).
   const scanning = active && !striped;
+  const tone = NODE_CARD_TONE[status];
 
   return (
     <span
       aria-hidden
       data-testid="node-status-rail"
       className={cn(
-        // Hairline discreto: 2 px y algo rebajado, para que el estado no pese
-        // más que el título (el punto del encabezado da la lectura precisa).
-        'absolute left-0 top-0 h-full w-[2px] opacity-[0.72]',
-        !striped && NODE_STATUS_COLOR[status],
+        // Barra de estado de 2 px a todo el ancho del borde superior (diseño
+        // "minimal-futurista"), a opacidad plena; la actividad suma el halo del
+        // acento. Es absoluta: no ocupa alto de flujo (`cardHeight` no cambia).
+        'absolute inset-x-0 top-0 h-[2px] rounded-t-[9px]',
+        !striped && tone.rail,
+        !striped && tone.glow && 'glow-accent',
+        // `.rail-scan` conserva el contrato del barrido y su respaldo estático
+        // con `prefers-reduced-motion`; el keyframe actual es vertical, así que
+        // sobre la barra horizontal queda prácticamente estático.
         scanning && 'rail-scan',
       )}
       style={striped ? { backgroundImage: LOOP_STRIPE } : undefined}

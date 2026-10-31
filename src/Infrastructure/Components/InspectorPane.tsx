@@ -29,6 +29,21 @@ import {
   type TDetailTab,
 } from '../Hooks/useDetailTabs';
 
+/**
+ * Control segmentado `Detalle | Chat`: rejilla de dos columnas sobre `muted`
+ * con borde y 3px de padding/separación (anula la píldora de `ui/tabs.tsx`).
+ */
+const DETAIL_TABS_LIST_CLASSNAME =
+  'grid min-h-0! min-w-0 flex-1 grid-cols-2 gap-[3px] rounded-lg border border-border bg-muted p-[3px]';
+
+/**
+ * Segmento del control: 30px de alto, 13px; el activo sobre `secondary` en
+ * `foreground` y peso medio, el inactivo atenuado. Sin borde ni sombra. El
+ * `gap-0.5` suma con el `ml-1` propio del badge ámbar (6px en total).
+ */
+const DETAIL_TABS_TRIGGER_CLASSNAME =
+  'h-[30px] gap-0.5 border-0 px-2 py-0 text-[13px] font-normal text-muted-foreground hover:text-foreground data-[state=active]:bg-secondary data-[state=active]:font-medium data-[state=active]:text-foreground data-[state=active]:shadow-none';
+
 interface InspectorPaneProps {
   graph: TGraphModel;
   parallelGroups: TParallelGroup[];
@@ -211,14 +226,18 @@ export const InspectorPane = ({
             space="small"
             justify="between"
             align="center"
-            className="shrink-0"
+            className="shrink-0 px-4 pt-3.5 pb-1"
           >
             <TabsList
               aria-label="Vistas del panel de detalle"
-              className="m-2 shrink-0"
+              className={DETAIL_TABS_LIST_CLASSNAME}
             >
               {detailTabs.tabs.map((item) => (
-                <TabsTrigger key={item.id} value={item.id}>
+                <TabsTrigger
+                  key={item.id}
+                  value={item.id}
+                  className={DETAIL_TABS_TRIGGER_CLASSNAME}
+                >
                   {item.label}
                   {item.id === CHAT_TAB_ID ? (
                     <ChatAttentionBadge count={attentionCount} />
@@ -236,7 +255,7 @@ export const InspectorPane = ({
                     : 'Pantalla completa'
                 }
                 onClick={onToggleFullscreen}
-                className="mr-2 inline-flex size-7 shrink-0 items-center justify-center rounded-flat text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="inline-flex size-7 shrink-0 items-center justify-center rounded-flat text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
                 <FontAwesomeIcon
                   icon={isFullscreen ? faMinimize : faMaximize}

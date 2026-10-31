@@ -3,3 +3,5 @@ export * from './useRootSessions';
 export * from './useSessionDirectory';
 export * from './useSessionFilters';
 export * from './useSessionNodeStatus';
+export * from './useSessionRowView';
+export * from './useSessionsEyebrow';

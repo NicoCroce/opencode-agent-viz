@@ -1,6 +1,8 @@
 import { Container } from '@app/Application/Components';
 import {
   DetailRow,
+  SECTION_CARD_CLASSNAME,
+  SECTION_ROWS_CARD_CLASSNAME,
   SectionFrame,
   SectionHeading,
 } from '@app/Application/Components/Molecules';
@@ -80,7 +82,7 @@ export const LatencySection = ({
     >
       <Container space="small">
         {shares.length > 0 ? (
-          <Container space="none" className="gap-0.5">
+          <Container space="none" className={SECTION_ROWS_CARD_CLASSNAME}>
             <SectionHeading>Reparto del tiempo</SectionHeading>
             {shares.map((share) => (
               <DetailRow
@@ -92,7 +94,7 @@ export const LatencySection = ({
           </Container>
         ) : null}
 
-        <Container space="none" className="gap-0.5">
+        <Container space="none" className={SECTION_ROWS_CARD_CLASSNAME}>
           <SectionHeading>Ritmo esperado del modelo</SectionHeading>
           {paces.length > 0 ? (
             paces.map((pace) => (
@@ -107,10 +109,10 @@ export const LatencySection = ({
           )}
         </Container>
 
-        <Container space="small">
+        <Container space="small" className={SECTION_CARD_CLASSNAME}>
           <label
             htmlFor="anomaly-threshold"
-            className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+            className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground"
           >
             Umbral de lentitud
           </label>
@@ -146,7 +148,11 @@ export const LatencySection = ({
           </p>
         </Container>
 
-        <Container space="none" className="gap-1" role="list">
+        <Container
+          space="none"
+          className={SECTION_ROWS_CARD_CLASSNAME}
+          role="list"
+        >
           <SectionHeading>Respuestas</SectionHeading>
           {samples.map((sample, index) => (
             <LatencySampleRow
@@ -159,7 +165,11 @@ export const LatencySection = ({
         </Container>
 
         {anomalies.length > 0 ? (
-          <Container space="none" className="gap-0.5" role="list">
+          <Container
+            space="none"
+            className={SECTION_ROWS_CARD_CLASSNAME}
+            role="list"
+          >
             <SectionHeading>Respuestas lentas</SectionHeading>
             {anomalies.map((anomaly) => (
               <Container

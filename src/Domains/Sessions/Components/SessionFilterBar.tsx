@@ -20,6 +20,19 @@ const CLEAR_FILTERS_LABEL = 'Limpiar filtros';
  */
 const CLEAR_FILTERS_ACCESSIBLE_NAME = 'Limpiar filtros de la barra';
 
+/**
+ * Piel de los controles de la barra (diseño "minimal-futurista"): 48px de alto,
+ * `rounded-lg` sobre `surface-1` y borde de acento con `ring-glow` mientras el
+ * desplegable está abierto. Los disparadores son moléculas compartidas sin
+ * `className` propio (`MultiSelectFilterPopover`, `LabeledSelect`), así que la
+ * piel se aplica por contexto a sus `<button>` (los popovers van en portal y no
+ * se ven afectados).
+ */
+const FILTER_CONTROLS_CLASS = [
+  '[&_button]:h-12 [&_button]:rounded-lg [&_button]:border-border [&_button]:bg-surface-1 [&_button]:px-4 [&_button]:text-[13px] [&_button]:shadow-none',
+  '[&_button[aria-expanded=true]]:border-accent [&_button[aria-expanded=true]]:ring-glow',
+].join(' ');
+
 interface SessionFilterBarProps {
   /** Catálogo de proyectos con al menos una sesión (FR-004), sin filtrar. */
   options: TProjectOption[];
@@ -45,10 +58,9 @@ interface SessionFilterBarProps {
  *
  * Fila **siempre visible** entre el título de la página y el listado, sin
  * tarjeta ni borde nuevo: solo `Container` con `row` / `justify="between"` y
- * separación por espaciado, coherente con el encabezado de grupo actual
- * (Design Direction del plan). Aloja el control de proyecto (`ProjectFilter`)
- * y, cuando la página cablea `onRangeChange`, el control temporal
- * (`TimeRangeFilter`, US2/T023).
+ * separación por espaciado (salta de línea en pantallas estrechas). Aloja,
+ * en el orden del diseño, el control temporal (`TimeRangeFilter`, US2/T023,
+ * solo si la página cablea `onRangeChange`) y el de proyecto (`ProjectFilter`).
  *
  * Mientras hay filtros activos (`hasActiveFilters`) muestra, sin expandir
  * nada, un **resumen** de lo seleccionado (`N proyectos · <etiqueta de rango>`)
@@ -73,30 +85,35 @@ export const SessionFilterBar = ({
     row
     justify="between"
     align="center"
-    space="small"
+    space="medium"
+    className="flex-wrap"
     data-testid="session-filter-bar"
   >
-    <Container row align="center" space="small">
+    <Container
+      row
+      align="center"
+      space="small"
+      className={`flex-wrap ${FILTER_CONTROLS_CLASS}`}
+    >
+      {onRangeChange ? (
+        <TimeRangeFilter value={range} onChange={onRangeChange} />
+      ) : null}
       <ProjectFilter
         options={options}
         selected={selectedProjects}
         onToggle={onToggleProject}
       />
-      {onRangeChange ? (
-        <TimeRangeFilter value={range} onChange={onRangeChange} />
-      ) : null}
     </Container>
     {hasActiveFilters ? (
       <Container row align="center" space="small">
-        <span
-          className="text-[11px] uppercase tracking-wide text-muted-foreground"
-        >
+        <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
           {`${summarizeProjects(selectedProjects.length)} · ${timeRangeLabel(range)}`}
         </span>
         <Button
           variant="link"
           onClick={onClear}
           aria-label={CLEAR_FILTERS_ACCESSIBLE_NAME}
+          className="text-accent"
         >
           {CLEAR_FILTERS_LABEL}
         </Button>

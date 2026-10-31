@@ -1,4 +1,7 @@
-import { GraphTruncationBanner } from '@app/Application/Components/Molecules';
+import {
+  GraphTruncationBanner,
+  SectionHeading,
+} from '@app/Application/Components/Molecules';
 import { Container } from '@app/Application/Components';
 import {
   SessionList,
@@ -7,6 +10,7 @@ import {
   type TSessionGroup,
   type TSessionStatus,
 } from '@app/Domains/Sessions';
+import { countRailSessions } from '../lib/workspaceHeadline';
 
 interface SessionsRailProps {
   groups: TSessionGroup[];
@@ -29,7 +33,9 @@ interface SessionsRailProps {
 }
 
 /**
- * Rail lateral de sesiones: título "Sesiones" y el listado (o su esqueleto).
+ * Rail lateral de sesiones: cabecera "Sesiones" + total en mono y el listado (o
+ * su esqueleto). El fondo `--surface-1` lo pone la columna de `WorkspaceLayout`
+ * para que cubra todo el alto.
  * Los componentes de lista se importan por el **barrel** de dominio para que el
  * `vi.mock('@app/Domains/Sessions')` de los specs siga interceptándolos.
  */
@@ -46,12 +52,25 @@ export const SessionsRail = ({
   // clave de caché es la misma, así que no añade ninguna request.
   const { truncated: aggregatedTruncation } = useRootSessions();
   const isTruncated = truncated ?? aggregatedTruncation ?? false;
+  const sessionCount = countRailSessions(groups);
+  const sessionCountLabel = `${sessionCount} ${
+    sessionCount === 1 ? 'sesión' : 'sesiones'
+  }`;
 
   return (
-    <Container space="small" className="p-3">
-      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        Sesiones
-      </span>
+    <Container space="none" className="gap-3.5 px-3.5 py-[18px]">
+      <Container row align="center" justify="between" space="small">
+        <SectionHeading>Sesiones</SectionHeading>
+        {isLoading ? null : (
+          <span
+            className="font-mono text-[11px] tabular-nums text-status-idle"
+            title={sessionCountLabel}
+          >
+            <span aria-hidden>{sessionCount}</span>
+            <span className="sr-only">{sessionCountLabel}</span>
+          </span>
+        )}
+      </Container>
       {isTruncated ? <GraphTruncationBanner /> : null}
       {isLoading ? (
         <SessionListSkeleton />

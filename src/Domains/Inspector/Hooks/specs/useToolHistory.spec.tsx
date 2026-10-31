@@ -131,4 +131,27 @@ describe('useToolHistory', () => {
     expect(result.current.hiddenCount).toBe(0);
     expect(result.current.visibleTools).toEqual(shrunk);
   });
+
+  it('scales the duration rows against the slowest visible call', () => {
+    const tools = makeTools(TOOL_HISTORY_LIMIT + 1);
+    // Pico oculto (fuera de la ventana): no debe aplastar las barras visibles.
+    tools[TOOL_HISTORY_LIMIT] = {
+      ...tools[TOOL_HISTORY_LIMIT],
+      endedAt: tools[TOOL_HISTORY_LIMIT].startedAt! + 60_000,
+    };
+    tools[2] = { ...tools[2], endedAt: tools[2].startedAt! + 1000 };
+
+    const { result } = renderHook(() => useToolHistory(tools));
+
+    expect(result.current.visibleRows).toHaveLength(TOOL_HISTORY_LIMIT);
+    expect(
+      result.current.visibleRows.map((row) => row.entry.name),
+    ).toEqual(names(result.current.visibleTools));
+    expect(result.current.visibleRows[2].ratio).toBe(1);
+    expect(result.current.visibleRows[0].ratio).toBe(0.5);
+    expect(
+      result.current.visibleRows.filter((row) => row.isHighlighted),
+    ).toHaveLength(1);
+    expect(result.current.visibleRows[2].isHighlighted).toBe(true);
+  });
 });

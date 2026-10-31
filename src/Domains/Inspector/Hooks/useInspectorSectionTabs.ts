@@ -56,11 +56,23 @@ export const INSPECTOR_SECTION_TAB_ITEMS: readonly TInspectorSectionTabItem[] =
 export const INSPECTOR_SECTION_TABS_ARIA_LABEL = 'Secciones técnicas del nodo';
 
 /**
- * Clases del tablist de secciones en el call site (ancho completo y alineado a
- * la izquierda). No duplica el override de alto del primitivo `ui/tabs.tsx`.
+ * Clases del tablist de secciones en el call site: pestañas subrayadas sobre
+ * una línea base `border-b` (ancho completo, alineadas a la izquierda y abajo,
+ * 18px entre pestañas). Anula la píldora del primitivo `ui/tabs.tsx` (fondo,
+ * radio y padding) pero **conserva** su `min-h-control` y su `flex-wrap`: en
+ * columnas estrechas la lista envuelve en filas en vez de desplazarse, de modo
+ * que ninguna etiqueta queda oculta (contract §6, SC-003).
  */
 export const INSPECTOR_SECTION_TABS_LIST_CLASSNAME =
-  'w-full justify-start gap-1';
+  'w-full items-end justify-start gap-x-[18px] gap-y-0 rounded-none border-b border-border bg-transparent p-0';
+
+/**
+ * Clases de cada pestaña: 13px, sin píldora; la activa se subraya con 2px de
+ * acento (superpuesto a la línea base con `-mb-px`) y pasa a `foreground`, la
+ * inactiva queda atenuada con hover.
+ */
+export const INSPECTOR_SECTION_TAB_TRIGGER_CLASSNAME =
+  '-mb-px rounded-none border-0 border-b-2 border-transparent px-0 pt-2 pb-2.5 text-[13px] font-normal text-muted-foreground hover:text-foreground data-[state=active]:border-accent data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none';
 
 /** Guarda de tipo: valida un valor arbitrario (p. ej. el `value` de Radix). */
 export const isInspectorSectionTab = (

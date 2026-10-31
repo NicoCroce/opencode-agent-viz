@@ -36,7 +36,8 @@ interface AgentNodeFooterProps {
 
 /**
  * Pie del card, en dos registros:
- * - **Vitals**: consumo (tokens · costo · duración), la carga analítica.
+ * - **Vitals**: consumo (tokens, costo y duración separados por aire, sin
+ *   puntos medios), la carga analítica.
  * - **Contexto**: rango horario compacto (`HH:mm → HH:mm`) y, cuando aplica, la
  *   herramienta en curso (FR-018) en la misma línea.
  *
@@ -88,20 +89,18 @@ export const AgentNodeFooter = ({
   return (
     <Container
       space="none"
-      className="mt-auto min-w-0 gap-1 border-t border-border pt-1.5"
+      className="mt-auto min-w-0 gap-1 border-t border-border/60 pt-1.5"
     >
       <Container
         row
         align="center"
         space="none"
-        className="min-w-0 flex-wrap gap-x-1.5 font-mono text-[11px] tabular-nums text-foreground/70"
+        className="min-w-0 flex-wrap gap-x-3 font-mono text-[11px] tabular-nums text-foreground/70"
       >
         <span>
           {tokens === null ? formatTokens(null) : `${formatTokens(tokens)} tok`}
         </span>
-        <span aria-hidden>·</span>
         <span>{formatCost(metrics.cost)}</span>
-        <span aria-hidden>·</span>
         <span>{formatDuration(metrics.durationMs)}</span>
       </Container>
 

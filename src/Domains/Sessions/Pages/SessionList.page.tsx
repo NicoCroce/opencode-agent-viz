@@ -6,16 +6,27 @@ import {
   Page,
 } from '@app/Application/Components';
 import { GraphTruncationBanner } from '@app/Application/Components/Molecules';
-import { SessionFilterBar, SessionList, SessionListSkeleton } from '../Components';
-import { useRootSessions, useSessionFilters } from '../Hooks';
+import { useDevice } from '@app/Application/Hooks';
+import {
+  SessionFilterBar,
+  SessionList,
+  SessionListSkeleton,
+  SessionTable,
+} from '../Components';
+import { useRootSessions, useSessionFilters, useSessionsEyebrow } from '../Hooks';
 import { useGetSessionStatus } from '../Sessions.service';
 import { sessionDetailPath } from '../Sessions.routes';
 
+/** Título visible de la página del listado. */
+const PAGE_TITLE = 'Sesiones';
+
 export const SessionListPage = () => {
   const navigate = useNavigate();
+  const { isMobile } = useDevice();
   const { groups, items, truncated, isLoading, isError, error } =
     useRootSessions();
   const statusQuery = useGetSessionStatus();
+  const eyebrow = useSessionsEyebrow(items, statusQuery.data);
   // Única suscripción a los datos: los `groups` ya calculados alimentan al hook
   // de filtros, que solo deriva estado de vista (nunca vuelve a consultar).
   const {
@@ -30,8 +41,18 @@ export const SessionListPage = () => {
     clearFilters,
   } = useSessionFilters(groups);
 
+  const openSession = (id: string) => {
+    void navigate(sessionDetailPath(id));
+  };
+
   if (isError) return <EmptyScreenError message={error?.message} />;
-  if (isLoading) return <SessionListSkeleton />;
+  // El esqueleto ocupa la misma columna centrada que la página cargada.
+  if (isLoading)
+    return (
+      <Page title={PAGE_TITLE}>
+        <SessionListSkeleton framed />
+      </Page>
+    );
   if (items.length === 0)
     return (
       <EmptyState
@@ -41,7 +62,7 @@ export const SessionListPage = () => {
     );
 
   return (
-    <Page title="Sesiones de OpenCode">
+    <Page title={PAGE_TITLE} eyebrow={eyebrow}>
       <SessionFilterBar
         options={options}
         selectedProjects={validSelected}
@@ -59,14 +80,20 @@ export const SessionListPage = () => {
           onClick={clearFilters}
           actionLabel="Limpiar filtros"
         />
-      ) : (
+      ) : isMobile ? (
+        // Móvil: tarjetas (las del rail); escritorio: la tabla del diseño.
         <SessionList
           groups={filteredGroups}
           statuses={statusQuery.data}
           selectedId={null}
-          onSelect={(id) => {
-            void navigate(sessionDetailPath(id));
-          }}
+          onSelect={openSession}
+          showCount
+        />
+      ) : (
+        <SessionTable
+          groups={filteredGroups}
+          statuses={statusQuery.data}
+          onSelect={openSession}
           showCount
         />
       )}

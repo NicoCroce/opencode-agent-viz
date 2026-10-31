@@ -39,6 +39,8 @@
   /* Dark / Flat design tokens (plan.md → Design Direction) */
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Display (cyan redesign): títulos y marca; el resto de la UI sigue en Inter. */
+  --font-display: 'Space Grotesk', 'Inter', ui-sans-serif, system-ui, sans-serif;
 
   --color-surface-0: hsl(var(--surface-0));
   --color-surface-1: hsl(var(--surface-1));
@@ -50,7 +52,15 @@
   --color-status-error: hsl(var(--status-error));
   --color-status-idle: hsl(var(--status-idle));
 
-  --radius-flat: 4px;
+  /* Medidor de esfuerzo: tono propio, fuera de la paleta de estados (el color
+     codifica estado; la cantidad de muescas, esfuerzo). */
+  --color-effort: hsl(var(--effort));
+
+  /* Aristas del grafo: hairline sólido (sin alfa) para que los tramos que
+     comparten riel no se aclaren al superponerse. */
+  --color-edge: hsl(var(--edge));
+
+  --radius-flat: 6px;
 }
 
 @layer base {
@@ -61,62 +71,70 @@
     --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
-    --primary: 24 92% 49%;
-    --primary-foreground: 355.7 100% 97.3%;
+    --primary: 193 82% 31%;
+    --primary-foreground: 0 0% 100%;
     --secondary: 240 4.8% 95.9%;
     --secondary-foreground: 240 5.9% 10%;
     --muted: 240 4.8% 95.9%;
     --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
+    --accent: 193 82% 31%;
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 100% 95.3%;
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
     --radius: 0.5rem;
-    --ring: 346.8 77.2% 49.8%;
-    --chart-1: 347 77% 50%;
-    --chart-2: 352 83% 91%;
-    --chart-3: 350 80% 72%;
-    --chart-4: 351 83% 82%;
-    --chart-5: 349 77% 62%;
+    --ring: 193 82% 31%;
+    --chart-1: 193 82% 31%;
+    --chart-2: 188 86% 53%;
+    --chart-3: 187 92% 69%;
+    --chart-4: 186 85% 82%;
+    --chart-5: 205 12% 54%;
+    --effort: 196 30% 30%;
+    --edge: 206 14% 72%;
   }
 
+  /* Cyan redesign (minimal / futurista): superficies azul-noche, un único
+     acento cyan para lo activo, seleccionado y la acción primaria; ámbar solo
+     para lo que pide atención. `--accent` es el cyan de realce (bordes, texto,
+     barras); los fondos de hover usan `bg-accent/10`, nunca el cyan pleno. */
   .dark {
-    --background: 20 14.3% 4.1%;
-    --foreground: 0 0% 95%;
-    --card: 24 9.8% 10%;
-    --card-foreground: 0 0% 95%;
-    --popover: 0 0% 9%;
-    --popover-foreground: 0 0% 95%;
-    --primary: 24 92% 49%;
-    --primary-foreground: 355.7 100% 97.3%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 15%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 12 6.5% 15.1%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 84% 65%; /* WCAG AA: ≥4.5:1 como texto en dark */
-    --destructive-foreground: 0 85.7% 97.3%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 221.2 83.2% 53.3%;
-    --chart-1: 347 77% 50%;
-    --chart-2: 349 77% 62%;
-    --chart-3: 350 80% 72%;
-    --chart-4: 351 83% 82%;
-    --chart-5: 352 83% 91%;
+    --background: 213 39% 5%;
+    --foreground: 196 43% 93%;
+    --card: 212 37% 7%;
+    --card-foreground: 196 43% 93%;
+    --popover: 210 35% 8%;
+    --popover-foreground: 196 43% 93%;
+    --primary: 188 86% 53%;
+    --primary-foreground: 193 74% 6%;
+    --secondary: 206 35% 13%;
+    --secondary-foreground: 196 43% 93%;
+    --muted: 208 33% 11%;
+    --muted-foreground: 206 16% 66%;
+    --accent: 188 86% 53%;
+    --accent-foreground: 193 74% 6%;
+    --destructive: 351 95% 71%; /* WCAG AA: ≥4.5:1 como texto en dark */
+    --destructive-foreground: 350 60% 10%;
+    --border: 206 31% 16%;
+    --input: 206 31% 16%;
+    --ring: 188 86% 53%;
+    --chart-1: 188 86% 53%;
+    --chart-2: 187 92% 69%;
+    --chart-3: 193 82% 31%;
+    --chart-4: 186 85% 82%;
+    --chart-5: 205 12% 54%;
+    --effort: 196 39% 87%;
+    --edge: 205 26% 27%;
 
-    /* Dark / Flat surfaces + status LEDs */
-    --surface-0: 220 24% 5%;
-    --surface-1: 218 22% 8%;
-    --surface-2: 215 21% 11%;
-    --status-running: 199 89% 60%;
-    --status-waiting: 38 92% 55%;
-    --status-done: 140 55% 47%;
-    --status-error: 0 84% 60%;
-    --status-idle: 220 9% 60%; /* WCAG AA: ≥4.5:1 como texto en dark */
+    /* Superficies + LEDs de estado */
+    --surface-0: 213 39% 5%;
+    --surface-1: 212 37% 7%;
+    --surface-2: 210 35% 10%;
+    --status-running: 188 86% 53%;
+    --status-waiting: 38 90% 61%;
+    --status-done: 152 50% 52%;
+    --status-error: 351 95% 71%;
+    --status-idle: 205 12% 54%; /* WCAG AA: ≥4.5:1 como texto en dark */
   }
 }
 
@@ -166,18 +184,32 @@ html {
   animation: lane-in 260ms ease-out both;
 }
 
+/* Brillo del acento (cyan redesign): halo para LEDs activos y anillo suave para
+   la selección. Sombras estáticas, sin animación. */
+@utility glow-accent {
+  box-shadow: 0 0 8px hsl(var(--accent) / 0.6);
+}
+
+@utility ring-glow {
+  box-shadow:
+    0 0 0 4px hsl(var(--accent) / 0.08),
+    0 0 24px hsl(var(--accent) / 0.08);
+}
+
 /* Barrido de brillo del rail de un nodo activo ("pensando"): CSS puro, sin
-   estado por nodo. Una banda del token de actividad recorre el rail de arriba
-   abajo; el color base de estado queda debajo como respaldo estático (FR-003). */
+   estado por nodo. Una banda clara recorre el rail de izquierda a derecha; el
+   color base de estado queda debajo como respaldo estático (FR-003). */
 @keyframes rail-scan {
   from {
-    transform: translateY(-100%);
+    transform: translateX(-100%);
   }
   to {
-    transform: translateY(100%);
+    transform: translateX(100%);
   }
 }
 
+/* El rail es una barra horizontal al tope del card (cyan redesign): el barrido
+   va de izquierda a derecha y usa un tono más claro que la barra para leerse. */
 .rail-scan {
   overflow: hidden;
 }
@@ -187,9 +219,9 @@ html {
   position: absolute;
   inset: 0;
   background: linear-gradient(
-    to bottom,
+    to right,
     transparent 0%,
-    hsl(var(--status-running)) 50%,
+    hsl(var(--foreground) / 0.75) 50%,
     transparent 100%
   );
   animation: rail-scan 1.6s ease-in-out infinite;

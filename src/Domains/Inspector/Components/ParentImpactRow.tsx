@@ -38,12 +38,13 @@ export const ParentImpactRow = ({
   return (
     <SectionFrame
       title="Aporte al padre"
+      variant="card"
       isError={isError}
       isLoading={isLoading}
       isEmpty={impact === null}
       emptyLabel="Sin aporte al padre"
     >
-      <Container space="none" className="gap-0.5">
+      <Container space="none" className="gap-1.5!">
         <DetailRow
           label="Caracteres aportados"
           value={impact?.addedChars ?? null}
@@ -61,7 +62,7 @@ export const ParentImpactRow = ({
       {impact && onNavigate ? (
         <Button
           variant="link"
-          className="h-auto w-fit p-0 text-[11px] font-normal"
+          className="h-auto w-fit p-0 text-xs font-normal"
           aria-label={`Ir al agente padre: ${parentTitle ?? impact.parentId}`}
           onClick={() => onNavigate(impact.parentId)}
         >

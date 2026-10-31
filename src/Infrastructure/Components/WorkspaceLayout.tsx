@@ -105,7 +105,7 @@ export const WorkspaceLayout = ({
       <Container row space="none" className="relative h-full min-h-0 min-w-0">
         <Container
           space="none"
-          className="w-[280px] shrink-0 min-w-0 overflow-auto border-r border-border"
+          className="w-[280px] shrink-0 min-w-0 overflow-auto border-r border-border bg-surface-1"
         >
           {sessions}
         </Container>
@@ -127,7 +127,7 @@ export const WorkspaceLayout = ({
           className={`min-w-0 border-border ${
             isFullscreen
               ? 'absolute inset-0 z-20 overflow-auto border-l-0 bg-surface-0'
-              : 'overflow-auto border-l'
+              : 'overflow-auto border-l bg-surface-1'
           }`}
           style={isFullscreen ? undefined : { width: inspectorWidth }}
         >

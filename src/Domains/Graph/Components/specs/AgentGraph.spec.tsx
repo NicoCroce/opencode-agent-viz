@@ -152,12 +152,21 @@ vi.mock('@xyflow/react', async () => {
       React.createElement(React.Fragment, null, children),
     Background: () => null,
     Controls: () => null,
+    Panel: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(React.Fragment, null, children),
     MarkerType: { ArrowClosed: 'arrowclosed' },
     useReactFlow: () => ({
       getNode: () => null,
+      getNodes: () => [],
+      getNodesBounds: () => ({ x: 0, y: 0, width: 0, height: 0 }),
       setCenter: () => undefined,
+      setViewport: () => undefined,
       fitView: () => undefined,
     }),
+    useStore: (selector: (state: { width: number; height: number }) => boolean) =>
+      selector({ width: 0, height: 0 }),
+    useStoreApi: () => ({ getState: () => ({ width: 0, height: 0 }) }),
+    useNodesInitialized: () => false,
   };
 });
 

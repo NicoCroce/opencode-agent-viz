@@ -6,3 +6,4 @@ export * from './useFollowMode';
 export * from './useChainSelection';
 export * from './useNodeResize';
 export * from './useNow';
+export * from './useGraphViewMode';
