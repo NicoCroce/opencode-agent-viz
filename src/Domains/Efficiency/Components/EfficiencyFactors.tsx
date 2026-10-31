@@ -1,6 +1,4 @@
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
-import { faCircleMinus, faCirclePlus } from '@fortawesome/free-solid-svg-icons';
+import { CircleMinus, CirclePlus, type LucideIcon } from 'lucide-react';
 import { Container } from '@app/Application/Components';
 import { SectionHeading } from '@app/Application/Components/Molecules';
 import { cn } from '@app/Application/lib/utils';
@@ -17,9 +15,9 @@ const KIND_LABEL: Record<TFactor['kind'], string> = {
   suma: 'suma',
 };
 
-const KIND_ICON: Record<TFactor['kind'], IconDefinition> = {
-  resta: faCircleMinus,
-  suma: faCirclePlus,
+const KIND_ICON: Record<TFactor['kind'], LucideIcon> = {
+  resta: CircleMinus,
+  suma: CirclePlus,
 };
 
 const KIND_TONE: Record<TFactor['kind'], string> = {
@@ -44,32 +42,35 @@ export const EfficiencyFactors = ({ factors }: EfficiencyFactorsProps) => {
       <SectionHeading>Factores de impacto</SectionHeading>
 
       <ul className="flex flex-col gap-2">
-        {factors.map((factor) => (
-          <li
-            key={factor.key}
-            className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs"
-          >
-            <FontAwesomeIcon
-              icon={KIND_ICON[factor.kind]}
-              aria-hidden
-              className={cn('size-3 shrink-0', KIND_TONE[factor.kind])}
-            />
-            <span className="min-w-0 font-medium text-foreground">
-              {factor.label}
-            </span>
-            <span className="text-muted-foreground">
-              {DIMENSION_LABEL[factor.dimension]}
-            </span>
-            <span
-              className={cn(
-                'ml-auto shrink-0 font-mono tabular-nums',
-                KIND_TONE[factor.kind],
-              )}
+        {factors.map((factor) => {
+          const Icon = KIND_ICON[factor.kind];
+
+          return (
+            <li
+              key={factor.key}
+              className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs"
             >
-              {KIND_LABEL[factor.kind]} · {factor.count}
-            </span>
-          </li>
-        ))}
+              <Icon
+                aria-hidden
+                className={cn('size-3 shrink-0', KIND_TONE[factor.kind])}
+              />
+              <span className="min-w-0 font-medium text-foreground">
+                {factor.label}
+              </span>
+              <span className="text-muted-foreground">
+                {DIMENSION_LABEL[factor.dimension]}
+              </span>
+              <span
+                className={cn(
+                  'ml-auto shrink-0 font-mono tabular-nums',
+                  KIND_TONE[factor.kind],
+                )}
+              >
+                {KIND_LABEL[factor.kind]} · {factor.count}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </Container>
   );

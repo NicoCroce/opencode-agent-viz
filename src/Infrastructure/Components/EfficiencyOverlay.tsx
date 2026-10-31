@@ -81,8 +81,8 @@ export const EfficiencyOverlay = ({
   onRestoreFocus,
 }: TEfficiencyOverlayProps) => {
   const { isMobile } = useDevice();
-  const { report, isError, isPartial, missingSessionIds } = useSessionEfficiency(
-    {
+  const { report, isError, isPartial, missingSessionIds } =
+    useSessionEfficiency({
       rootSessionId,
       sessions,
       rootReady,
@@ -90,8 +90,7 @@ export const EfficiencyOverlay = ({
       graphError,
       now: now ?? undefined,
       enabled: isOpen,
-    },
-  );
+    });
 
   const agentCount = Object.keys(sessions).length;
   const subtitle = rootTitle ?? `Solo lectura · ${agentCount} agentes`;
@@ -183,45 +182,49 @@ export const EfficiencyOverlay = ({
       }}
     >
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[hsl(206_46%_2%/0.74)] backdrop-blur-[2px]" />
         <DialogPrimitive.Content
-          className="fixed inset-0 z-50 bg-surface-1"
+          className="fixed inset-0 z-50 bg-surface-0"
           onCloseAutoFocus={(event) => {
             event.preventDefault();
             onRestoreFocus();
           }}
         >
           <Container space="none" className="h-full">
-            <Container
-              row
-              align="center"
-              justify="between"
-              space="medium"
-              className="flex-wrap border-b border-border p-4"
-            >
-              <Container space="small" className="min-w-0">
-                <DialogPrimitive.Title className="text-lg font-semibold text-foreground">
-                  Eficiencia de la sesión
-                </DialogPrimitive.Title>
-                <DialogPrimitive.Description className="text-sm text-muted-foreground">
-                  Análisis de solo lectura de la sesión y su subárbol.
-                </DialogPrimitive.Description>
-                <p className="text-xs text-muted-foreground">{subtitle}</p>
-              </Container>
-              <Button
-                variant="outline"
-                aria-label="Cerrar análisis de eficiencia"
-                onClick={onClose}
+            <div className="border-b border-border/60 bg-surface-0/70 px-5 py-4 backdrop-blur-xl">
+              <Container
+                row
+                align="center"
+                justify="between"
+                space="medium"
+                className="mx-auto w-full max-w-6xl flex-wrap"
               >
-                Cerrar
-              </Button>
-            </Container>
+                <Container space="small" className="min-w-0">
+                  <DialogPrimitive.Title className="font-display text-lg font-semibold tracking-[-0.02em] text-foreground">
+                    Eficiencia de la sesión
+                  </DialogPrimitive.Title>
+                  <DialogPrimitive.Description className="text-sm text-muted-foreground">
+                    Análisis de solo lectura de la sesión y su subárbol.
+                  </DialogPrimitive.Description>
+                  <p className="text-xs text-muted-foreground">{subtitle}</p>
+                </Container>
+                <Button
+                  variant="outline"
+                  aria-label="Cerrar análisis de eficiencia"
+                  onClick={onClose}
+                >
+                  Cerrar
+                </Button>
+              </Container>
+            </div>
 
             <Container
               space="none"
-              className="min-h-0 flex-1 overflow-y-auto p-4"
+              className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-6"
             >
-              {renderBody()}
+              <div className="mx-auto w-full max-w-6xl flex-wrap">
+                {renderBody()}
+              </div>
             </Container>
           </Container>
         </DialogPrimitive.Content>

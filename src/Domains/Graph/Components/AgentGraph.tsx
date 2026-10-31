@@ -94,7 +94,12 @@ export const AgentGraph = ({
   return (
     <ReactFlowProvider>
       <NodeFocusProvider value={focus}>
-        <div className={cn('h-full w-full', className)}>
+        <div
+          className={cn(
+            'relative h-full w-full overflow-hidden bg-[radial-gradient(120%_90%_at_50%_0%,hsl(var(--surface-1))_0%,hsl(var(--surface-0))_58%,hsl(var(--surface-0))_100%)] [--xy-background-color:transparent]',
+            className,
+          )}
+        >
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -103,6 +108,7 @@ export const AgentGraph = ({
             colorMode="dark"
             fitView
             minZoom={0.2}
+            zoomOnDoubleClick={false}
             nodesDraggable={false}
             nodesConnectable={false}
             proOptions={{ hideAttribution: true }}
@@ -122,7 +128,7 @@ export const AgentGraph = ({
             onNodeMouseLeave={() => setHoveredNodeId(null)}
             onPaneClick={onClearSelection}
           >
-            <Background gap={16} color="#232A34" />
+            <Background gap={20} color="hsl(var(--border) / 0.55)" />
             <Controls showInteractive={false} />
             <ExecutionLanes
               plan={plan}

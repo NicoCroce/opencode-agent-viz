@@ -20,7 +20,7 @@ export const NavButton = ({ sessionId, onNavigate, title }: NavButtonProps) => (
     type="button"
     onClick={() => onNavigate(sessionId)}
     title={title ?? sessionId}
-    className="max-w-[16rem] truncate rounded-flat border border-border px-2 py-0.5 font-mono text-[11px] text-foreground transition-colors hover:border-accent hover:text-accent focus-visible:border-accent focus-visible:text-accent focus-visible:outline-none"
+    className="max-w-[16rem] truncate rounded-flat border border-border px-2 py-0.5 font-mono text-[11px] text-foreground transition-colors hover:border-signal/50 hover:text-signal focus-visible:border-signal/50 focus-visible:text-signal focus-visible:outline-none"
   >
     {sessionId}
   </button>

@@ -1,5 +1,4 @@
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
+import type { LucideIcon } from 'lucide-react';
 import { Container } from '@app/Application/Components/Layout';
 import { cn } from '@app/Application/lib/utils';
 import {
@@ -12,7 +11,7 @@ interface AlertIconBadgeProps {
   /** Variante de alerta; define color, fondo y el icono por defecto. */
   variant: TAlertVariant;
   /** Icono explícito; si se omite usa `ALERT_VARIANT_ICON[variant]`. */
-  icon?: IconDefinition;
+  icon?: LucideIcon;
   className?: string;
 }
 
@@ -27,16 +26,17 @@ export const AlertIconBadge = ({
   variant,
   icon,
   className,
-}: AlertIconBadgeProps) => (
-  <Container
-    align="center"
-    justify="center"
-    space="none"
-    className={cn(iconContainerVariants({ variant }), className)}
-  >
-    <FontAwesomeIcon
-      icon={icon ?? ALERT_VARIANT_ICON[variant]}
-      className="w-7 h-7"
-    />
-  </Container>
-);
+}: AlertIconBadgeProps) => {
+  const Icon = icon ?? ALERT_VARIANT_ICON[variant];
+
+  return (
+    <Container
+      align="center"
+      justify="center"
+      space="none"
+      className={cn(iconContainerVariants({ variant }), className)}
+    >
+      <Icon aria-hidden className="size-5" strokeWidth={1.7} />
+    </Container>
+  );
+};

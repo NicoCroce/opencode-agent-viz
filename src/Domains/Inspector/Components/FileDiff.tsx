@@ -1,9 +1,5 @@
 import { useMemo, useState } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faChevronDown,
-  faChevronRight,
-} from '@fortawesome/free-solid-svg-icons';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Container } from '@app/Application/Components';
 import { cn } from '@app/Application/lib/utils';
 import type { TDiffLine, TDiffLineKind } from '../Inspector.entity';
@@ -98,6 +94,7 @@ export const FileDiff = ({ patch }: FileDiffProps) => {
     >
       {hunks.map((hunk, index) => {
         const isExpanded = !collapsed.has(index);
+        const Chevron = isExpanded ? ChevronDown : ChevronRight;
 
         return (
           <Container key={`${hunk.header}-${index}`} space="none">
@@ -105,11 +102,10 @@ export const FileDiff = ({ patch }: FileDiffProps) => {
               type="button"
               aria-expanded={isExpanded}
               onClick={() => toggle(index)}
-              className="flex w-full items-center gap-2 bg-surface-2 px-2 py-1 text-left transition-colors hover:text-accent"
+              className="flex w-full items-center gap-2 bg-surface-2 px-2 py-1 text-left transition-colors hover:bg-surface-1 hover:text-signal"
             >
-              <FontAwesomeIcon
-                icon={isExpanded ? faChevronDown : faChevronRight}
-                className="shrink-0 text-[10px] text-muted-foreground"
+              <Chevron
+                className="size-2.5 shrink-0 text-muted-foreground"
                 aria-hidden
               />
               <span className="font-mono text-[11px] tabular-nums text-muted-foreground">

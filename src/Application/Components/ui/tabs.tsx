@@ -12,7 +12,7 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      'inline-flex min-h-control flex-wrap items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground',
+      'inline-flex min-h-control flex-wrap items-center justify-center gap-0.5 rounded-lg border border-border/70 bg-surface-1/80 p-0.5 text-muted-foreground',
       className,
     )}
     {...props}
@@ -20,6 +20,11 @@ const TabsList = React.forwardRef<
 ));
 TabsList.displayName = TabsPrimitive.List.displayName;
 
+/**
+ * Trigger del tablist. El estado activo se marca con **borde de contraste +
+ * superficie** (no solo color de texto) y conserva el mismo ancho de caja en
+ * reposo y activo; el foco usa `outline` (respaldo de `forced-colors`).
+ */
 const TabsTrigger = React.forwardRef<
   React.ComponentRef<typeof TabsPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
@@ -27,7 +32,7 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      'inline-flex items-center justify-center whitespace-nowrap rounded-md border border-transparent px-3 py-1 text-sm font-medium transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring forced-colors:focus-visible:outline-[Highlight] disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow',
+      'relative inline-flex items-center justify-center whitespace-nowrap rounded-md border border-transparent px-3 py-1 text-xs font-medium text-muted-foreground transition-[background-color,border-color,color] duration-150 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring forced-colors:focus-visible:outline-2 forced-colors:focus-visible:outline-[Highlight] disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-foreground data-[state=active]:bg-background data-[state=active]:text-foreground',
       className,
     )}
     {...props}
@@ -42,7 +47,7 @@ const TabsContent = React.forwardRef<
   <TabsPrimitive.Content
     ref={ref}
     className={cn(
-      'mt-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring forced-colors:focus-visible:outline-[Highlight] cursor-pointer',
+      'mt-2 cursor-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring forced-colors:focus-visible:outline-2 forced-colors:focus-visible:outline-[Highlight]',
       className,
     )}
     {...props}

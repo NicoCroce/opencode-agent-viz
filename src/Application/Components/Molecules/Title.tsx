@@ -12,10 +12,10 @@ interface TitleProps extends React.DetailedHTMLProps<
 }
 
 const headingClasses = {
-  h1: 'scroll-m-20 text-4xl leading-[46px] py-2 pt-6 tracking-tight lg:text-5xl',
-  h2: 'scroll-m-20 border-b pb-2 text-3xl tracking-tight first:mt-0',
-  h3: 'scroll-m-20 text-2xl tracking-tight',
-  h4: 'scroll-m-20 text-xl tracking-tight',
+  h1: 'scroll-m-20 font-display text-[1.9rem] font-semibold leading-[1.1] tracking-[-0.035em] py-2 pt-6 lg:text-[2.35rem]',
+  h2: 'scroll-m-20 font-display border-b border-border/70 pb-2 text-2xl font-semibold tracking-[-0.03em] first:mt-0',
+  h3: 'scroll-m-20 font-display text-xl font-semibold tracking-[-0.02em]',
+  h4: 'scroll-m-20 font-display text-lg font-semibold tracking-[-0.02em]',
 };
 
 export const Title = ({

@@ -60,7 +60,7 @@ export const INSPECTOR_SECTION_TABS_ARIA_LABEL = 'Secciones técnicas del nodo';
  * la izquierda). No duplica el override de alto del primitivo `ui/tabs.tsx`.
  */
 export const INSPECTOR_SECTION_TABS_LIST_CLASSNAME =
-  'w-full justify-start gap-1';
+  'w-full justify-start gap-0.5';
 
 /** Guarda de tipo: valida un valor arbitrario (p. ej. el `value` de Radix). */
 export const isInspectorSectionTab = (

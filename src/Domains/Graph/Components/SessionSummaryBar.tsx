@@ -1,4 +1,5 @@
 import { Container } from '@app/Application/Components';
+import { cn } from '@app/Application/lib/utils';
 import {
   formatCost,
   formatDuration,
@@ -31,6 +32,13 @@ export interface SessionSummaryBarProps {
      */
     sessionSpeedup?: { speedup: number | null } | null;
   };
+  /** En móvil, solo los contadores por estado (sin métricas de sesión). */
+  compact?: boolean;
+  /**
+   * Clases del bloque de métricas de sesión. La cabecera del grafo las usa para
+   * ocultarlas cuando el panel es estrecho y dejar solo los contadores vivos.
+   */
+  metricsClassName?: string;
 }
 
 /**
@@ -45,9 +53,15 @@ export interface SessionSummaryBarProps {
  * agrupan bajo "Esperando" y una interrupción nunca se cuenta como error
  * (FR-019). La construcción de contadores vive en `buildSummaryCounters`.
  */
-export const SessionSummaryBar = ({ summary }: SessionSummaryBarProps) => {
-  const counters = buildSummaryCounters(summary).filter(
-    (counter) => counter.always || counter.count > 0,
+export const SessionSummaryBar = ({
+  summary,
+  compact = false,
+  metricsClassName,
+}: SessionSummaryBarProps) => {
+  const counters = buildSummaryCounters(summary).filter((counter) =>
+    compact
+      ? counter.count > 0 || counter.status === 'running'
+      : counter.always || counter.count > 0,
   );
 
   const tokens = totalTokens(summary.metrics.tokens);
@@ -57,30 +71,35 @@ export const SessionSummaryBar = ({ summary }: SessionSummaryBarProps) => {
       row
       space="small"
       align="center"
-      className="min-w-0 overflow-hidden whitespace-nowrap font-mono text-[11px] tabular-nums text-muted-foreground"
+      className="min-w-0 gap-1.5 overflow-hidden whitespace-nowrap text-[10px] tabular-nums text-muted-foreground"
     >
       {counters.map((counter) => (
         <SummaryCounterBadge key={counter.status} counter={counter} />
       ))}
 
-      <span aria-hidden>·</span>
+      {compact ? null : (
+        <span className={cn('flex items-center gap-1.5', metricsClassName)}>
+          <span aria-hidden className="h-3.5 w-px shrink-0 bg-border/60" />
 
-      <SummaryMetric
-        label="Costo"
-        value={summary.metrics.cost}
-        format={formatCost}
-      />
-      <SummaryMetric label="Tokens" value={tokens} format={formatTokens} />
-      <SummaryMetric
-        label="Tiempo"
-        value={summary.elapsedMs}
-        format={formatDuration}
-      />
-      <SummaryMetric
-        label="Paralelismo"
-        value={summary.sessionSpeedup?.speedup ?? null}
-        format={formatSpeedup}
-      />
+          <SummaryMetric
+            label="Costo"
+            value={summary.metrics.cost}
+            format={formatCost}
+          />
+          <SummaryMetric label="Tokens" value={tokens} format={formatTokens} />
+          <SummaryMetric
+            label="Tiempo"
+            value={summary.elapsedMs}
+            format={formatDuration}
+          />
+          <SummaryMetric
+            label="Paralelismo"
+            compactLabel="∥"
+            value={summary.sessionSpeedup?.speedup ?? null}
+            format={formatSpeedup}
+          />
+        </span>
+      )}
     </Container>
   );
 };

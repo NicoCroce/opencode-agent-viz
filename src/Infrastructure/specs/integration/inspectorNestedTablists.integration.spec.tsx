@@ -107,7 +107,7 @@ const EMPTY_PROMPT = 'Selecciona un nodo del grafo para ver su detalle.';
 const WORKSPACE_TABLIST_LABEL = 'Vistas del workspace';
 
 /** Pestaña de primer nivel que hospeda el panel del detalle (móvil). */
-const INSPECTOR_WORKSPACE_TAB = 'inspector';
+const INSPECTOR_WORKSPACE_TAB = 'Detalle';
 
 const rootSession = () => buildSessionInfo();
 

@@ -169,10 +169,10 @@ describe('WorkspaceLayout — móvil, chat de primer nivel (T060, FR-013/FR-014,
       screen.getByRole('tablist', { name: 'Vistas del workspace' }),
     ).toBeInTheDocument();
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
-      'sessions',
-      'graph',
-      'inspector',
-      'chat',
+      'Sesiones',
+      'Grafo',
+      'Detalle',
+      'Chat',
     ]);
     expect(screen.getByTestId('history-node')).toBeInTheDocument();
 
@@ -184,7 +184,7 @@ describe('WorkspaceLayout — móvil, chat de primer nivel (T060, FR-013/FR-014,
   it('no añade el tablist interno Detalle|Chat (sin tabbars anidadas)', () => {
     render(<MobileHarness />);
 
-    fireEvent.click(screen.getByRole('tab', { name: 'inspector' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Detalle' }));
     expect(screen.getByTestId('inspector-node')).toBeInTheDocument();
 
     // Un único tablist (el del workspace): el layout no anida `Detalle | Chat`.
@@ -200,10 +200,10 @@ describe('WorkspaceLayout — móvil, chat de primer nivel (T060, FR-013/FR-014,
     // Antes de activar el tab el chat no está montado.
     expect(screen.queryByTestId('chat-node')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'chat' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Chat' }));
 
     expect(screen.getByTestId('chat-node')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'chat' })).toHaveAttribute(
+    expect(screen.getByRole('tab', { name: 'Chat' })).toHaveAttribute(
       'aria-selected',
       'true',
     );

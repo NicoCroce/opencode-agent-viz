@@ -1,8 +1,5 @@
 import { useId, useState, type ReactNode } from 'react';
-import {
-  faChevronDown,
-  faChevronUp,
-} from '@fortawesome/free-solid-svg-icons';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@app/Application/lib/utils';
 import { Container } from '../Layout';
 import { Button } from './Button';
@@ -83,7 +80,7 @@ export const Disclosure = ({
       <Button
         variant="outline"
         showIcon
-        icon={isExpanded ? faChevronUp : faChevronDown}
+        icon={isExpanded ? ChevronUp : ChevronDown}
         aria-expanded={isExpanded}
         aria-controls={regionId}
         onClick={handleToggle}

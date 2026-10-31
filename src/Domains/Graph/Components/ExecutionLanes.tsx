@@ -34,9 +34,9 @@ export const ExecutionLanes = ({
         className={cn(
           'lane-in pointer-events-none absolute',
           activeLevel === level.level
-            ? 'bg-accent/[0.05]'
+            ? 'bg-signal/[0.012]'
             : level.level % 2 === 1
-              ? 'bg-white/[0.015]'
+              ? 'bg-white/[0.012]'
               : '',
         )}
         style={{
@@ -51,7 +51,7 @@ export const ExecutionLanes = ({
           <div className="absolute inset-x-0 top-0 h-px bg-border/40" />
         ) : null}
         {activeLevel === level.level ? (
-          <div className="absolute inset-y-0 left-0 w-[2px] bg-accent/70" />
+          <div className="absolute inset-y-0 left-0 w-[2px] bg-signal/60" />
         ) : null}
       </div>
     ))}

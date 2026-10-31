@@ -22,7 +22,11 @@ type AgentFlowNode = Node<TGraphNodeData, 'agent'>;
  * alto lo calcula `cardHeight` (`lib/cardHeight.ts`) y lo comparten los carriles
  * de ejecución.
  */
-const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) => {
+const AgentNodeComponent = ({
+  id,
+  data,
+  selected,
+}: NodeProps<AgentFlowNode>) => {
   // Resaltado de foco por contexto (contrato de render §1.2/§2).
   const focusOpacity = useNodeFocusOpacity(id);
   // Realce de atención: solo el nodo afectado, leído del contexto (FR-009/A6).
@@ -31,24 +35,26 @@ const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) =>
   // Activo mientras corre, reintenta, compacta o espera permiso/respuesta
   // (FR-015/FR-017); un estado terminal ya no está activo.
   const isRunning = isActiveStatus(data.status);
-  const parallel = data.parallel && data.parallel.size > 1 ? data.parallel : null;
+  const parallel =
+    data.parallel && data.parallel.size > 1 ? data.parallel : null;
 
   return (
     <div
       style={focusOpacity === undefined ? undefined : { opacity: focusOpacity }}
       className={cn(
-        'group relative h-full w-full min-w-0 rounded-flat border bg-surface-2',
+        'group relative h-full w-full min-w-0 rounded-flat border bg-surface-2 transition-[border-color,box-shadow,background-color] duration-200',
+        'shadow-[inset_0_1px_0_hsl(0_0%_100%/0.04)]',
         // El pendiente gana el borde (no-color: trazo discontinuo + etiqueta
         // textual), luego la selección, luego el borde en reposo.
         hasAttention
           ? 'border-dashed border-status-waiting'
           : selected
-            ? 'border-accent'
-            : 'border-border',
-        // Color de tiradores: `--border` en reposo y `--accent` en hover/selected.
+            ? 'border-signal shadow-[inset_0_1px_0_hsl(0_0%_100%/0.05),0_0_0_1px_hsl(var(--signal)/0.28),0_18px_44px_-26px_hsl(var(--signal)/0.55)]'
+            : 'border-border/80 hover:border-border',
+        // Color de tiradores: `--border` en reposo y `--signal` en hover/selected.
         selected
-          ? '[--xy-resize-background-color:hsl(var(--accent))]'
-          : '[--xy-resize-background-color:hsl(var(--border))] group-hover:[--xy-resize-background-color:hsl(var(--accent))]',
+          ? '[--xy-resize-background-color:hsl(var(--signal))]'
+          : '[--xy-resize-background-color:hsl(var(--border))] group-hover:[--xy-resize-background-color:hsl(var(--signal))]',
       )}
     >
       {hasAttention ? (
@@ -69,7 +75,6 @@ const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) =>
         hasLoop={data.metrics.hasLoop}
       />
       <Handle type="target" position={Position.Top} className="!bg-border" />
-
       <Container
         space="none"
         className="h-full w-full min-w-0 overflow-hidden py-2.5 pl-3 pr-2.5"

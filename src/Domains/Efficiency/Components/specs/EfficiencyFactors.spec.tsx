@@ -78,9 +78,9 @@ describe('EfficiencyFactors', () => {
     const lossIcon = loss.querySelector('svg');
     const gainIcon = gain.querySelector('svg');
 
-    expect(lossIcon).toHaveAttribute('data-icon', 'circle-minus');
+    expect(lossIcon).toHaveClass('lucide-circle-minus');
     expect(lossIcon).toHaveAttribute('aria-hidden', 'true');
-    expect(gainIcon).toHaveAttribute('data-icon', 'circle-plus');
+    expect(gainIcon).toHaveClass('lucide-circle-plus');
     expect(gainIcon).toHaveAttribute('aria-hidden', 'true');
   });
 

@@ -2,7 +2,11 @@ import { createContext, useContext, useId, useRef } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import { Container } from '@app/Application/Components';
 import { ChatAttentionBadge } from '@app/Domains/Chat';
-import { WORKSPACE_TABS, type TWorkspaceTab } from '../WorkspacePage.constants';
+import {
+  WORKSPACE_TABS,
+  WORKSPACE_TAB_LABEL,
+  type TWorkspaceTab,
+} from '../WorkspacePage.constants';
 
 /**
  * Conteo de atención del subárbol abierto, publicado por `WorkspacePage` para
@@ -59,9 +63,9 @@ export const WorkspaceMobileTabs = ({
   attentionCount,
 }: WorkspaceMobileTabsProps) => {
   const baseId = useId();
-  const tabRefs = useRef<Partial<Record<TWorkspaceTab, HTMLButtonElement | null>>>(
-    {},
-  );
+  const tabRefs = useRef<
+    Partial<Record<TWorkspaceTab, HTMLButtonElement | null>>
+  >({});
   // La prop directa gana al contexto (tests y usos aislados del componente).
   const contextAttention = useContext(WorkspaceChatAttentionContext);
   const chatAttention = attentionCount ?? contextAttention;
@@ -84,7 +88,8 @@ export const WorkspaceMobileTabs = ({
     let nextIndex: number | null = null;
 
     if (event.key === 'ArrowRight') nextIndex = index === last ? 0 : index + 1;
-    else if (event.key === 'ArrowLeft') nextIndex = index === 0 ? last : index - 1;
+    else if (event.key === 'ArrowLeft')
+      nextIndex = index === 0 ? last : index - 1;
     else if (event.key === 'Home') nextIndex = 0;
     else if (event.key === 'End') nextIndex = last;
 
@@ -101,7 +106,7 @@ export const WorkspaceMobileTabs = ({
       <Container
         row
         space="none"
-        className="shrink-0 border-b border-border"
+        className="shrink-0 border-b border-border/60 bg-surface-0/50 backdrop-blur"
         role="tablist"
         aria-label="Vistas del workspace"
       >
@@ -119,13 +124,13 @@ export const WorkspaceMobileTabs = ({
             tabIndex={tab === item ? 0 : -1}
             onClick={() => onChange(item)}
             onKeyDown={(event) => handleKeyDown(event, index)}
-            className={`flex-1 px-3 py-2 text-xs font-medium capitalize ${
+            className={`relative flex-1 px-3 py-2.5 text-xs font-medium capitalize transition-colors ${
               tab === item
-                ? 'border-b-2 border-accent text-foreground'
-                : 'text-muted-foreground'
+                ? 'text-foreground after:absolute after:inset-x-3 after:bottom-0 after:h-[2px] after:rounded-full after:bg-signal'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            {item}
+            {WORKSPACE_TAB_LABEL[item]}
             {item === 'chat' ? (
               <ChatAttentionBadge count={chatAttention} />
             ) : null}

@@ -17,7 +17,11 @@ export const SummaryCounterBadge = ({ counter }: SummaryCounterBadgeProps) => (
     className="flex shrink-0 items-center gap-1"
   >
     <StatusDot status={counter.status} />
-    <span className="text-foreground">{counter.count}</span>
-    <span>{counter.label}</span>
+    <span className="font-mono text-[10px] font-semibold text-foreground">
+      {counter.count}
+    </span>
+    <span className="text-[9px] uppercase tracking-[0.1em] text-muted-foreground/75">
+      {counter.label}
+    </span>
   </span>
 );

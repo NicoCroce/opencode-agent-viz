@@ -32,17 +32,24 @@
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
-  --height-control: 2.6rem;
+  --height-control: 2.4rem;
   --height-control-2x: calc(var(--height-control) * 2);
   --width-control: var(--height-control);
 
-  /* Dark / Flat design tokens (plan.md → Design Direction) */
+  /* Direction: "Signal Deck" — a dark instrument panel where cyan is data,
+     never decoration. */
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display:
+    'Space Grotesk', 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --color-surface-0: hsl(var(--surface-0));
   --color-surface-1: hsl(var(--surface-1));
   --color-surface-2: hsl(var(--surface-2));
+  --color-surface-3: hsl(var(--surface-3));
+
+  /* Vivid cyan used as the live signal: focus, selection, activity, primary. */
+  --color-signal: hsl(var(--signal));
 
   --color-status-running: hsl(var(--status-running));
   --color-status-waiting: hsl(var(--status-waiting));
@@ -50,73 +57,91 @@
   --color-status-error: hsl(var(--status-error));
   --color-status-idle: hsl(var(--status-idle));
 
-  --radius-flat: 4px;
+  --radius-flat: 6px;
 }
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    /* Light fallback: a pale cyan-tinted paper, never used by the app today
+       (the shell is dark-only) but kept coherent for embedded surfaces. */
+    --background: 195 40% 97%;
+    --foreground: 201 45% 9%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 201 45% 9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 24 92% 49%;
-    --primary-foreground: 355.7 100% 97.3%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 100% 95.3%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --radius: 0.5rem;
-    --ring: 346.8 77.2% 49.8%;
-    --chart-1: 347 77% 50%;
-    --chart-2: 352 83% 91%;
-    --chart-3: 350 80% 72%;
-    --chart-4: 351 83% 82%;
-    --chart-5: 349 77% 62%;
+    --popover-foreground: 201 45% 9%;
+    --primary: 188 92% 27%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 197 30% 93%;
+    --secondary-foreground: 201 45% 12%;
+    --muted: 197 30% 94%;
+    --muted-foreground: 200 14% 38%;
+    --accent: 194 35% 91%;
+    --accent-foreground: 201 45% 12%;
+    --destructive: 356 65% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 198 25% 86%;
+    --input: 198 25% 82%;
+    --radius: 0.75rem;
+    --ring: 188 92% 27%;
+    --chart-1: 188 92% 32%;
+    --chart-2: 199 85% 42%;
+    --chart-3: 168 55% 34%;
+    --chart-4: 213 70% 50%;
+    --chart-5: 188 30% 60%;
+    --surface-0: 195 40% 97%;
+    --surface-1: 195 36% 94%;
+    --surface-2: 195 32% 91%;
+    --surface-3: 195 28% 87%;
+    --signal: 188 92% 27%;
+    --status-running: 190 92% 32%;
+    --status-waiting: 32 90% 38%;
+    --status-done: 158 65% 30%;
+    --status-error: 356 70% 45%;
+    --status-idle: 200 10% 45%;
   }
 
   .dark {
-    --background: 20 14.3% 4.1%;
-    --foreground: 0 0% 95%;
-    --card: 24 9.8% 10%;
-    --card-foreground: 0 0% 95%;
-    --popover: 0 0% 9%;
-    --popover-foreground: 0 0% 95%;
-    --primary: 24 92% 49%;
-    --primary-foreground: 355.7 100% 97.3%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 15%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 12 6.5% 15.1%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 84% 65%; /* WCAG AA: ≥4.5:1 como texto en dark */
-    --destructive-foreground: 0 85.7% 97.3%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 221.2 83.2% 53.3%;
-    --chart-1: 347 77% 50%;
-    --chart-2: 349 77% 62%;
-    --chart-3: 350 80% 72%;
-    --chart-4: 351 83% 82%;
-    --chart-5: 352 83% 91%;
+    /* Signal Deck — abyss / hull / panel / lifted panel. One hue (cyan-blue),
+       lightness does the elevation work; cyan only carries data. */
+    --background: 206 46% 4%; /* #060B0F */
+    --foreground: 188 34% 93%; /* #E6F4F6 */
+    --card: 205 39% 6%; /* #091117 */
+    --card-foreground: 188 34% 93%;
+    --popover: 204 36% 8%; /* #0D171F */
+    --popover-foreground: 188 34% 93%;
+    --primary: 186 92% 56%; /* #1FE7F3 */
+    --primary-foreground: 200 80% 5%; /* #02090C */
+    --secondary: 201 30% 12%; /* #16232B */
+    --secondary-foreground: 188 30% 92%;
+    --muted: 201 30% 10%;
+    --muted-foreground: 196 14% 63%; /* #93A5AC */
+    --accent: 196 38% 13%; /* hover surface, cyan-dusted */
+    --accent-foreground: 188 40% 96%;
+    --destructive: 357 82% 67%; /* #F46A72 */
+    --destructive-foreground: 200 80% 5%;
+    --border: 199 30% 15%; /* #1B2A33 */
+    --input: 200 34% 11%; /* inputs sit inset, darker than the panel */
+    --radius: 0.75rem;
+    --ring: 186 92% 56%;
+    --chart-1: 186 92% 58%;
+    --chart-2: 199 88% 62%;
+    --chart-3: 166 60% 52%;
+    --chart-4: 214 82% 68%;
+    --chart-5: 188 34% 72%;
 
-    /* Dark / Flat surfaces + status LEDs */
-    --surface-0: 220 24% 5%;
-    --surface-1: 218 22% 8%;
-    --surface-2: 215 21% 11%;
-    --status-running: 199 89% 60%;
-    --status-waiting: 38 92% 55%;
-    --status-done: 140 55% 47%;
-    --status-error: 0 84% 60%;
-    --status-idle: 220 9% 60%; /* WCAG AA: ≥4.5:1 como texto en dark */
+    --surface-0: 206 46% 4%;
+    --surface-1: 205 39% 6%;
+    --surface-2: 203 34% 9%;
+    --surface-3: 202 30% 12%;
+
+    --signal: 186 92% 56%;
+
+    --status-running: 186 90% 58%;
+    --status-waiting: 39 95% 62%;
+    --status-done: 158 68% 56%;
+    --status-error: 357 84% 67%;
+    --status-idle: 198 12% 63%;
   }
 }
 
@@ -124,15 +149,113 @@
   * {
     @apply border-border;
   }
+
+  html {
+    color-scheme: dark;
+  }
+
   body {
     @apply bg-background text-foreground;
+    background-image:
+      radial-gradient(
+        1100px 520px at 18% -12%,
+        hsl(var(--signal) / 0.07),
+        transparent 62%
+      ),
+      radial-gradient(
+        900px 480px at 92% 108%,
+        hsl(214 82% 60% / 0.05),
+        transparent 60%
+      );
+    background-attachment: fixed;
   }
+
+  ::selection {
+    background-color: hsl(var(--signal) / 0.28);
+    color: hsl(var(--foreground));
+  }
+
+  /* Thin instrument scrollbars. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+    background-color: hsl(var(--border));
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(196 24% 28%);
+  }
+}
+
+/* Controles del lienzo: mismo lenguaje de instrumento que el resto (hairline,
+   superficie hull, iconos de trazo). */
+.react-flow__controls {
+  overflow: hidden;
+  border: 1px solid hsl(var(--border) / 0.7);
+  border-radius: 10px;
+  background: hsl(var(--surface-1) / 0.9);
+  box-shadow: 0 14px 34px -22px hsl(0 0% 0% / 0.9);
+  backdrop-filter: blur(12px);
+}
+
+.react-flow__controls-button {
+  width: 30px;
+  height: 30px;
+  border-bottom: 1px solid hsl(var(--border) / 0.5);
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.react-flow__controls-button:hover {
+  background: hsl(var(--surface-2));
+  color: hsl(var(--foreground));
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: 0;
+}
+
+.react-flow__controls-button svg {
+  max-width: 12px;
+  max-height: 12px;
+  fill: currentColor;
+}
+
+.react-flow__controls-button:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: -2px;
 }
 
 html {
   font-size: 15px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  letter-spacing: -0.03em;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -163,7 +286,7 @@ html {
 }
 
 .lane-in {
-  animation: lane-in 260ms ease-out both;
+  animation: lane-in 260ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
 /* Barrido de brillo del rail de un nodo activo ("pensando"): CSS puro, sin
@@ -189,10 +312,10 @@ html {
   background: linear-gradient(
     to bottom,
     transparent 0%,
-    hsl(var(--status-running)) 50%,
+    hsl(0 0% 100% / 0.9) 50%,
     transparent 100%
   );
-  animation: rail-scan 1.6s ease-in-out infinite;
+  animation: rail-scan 1.9s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 
 /* Indicador de escritura del chat (FR-004): tres puntos que pulsan en escalera.
@@ -239,7 +362,58 @@ html {
 }
 
 .growth-reveal {
-  animation: growth-reveal 600ms ease-out;
+  animation: growth-reveal 600ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Command bar signal: a single cyan hairline that carries the product's
+   "live" state. The light sweep is decorative and stops for reduced motion. */
+@keyframes signal-sweep {
+  0% {
+    transform: translateX(-30%);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateX(130%);
+    opacity: 0;
+  }
+}
+
+.signal-sweep {
+  animation: signal-sweep 7s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--status-done) / 0.45);
+  }
+  60% {
+    box-shadow: 0 0 0 4px hsl(var(--status-done) / 0);
+  }
+}
+
+.live-pulse {
+  animation: live-pulse 2.4s cubic-bezier(0.23, 1, 0.32, 1) infinite;
+}
+
+@keyframes signal-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--signal) / 0.42);
+  }
+  60% {
+    box-shadow: 0 0 0 4px hsl(var(--signal) / 0);
+  }
+}
+
+.signal-pulse {
+  animation: signal-pulse 2.2s cubic-bezier(0.23, 1, 0.32, 1) infinite;
 }
 
 :focus-visible {
@@ -252,17 +426,6 @@ body,
 #root,
 .layout {
   height: 100%;
-}
-
-:root {
-  --menu-width: 250px;
-  --menu-height: 56px;
-}
-
-@media (width <= 768px) {
-  :root {
-    --menu-width: 0px;
-  }
 }
 
 :root {

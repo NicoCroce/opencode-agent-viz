@@ -10,7 +10,7 @@ export const registerEventViewport = (queryClient: QueryClient) => {
 };
 
 const setStoreIsMobile = (width: number, queryClient: QueryClient) => {
-  const isMobile = width <= 768;
+  const isMobile = width <= 1024;
   if (queryClient.getQueryData([STORE_KEY.isMobile]) !== isMobile)
     queryClient.setQueryData([STORE_KEY.isMobile], isMobile);
 };

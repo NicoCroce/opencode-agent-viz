@@ -20,7 +20,10 @@ export const AgentNodeEffortBand = ({ effort }: AgentNodeEffortBandProps) => {
   if (!effort) return null;
 
   return (
-    <Container space="none" className="min-w-0 border-t border-border pt-1.5">
+    <Container
+      space="none"
+      className="min-w-0 border-t border-border/60 pt-1.5"
+    >
       <Container row align="center" space="none" className="min-w-0 gap-2">
         <span
           aria-hidden

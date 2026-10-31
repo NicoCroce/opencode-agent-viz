@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { formatDuration } from '@app/Application/Helpers';
 import { formatToolInput } from '@app/Application/Helpers/formatToolInput';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faChevronDown,
-  faChevronRight,
-} from '@fortawesome/free-solid-svg-icons';
+import { ChevronDown, ChevronRight, Wrench } from 'lucide-react';
 import { Container } from '@app/Application/Components';
-import { LabeledField, ToolStatusBadge } from '@app/Application/Components/Molecules';
+import {
+  LabeledField,
+  ToolStatusBadge,
+} from '@app/Application/Components/Molecules';
 import type { TToolEntry } from '@app/Domains/History/History.entity';
 
 interface ToolCallEntryProps {
@@ -28,6 +27,7 @@ export const ToolCallEntry = ({ entry }: ToolCallEntryProps) => {
 
   const hasResult = entry.result !== null;
   const hasError = entry.error !== null;
+  const Chevron = expanded ? ChevronDown : ChevronRight;
 
   return (
     <Container space="none">
@@ -35,14 +35,21 @@ export const ToolCallEntry = ({ entry }: ToolCallEntryProps) => {
         type="button"
         onClick={() => setExpanded((value) => !value)}
         aria-expanded={expanded}
-        className="flex w-full items-center gap-2 py-1 text-left text-foreground transition-colors hover:text-accent"
+        className="flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-foreground/90 transition-colors hover:bg-surface-1 hover:text-foreground"
       >
-        <FontAwesomeIcon
-          icon={expanded ? faChevronDown : faChevronRight}
-          className="shrink-0 text-[10px] text-muted-foreground"
+        <Chevron
+          className="size-2.5 shrink-0 text-muted-foreground"
           aria-hidden
         />
-        <span className="min-w-0 truncate font-mono text-xs">{entry.name}</span>
+        <span
+          aria-hidden
+          className="inline-flex size-4 shrink-0 items-center justify-center rounded border border-border/60 bg-surface-1 text-muted-foreground"
+        >
+          <Wrench className="size-2.5" strokeWidth={1.8} />
+        </span>
+        <span className="min-w-0 truncate font-mono text-[11px]">
+          {entry.name}
+        </span>
         <ToolStatusBadge status={entry.status} />
         <span className="ml-auto shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
           {formatDuration(entry.durationMs)}
@@ -52,7 +59,7 @@ export const ToolCallEntry = ({ entry }: ToolCallEntryProps) => {
       {expanded ? (
         <Container
           space="small"
-          className="border-l border-border py-1 pl-4"
+          className="ml-1 border-l border-border/60 py-1 pl-4"
         >
           <LabeledField label="Entrada">
             <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-flat border border-border bg-surface-0 p-2 font-mono text-[11px] leading-5 text-foreground">
@@ -77,7 +84,9 @@ export const ToolCallEntry = ({ entry }: ToolCallEntryProps) => {
           ) : null}
 
           {!hasResult && !hasError ? (
-            <p className="text-xs text-muted-foreground">Sin resultado todavía.</p>
+            <p className="text-xs text-muted-foreground">
+              Sin resultado todavía.
+            </p>
           ) : null}
         </Container>
       ) : null}

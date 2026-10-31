@@ -4,8 +4,7 @@ import type {
   PointerEvent as ReactPointerEvent,
   ReactNode,
 } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faMaximize, faMinimize } from '@fortawesome/free-solid-svg-icons';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import {
   Container,
   Tabs,
@@ -211,11 +210,11 @@ export const InspectorPane = ({
             space="small"
             justify="between"
             align="center"
-            className="shrink-0"
+            className="shrink-0 border-b border-border/60 bg-surface-0/40 px-2 py-2"
           >
             <TabsList
               aria-label="Vistas del panel de detalle"
-              className="m-2 shrink-0"
+              className="shrink-0"
             >
               {detailTabs.tabs.map((item) => (
                 <TabsTrigger key={item.id} value={item.id}>
@@ -236,12 +235,13 @@ export const InspectorPane = ({
                     : 'Pantalla completa'
                 }
                 onClick={onToggleFullscreen}
-                className="mr-2 inline-flex size-7 shrink-0 items-center justify-center rounded-flat text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="mr-1 inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
-                <FontAwesomeIcon
-                  icon={isFullscreen ? faMinimize : faMaximize}
-                  aria-hidden
-                />
+                {isFullscreen ? (
+                  <Minimize2 aria-hidden className="size-4" strokeWidth={1.8} />
+                ) : (
+                  <Maximize2 aria-hidden className="size-4" strokeWidth={1.8} />
+                )}
               </button>
             ) : null}
           </Container>

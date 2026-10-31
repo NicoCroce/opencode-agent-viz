@@ -47,13 +47,13 @@ export const GutterNode = ({ data }: NodeProps<TGutterNode>) => {
     <div
       className={cn(
         'relative flex h-full w-full flex-col justify-center gap-1 border-r px-4',
-        data.active ? 'border-accent/70' : 'border-border/70',
+        data.active ? 'border-signal/35' : 'border-border/60',
       )}
     >
       <span
         className={cn(
-          'font-mono text-base font-semibold leading-none tabular-nums',
-          data.active ? 'text-accent' : 'text-foreground/85',
+          'font-mono text-[13px] font-semibold leading-none tracking-[0.08em] tabular-nums',
+          data.active ? 'text-signal' : 'text-muted-foreground/70',
         )}
       >
         {String(data.level).padStart(2, '0')}
@@ -64,7 +64,9 @@ export const GutterNode = ({ data }: NodeProps<TGutterNode>) => {
       <span className="flex items-center gap-1.5 font-mono text-[11px] tabular-nums text-muted-foreground">
         <span>{formatDuration(data.endedAt - data.startedAt)}</span>
         <span aria-hidden>·</span>
-        <span>{data.count > 1 ? `∥ ${data.count} en paralelo` : '1 agente'}</span>
+        <span>
+          {data.count > 1 ? `∥ ${data.count} en paralelo` : '1 agente'}
+        </span>
       </span>
       <span
         aria-hidden

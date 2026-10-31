@@ -57,9 +57,9 @@ describe('EfficiencyFindingCard', () => {
   });
 
   it.each([
-    ['alta', 'circle-exclamation'],
-    ['media', 'triangle-exclamation'],
-    ['baja', 'circle-info'],
+    ['alta', 'circle-alert'],
+    ['media', 'triangle-alert'],
+    ['baja', 'info'],
   ] as const)(
     'comunica la severidad %s con texto e icono decorativo',
     (severity: TSeverity, iconName: string) => {
@@ -68,7 +68,7 @@ describe('EfficiencyFindingCard', () => {
       const label = screen.getByText(`Severidad ${SEVERITY_LABEL[severity]}`);
       const icon = label.querySelector('svg');
 
-      expect(icon).toHaveAttribute('data-icon', iconName);
+      expect(icon).toHaveClass(`lucide-${iconName}`);
       expect(icon).toHaveAttribute('aria-hidden', 'true');
     },
   );

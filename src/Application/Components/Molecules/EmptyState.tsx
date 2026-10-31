@@ -1,10 +1,10 @@
 import { AlertMessage } from '../Organisms/AlertMessage';
-import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
+import type { LucideIcon } from 'lucide-react';
 
 interface EmptyStateProps {
   title: string;
   description?: string;
-  icon?: IconDefinition;
+  icon?: LucideIcon;
   action?: {
     label: string;
     onClick: () => void;

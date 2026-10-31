@@ -1,11 +1,10 @@
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
 import {
-  faCircleCheck,
-  faCircleExclamation,
-  faThumbsUp,
-  faTriangleExclamation,
-} from '@fortawesome/free-solid-svg-icons';
+  CircleAlert,
+  CircleCheck,
+  ThumbsUp,
+  TriangleAlert,
+  type LucideIcon,
+} from 'lucide-react';
 import { Container } from '@app/Application/Components';
 import { formatPercent } from '@app/Application/Helpers';
 import { cn } from '@app/Application/lib/utils';
@@ -23,11 +22,11 @@ export interface EfficiencyVerdictProps {
 }
 
 /** Icono por banda: la señal nunca depende solo del color (FR-041). */
-const BAND_ICON: Record<TBand, IconDefinition> = {
-  eficiente: faCircleCheck,
-  aceptable: faThumbsUp,
-  mejorable: faTriangleExclamation,
-  friccion: faCircleExclamation,
+const BAND_ICON: Record<TBand, LucideIcon> = {
+  eficiente: CircleCheck,
+  aceptable: ThumbsUp,
+  mejorable: TriangleAlert,
+  friccion: CircleAlert,
 };
 
 /** Tono por banda con tokens del tema; nunca rojo (R11). */
@@ -56,6 +55,7 @@ export const EfficiencyVerdict = ({ report }: EfficiencyVerdictProps) => {
   if (score === null || band === null) return null;
 
   const bandLabel = BAND_LABEL[band];
+  const BandIcon = BAND_ICON[band];
   const coverageDigits = Number.isInteger(coverage) ? 0 : 1;
   const coverageLabel = formatPercent(coverage, coverageDigits);
 
@@ -77,7 +77,7 @@ export const EfficiencyVerdict = ({ report }: EfficiencyVerdictProps) => {
             BAND_TONE[band],
           )}
         >
-          <FontAwesomeIcon icon={BAND_ICON[band]} className="size-3.5" />
+          <BandIcon className="size-3.5" />
           {bandLabel}
         </span>
       </Container>

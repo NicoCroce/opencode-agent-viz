@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { faChartLine } from '@fortawesome/free-solid-svg-icons';
+import { ChartLine } from 'lucide-react';
 import {
   Button,
   Container,
@@ -18,15 +18,10 @@ import { queryKeys } from '@app/Domains/queryKeys';
 import { SESSIONS_LIST_ROUTE } from '@app/Domains/Sessions';
 import type { TSessionSummary } from '@app/Domains/Inspector';
 
-/**
- * Forma mínima del resultado cacheado de raíces (`sessions.roots`) que necesita
- * el panel: solo el corte del **listado** de su directorio (FR-006).
- */
 interface TCachedRootsTruncation {
   truncated?: boolean;
 }
 
-/** Modo "seguir nodo activo" del grafo (forma de `useFollowMode`). */
 export interface TFollowMode {
   enabled: boolean;
   toggle: () => void;
@@ -42,44 +37,19 @@ interface GraphPaneProps {
   onClearSelection: () => void;
   onOpenHistory: (sessionId: string) => void;
   rootId: string | null;
-  /**
-   * Ids de nodos con un pendiente de atención (FR-009); se reenvía a
-   * `AgentGraph` para el realce por contexto, sin tocar `data` ni re-layoutar.
-   */
   attentionNodeIds?: ReadonlySet<string>;
-  /**
-   * Abre el panel de eficiencia con el **disparador real** (contrato overlay
-   * §1): el overlay guarda la referencia para devolverle el foco al cerrar
-   * (FR-005). Opcional para no romper consumos/tests que solo miran el grafo.
-   */
   onOpenEfficiency?: (trigger: HTMLElement) => void;
-  /**
-   * Presentación móvil: el botón `Eficiencia` queda en solo icono y su
-   * `aria-label` aporta el nombre accesible (contrato overlay §1).
-   */
   isMobile?: boolean;
 }
 
 /**
- * Panel del grafo: cabecera (contador de agentes + resumen + botón seguir) y
+ * Panel del grafo: cabecera instrumental (contador + resumen + acciones) y
  * cuerpo con el orden de estados obligatorio **error → carga → no encontrada →
  * vacío → datos** (FR-004/FR-005/FR-008, Principio VI).
  *
- * "No encontrada" (sesión inexistente) es un estado propio, **distinto** de
- * "sin agentes" y del error, y siempre ofrece salida al listado de sesiones: la
- * carga acotada tiene prioridad sobre él y ningún estado queda sin salida
- * (SC-002, contrato de subárbol §4).
- *
- * Los componentes de presentación se importan por el **barrel** de dominio para
- * que los `vi.mock('@app/Domains/Graph')` de los specs sigan interceptándolos
- * (no montar React Flow real en los tests).
- *
- * El aviso de truncamiento (FR-006) se monta **entre la cabecera y el lienzo**,
- * de forma persistente y sin bloquear el grafo: no hay estado que lo oculte ni
- * acción dentro de él (informativo puro, `role="status"`). Se acota al
- * **directorio de la sesión que se está viendo**: el del subárbol (`graph.truncated`)
- * o el de su listado de raíces leído de la caché (`sessions.roots(directory)`),
- * nunca el agregado de todos los proyectos (review 1, amarillo 4).
+ * La cabecera deja de competir con el lienzo: el contador de agentes es la
+ * cifra protagonista, el resumen son pares etiqueta/valor y las acciones viven
+ * a la derecha en una única fila.
  */
 export const GraphPane = ({
   graph,
@@ -97,22 +67,12 @@ export const GraphPane = ({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  // Directorio de la sesión que se está viendo: todos los nodos del subárbol
-  // pertenecen al mismo proyecto, así que basta el nodo abierto
-  // (`data.sessionId === rootId`) y, como respaldo, el primer nodo. Sin nodos
-  // (p. ej. sesión inexistente) el directorio es indeterminable y el aviso no se
-  // muestra: no hay un corte propio que declarar.
   const viewedDirectory =
     graph.graph.nodes.find((node) => node.data.sessionId === rootId)?.data
       .directory ??
     graph.graph.nodes[0]?.data.directory ??
     null;
 
-  // El corte del **listado de raíces** se lee de la caché por el directorio
-  // abierto (`sessions.roots(directory)`, ya poblada por el cargador del
-  // subárbol): usar el agregado de `useRootSessions` marcaba "vista parcial" al
-  // abrir un proyecto completo si **otro** proyecto se había cortado (review 1,
-  // amarillo 4). No abre ninguna consulta nueva.
   const rootsTruncated =
     viewedDirectory === null
       ? false
@@ -120,36 +80,48 @@ export const GraphPane = ({
           queryKeys.sessions.roots(viewedDirectory),
         )?.truncated ?? false);
 
-  // El corte del subárbol (`graph.truncated`) ya está acotado por construcción a
-  // la sesión abierta; se suma el del listado de su propio directorio.
   const isTruncated = graph.truncated || rootsTruncated;
+  const agentCount = graph.graph.nodes.length;
 
   return (
     <Container space="none" className="h-full min-h-0 min-w-0">
       <Container
         row
-        space="small"
+        space="none"
         justify="between"
         align="center"
-        className="min-w-0 shrink-0 border-b border-border px-3 py-2"
+        className="shrink-0 gap-3 border-b border-border/60 bg-surface-0/40 px-4 py-2"
       >
         <Container row space="small" align="center" className="min-w-0">
-          <span className="shrink-0 font-mono text-xs text-muted-foreground">
-            {graph.graph.nodes.length} agentes
+          <span
+            role="group"
+            className="flex shrink-0 items-baseline gap-1.5"
+            aria-label={`${agentCount} ${agentCount === 1 ? 'agente' : 'agentes'}`}
+          >
+            <span className="font-display text-lg font-semibold leading-none tabular-nums text-foreground">
+              {agentCount}
+            </span>
+            <span className="text-[9px] font-medium uppercase leading-none tracking-[0.16em] text-muted-foreground">
+              {agentCount === 1 ? 'agente' : 'agentes'}
+            </span>
           </span>
-          {summary ? <SessionSummaryBar summary={summary} /> : null}
+          {summary ? (
+            <>
+              <span aria-hidden className="h-4 w-px shrink-0 bg-border/60" />
+              <SessionSummaryBar
+                summary={summary}
+                compact={isMobile}
+                metricsClassName="hidden 2xl:flex"
+              />
+            </>
+          ) : null}
         </Container>
         <Container row space="small" align="center" className="shrink-0">
-          {/*
-            Entrada al análisis de eficiencia (contrato overlay §1): solo con al
-            menos un nodo, porque sin sesión no hay nada que analizar. Va
-            **antes** de `Seguir` para no desplazar el control existente y en
-            móvil se reduce a icono con nombre accesible.
-          */}
-          {graph.graph.nodes.length > 0 ? (
+          {agentCount > 0 ? (
             <Button
               variant="outline"
-              icon={faChartLine}
+              size="sm"
+              icon={ChartLine}
               showIcon
               aria-haspopup="dialog"
               aria-label={isMobile ? 'Abrir análisis de eficiencia' : undefined}
@@ -159,7 +131,8 @@ export const GraphPane = ({
             </Button>
           ) : null}
           <Button
-            variant="outline"
+            variant={follow.enabled ? 'default' : 'outline'}
+            size="sm"
             onClick={follow.toggle}
             aria-pressed={follow.enabled}
           >
@@ -171,36 +144,32 @@ export const GraphPane = ({
         <GraphTruncationBanner className="shrink-0 rounded-none border-x-0 border-t-0" />
       ) : null}
       <Container block className="min-h-0 min-w-0 flex-1">
-        {/*
-          Orden de estados del contrato de subárbol §4, sin excepción:
-          error → carga acotada → no encontrada → vacío → datos. "No encontrada"
-          (sesión inexistente / 404) ofrece salida al listado; el fallo real de
-          datos se queda en `EmptyScreenError` (no se colapsa con "no
-          encontrada" ni con "sin agentes"). La carga es **acotada**: el estado
-          que la gobierna (`isLoading`) solo lo marca la resolución del
-          `directory` o la estructura, nunca un esqueleto terminal (FR-004/
-          FR-005, SC-002).
-        */}
         {graph.isError ? (
-          <EmptyScreenError message={graph.error?.message} />
+          <Container align="center" justify="center" className="h-full p-6">
+            <EmptyScreenError message={graph.error?.message} />
+          </Container>
         ) : graph.isLoading ? (
           <GraphSkeleton />
         ) : graph.notFound ? (
-          <EmptyState
-            title="Sesión no encontrada"
-            description="Esta sesión no existe o ya no está disponible en este proyecto."
-            action={{
-              label: 'Ir al listado de sesiones',
-              onClick: () => {
-                void navigate(SESSIONS_LIST_ROUTE);
-              },
-            }}
-          />
-        ) : graph.graph.nodes.length === 0 ? (
-          <EmptyState
-            title="Sin agentes"
-            description="Esta sesión todavía no reportó agentes."
-          />
+          <Container align="center" justify="center" className="h-full p-6">
+            <EmptyState
+              title="Sesión no encontrada"
+              description="Esta sesión no existe o ya no está disponible en este proyecto."
+              action={{
+                label: 'Ir al listado de sesiones',
+                onClick: () => {
+                  void navigate(SESSIONS_LIST_ROUTE);
+                },
+              }}
+            />
+          </Container>
+        ) : agentCount === 0 ? (
+          <Container align="center" justify="center" className="h-full p-6">
+            <EmptyState
+              title="Sin agentes"
+              description="Esta sesión todavía no reportó agentes."
+            />
+          </Container>
         ) : (
           <AgentGraph
             graph={graph.graph}

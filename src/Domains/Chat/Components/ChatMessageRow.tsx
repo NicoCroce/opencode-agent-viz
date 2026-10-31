@@ -84,7 +84,9 @@ export const ChatMessageRow = memo(function ChatMessageRow({
       data-testid="chat-message-row"
       data-role={entry.role}
       className={`flex min-w-0 max-w-[85%] flex-col gap-1 break-words ${
-        isUser ? 'self-end items-end' : 'self-start items-start'
+        isUser
+          ? 'self-end items-end rounded-xl border border-border/60 bg-surface-2/70 px-3 py-2'
+          : 'self-start items-start'
       }`}
     >
       {entry.history ? (

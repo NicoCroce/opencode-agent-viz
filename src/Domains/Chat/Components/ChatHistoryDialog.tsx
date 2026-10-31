@@ -1,10 +1,11 @@
 import { useId, useState, type RefObject } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { Search, X } from 'lucide-react';
 import {
-  faMagnifyingGlass,
-  faXmark,
-} from '@fortawesome/free-solid-svg-icons';
-import { Container, EmptyState, Label, Toggle } from '@app/Application/Components';
+  Container,
+  EmptyState,
+  Label,
+  Toggle,
+} from '@app/Application/Components';
 import { Button } from '@app/Application/Components/ui/button';
 import { Input } from '@app/Application/Components/ui/input';
 import {
@@ -256,8 +257,7 @@ export const ChatHistoryDialog = ({
               <Label htmlFor={searchId} className="sr-only">
                 Buscar en los mensajes
               </Label>
-              <FontAwesomeIcon
-                icon={faMagnifyingGlass}
+              <Search
                 aria-hidden
                 className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
               />
@@ -280,11 +280,7 @@ export const ChatHistoryDialog = ({
                   data-testid="chat-history-search-clear"
                   className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 p-0"
                 >
-                  <FontAwesomeIcon
-                    icon={faXmark}
-                    aria-hidden
-                    className="size-3.5"
-                  />
+                  <X aria-hidden className="size-3.5" />
                 </Button>
               )}
             </Container>

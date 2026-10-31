@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { faChevronDown } from '@fortawesome/free-solid-svg-icons';
+import { ChevronDown } from 'lucide-react';
 import {
   Button,
   Checkbox,
@@ -63,7 +63,7 @@ export const MultiSelectFilterPopover = ({
         <Button
           variant="outline"
           showIcon
-          icon={faChevronDown}
+          icon={ChevronDown}
           aria-label={`${ariaLabel}: ${summary}`}
         >
           {summary}

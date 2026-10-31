@@ -1,10 +1,5 @@
 import { type RefObject } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faClockRotateLeft,
-  faEye,
-  faEyeSlash,
-} from '@fortawesome/free-solid-svg-icons';
+import { Eye, EyeOff, History } from 'lucide-react';
 import { Container } from '@app/Application/Components';
 import { Button } from '@app/Application/Components/ui/button';
 import {
@@ -100,11 +95,11 @@ export const ChatToolbar = ({
               data-testid="chat-tools-toggle"
               className="h-8 w-8 rounded-full p-0"
             >
-              <FontAwesomeIcon
-                icon={showTools ? faEye : faEyeSlash}
-                aria-hidden
-                className="size-3"
-              />
+              {showTools ? (
+                <Eye aria-hidden className="size-3.5" strokeWidth={1.8} />
+              ) : (
+                <EyeOff aria-hidden className="size-3.5" strokeWidth={1.8} />
+              )}
             </Button>
           </TooltipTrigger>
           <TooltipContent>{toolsLabel}</TooltipContent>
@@ -122,11 +117,7 @@ export const ChatToolbar = ({
         data-testid="chat-history-open"
         className="h-8 w-8 rounded-full p-0"
       >
-        <FontAwesomeIcon
-          icon={faClockRotateLeft}
-          aria-hidden
-          className="size-3"
-        />
+        <History aria-hidden className="size-3.5" strokeWidth={1.8} />
       </Button>
     </Container>
   );

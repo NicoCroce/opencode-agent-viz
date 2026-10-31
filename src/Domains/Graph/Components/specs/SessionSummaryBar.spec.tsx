@@ -4,7 +4,9 @@ import { EMPTY_METRICS, type TNodeStatus } from '../../Graph.entity';
 import type { TSessionSummary } from '../../../Inspector/Inspector.entity';
 import { SessionSummaryBar } from '../SessionSummaryBar';
 
-const summary = (overrides: Partial<TSessionSummary> = {}): TSessionSummary => ({
+const summary = (
+  overrides: Partial<TSessionSummary> = {},
+): TSessionSummary => ({
   rootSessionId: 'ses_root',
   metrics: {
     ...EMPTY_METRICS,
@@ -109,14 +111,14 @@ describe('SessionSummaryBar', () => {
       sessionSpeedup: { serialMs: 120_000, wallMs: 48_000, speedup: 2.5 },
     });
 
-    expect(screen.getByText('Paralelismo')).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Paralelismo/)).toBeInTheDocument();
     expect(screen.getByText('×2.5')).toBeInTheDocument();
   });
 
   it('shows "no disponible" for the global parallelism without a speedup', () => {
     renderBar({ sessionSpeedup: { serialMs: null, wallMs: 0, speedup: null } });
 
-    expect(screen.getByText('Paralelismo')).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Paralelismo/)).toBeInTheDocument();
     // Costo, Tokens y Tiempo siguen presentes; el paralelismo cae a "no disponible".
     expect(screen.getAllByLabelText('no disponible')).toHaveLength(1);
   });

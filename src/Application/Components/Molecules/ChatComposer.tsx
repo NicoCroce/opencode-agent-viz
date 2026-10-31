@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import type { FormEvent, KeyboardEvent, ReactNode } from 'react';
-import { faPaperPlane, faStop } from '@fortawesome/free-solid-svg-icons';
+import { Send, Square } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -96,7 +96,10 @@ export const ChatComposer = ({
       onSubmit={handleSubmit}
       aria-busy={isSubmitting}
     >
-      <Container space="small">
+      <Container
+        space="small"
+        className="rounded-xl border border-border/70 bg-surface-1/60 p-2 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.03)] transition-[border-color,box-shadow] duration-150 focus-within:border-signal/35 focus-within:shadow-[inset_0_1px_0_hsl(0_0%_100%/0.03),0_0_0_3px_hsl(var(--signal)/0.07)]"
+      >
         <Label htmlFor={textareaId} className="sr-only">
           Mensaje
         </Label>
@@ -110,6 +113,7 @@ export const ChatComposer = ({
           disabled={isDisabled}
           rows={3}
           placeholder="Escribe un mensaje…"
+          className="min-h-[68px] resize-none border-0 bg-transparent px-1.5 py-1.5 focus-visible:border-0 focus-visible:bg-transparent focus-visible:ring-0"
         />
 
         {/* Fila inferior tipo Copilot: chips del chat a la izquierda y un
@@ -119,7 +123,7 @@ export const ChatComposer = ({
           align="center"
           justify="between"
           space="small"
-          className="flex-wrap"
+          className="flex-wrap border-t border-border/50 pt-1.5"
         >
           <Container
             row
@@ -145,20 +149,22 @@ export const ChatComposer = ({
                     type="button"
                     variant="ghost"
                     showIcon
-                    icon={faStop}
+                    icon={Square}
                     aria-label="Detener el turno"
                     disabled={!canInterrupt}
                     isLoading={isInterrupting}
                     aria-busy={isInterrupting}
-                    className="h-8 w-8 rounded-lg p-0 text-muted-foreground hover:text-foreground"
+                    className="size-8 rounded-full p-0 text-muted-foreground hover:bg-accent hover:text-destructive"
                   />
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>¿Detener el turno en curso?</AlertDialogTitle>
+                    <AlertDialogTitle>
+                      ¿Detener el turno en curso?
+                    </AlertDialogTitle>
                     <AlertDialogDescription>
-                      Se interrumpirá el turno de esta sesión. Las sesiones hijas
-                      (subagentes) continuarán en ejecución.
+                      Se interrumpirá el turno de esta sesión. Las sesiones
+                      hijas (subagentes) continuarán en ejecución.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -174,12 +180,12 @@ export const ChatComposer = ({
                 type="submit"
                 variant="ghost"
                 showIcon
-                icon={faPaperPlane}
+                icon={Send}
                 aria-label="Enviar mensaje"
                 disabled={!canSubmit}
                 isLoading={isSubmitting}
                 aria-busy={isSubmitting}
-                className="h-8 w-8 rounded-lg p-0 text-muted-foreground hover:text-foreground"
+                className="size-8 rounded-full p-0"
               />
             )}
           </Container>

@@ -610,7 +610,7 @@ describe('WorkspacePage — resize del panel de detalle (T042, P5, FR-012, SC-00
 
     // Se abre la pestaña del inspector: el panel se monta, pero los controles de
     // escritorio (separador y fullscreen) no deben existir (AGENTS §9).
-    fireEvent.click(screen.getByRole('tab', { name: 'inspector' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Detalle' }));
 
     expect(screen.getByTestId('inspector-panel')).toBeInTheDocument();
     expect(screen.queryByRole('separator')).not.toBeInTheDocument();
@@ -777,7 +777,7 @@ describe('WorkspacePage — cableado del panel de chat (T026, FR-008/FR-014)', (
       expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByRole('tab', { name: 'inspector' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Detalle' }));
 
     expect(screen.getByTestId('inspector-panel')).toBeInTheDocument();
     expect(
@@ -800,7 +800,7 @@ describe('WorkspacePage — cableado del panel de chat (T026, FR-008/FR-014)', (
     // `WorkspaceLayout` el destino quedaría vacío.
     expect(screen.queryByTestId('chat-panel')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'chat' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Chat' }));
 
     const chat = await screen.findByTestId('chat-panel');
     expect(chat).toHaveAttribute('data-session-id', SESSION_ID);

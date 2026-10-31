@@ -58,7 +58,7 @@ export const ChatAttentionBanner = ({
   return (
     <Alert
       data-testid="chat-attention-banner"
-      className={`border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800/30 dark:bg-amber-950/20 dark:text-amber-100 ${className ?? ''}`}
+      className={`border-status-waiting/25 bg-status-waiting/[0.06] ${className ?? ''}`}
     >
       <AlertTitle>El agente necesita tu respuesta</AlertTitle>
       <AlertDescription>{summary}</AlertDescription>

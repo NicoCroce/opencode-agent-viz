@@ -81,7 +81,7 @@ const SelectChip = ({
       <Select value={value} onValueChange={onValueChange} disabled={disabled}>
         <SelectTrigger
           id={id}
-          className="h-8 w-auto min-w-0 gap-1 rounded-full border-input bg-transparent px-3 text-xs [&>span]:max-w-[12rem] [&>span]:truncate"
+          className="h-8 w-auto min-w-0 gap-1 rounded-full border-border/70 bg-surface-1/60 px-3 text-xs hover:bg-surface-2 [&>span]:max-w-[12rem] [&>span]:truncate"
         >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>

@@ -46,24 +46,37 @@ export const SessionsRail = ({
   // clave de caché es la misma, así que no añade ninguna request.
   const { truncated: aggregatedTruncation } = useRootSessions();
   const isTruncated = truncated ?? aggregatedTruncation ?? false;
+  const total = groups.reduce((sum, group) => sum + group.items.length, 0);
 
   return (
-    <Container space="small" className="p-3">
-      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        Sesiones
-      </span>
-      {isTruncated ? <GraphTruncationBanner /> : null}
-      {isLoading ? (
-        <SessionListSkeleton />
-      ) : (
-        <SessionList
-          groups={groups}
-          statuses={statuses}
-          selectedId={selectedId}
-          onSelect={onSelect}
-          attentionByRoot={attentionByRoot}
-        />
-      )}
+    <Container space="none" className="h-full">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/50 px-4 py-3">
+        <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+          Sesiones
+        </span>
+        <span
+          className="rounded-full border border-border/60 px-1.5 font-mono text-[10px] tabular-nums leading-4 text-muted-foreground/80"
+          aria-label={`${total} sesiones`}
+        >
+          {total}
+        </span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto px-2 py-2">
+        <Container space="none" className="gap-1">
+          {isTruncated ? <GraphTruncationBanner /> : null}
+          {isLoading ? (
+            <SessionListSkeleton />
+          ) : (
+            <SessionList
+              groups={groups}
+              statuses={statuses}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              attentionByRoot={attentionByRoot}
+            />
+          )}
+        </Container>
+      </div>
     </Container>
   );
 };

@@ -361,7 +361,7 @@ describe('WorkspacePage — tick del resumen condicionado a nodos activos (T041,
 
     // La estructura ya está disponible (1 nodo), pero ningún nodo está activo.
     await waitFor(() =>
-      expect(screen.getByText('1 agentes')).toBeInTheDocument(),
+      expect(screen.getByRole('group', { name: '1 agente' })).toBeInTheDocument(),
     );
     expect(graphHooks.useNow).toHaveBeenCalledWith({ enabled: false });
     expect(summaryTicks().every((enabled) => enabled === false)).toBe(true);
@@ -377,7 +377,7 @@ describe('WorkspacePage — tick del resumen condicionado a nodos activos (T041,
     renderWorkspace(client);
 
     await waitFor(() =>
-      expect(screen.getByText('1 agentes')).toBeInTheDocument(),
+      expect(screen.getByRole('group', { name: '1 agente' })).toBeInTheDocument(),
     );
     await waitFor(() =>
       expect(graphHooks.useNow).toHaveBeenCalledWith({ enabled: true }),
@@ -503,7 +503,7 @@ describe('WorkspacePage — identidad de nodo estable con ~150 nodos (T053, SC-0
     // El modelo real expone los ~150 nodos en el primer render (todo en caché).
     const nodesBefore = latestGraphNodes();
     expect(nodesBefore).toHaveLength(PERF_NODE_COUNT);
-    expect(screen.getByText(`${PERF_NODE_COUNT} agentes`)).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: `${PERF_NODE_COUNT} agentes` })).toBeInTheDocument();
 
     const rootBefore = nodeById(nodesBefore, PERF_ROOT_ID);
     const rootDurationBefore = rootBefore.data.metrics.durationMs;

@@ -6,10 +6,18 @@ import {
   Page,
 } from '@app/Application/Components';
 import { GraphTruncationBanner } from '@app/Application/Components/Molecules';
-import { SessionFilterBar, SessionList, SessionListSkeleton } from '../Components';
+import {
+  SessionFilterBar,
+  SessionList,
+  SessionListSkeleton,
+} from '../Components';
 import { useRootSessions, useSessionFilters } from '../Hooks';
 import { useGetSessionStatus } from '../Sessions.service';
 import { sessionDetailPath } from '../Sessions.routes';
+
+const PAGE_TITLE = 'Sesiones de OpenCode';
+const PAGE_DESCRIPTION =
+  'Ejecuciones multiagente en vivo, agrupadas por proyecto';
 
 export const SessionListPage = () => {
   const navigate = useNavigate();
@@ -30,18 +38,32 @@ export const SessionListPage = () => {
     clearFilters,
   } = useSessionFilters(groups);
 
-  if (isError) return <EmptyScreenError message={error?.message} />;
-  if (isLoading) return <SessionListSkeleton />;
+  if (isError)
+    return (
+      <Page title={PAGE_TITLE} description={PAGE_DESCRIPTION}>
+        <EmptyScreenError message={error?.message} />
+      </Page>
+    );
+
+  if (isLoading)
+    return (
+      <Page title={PAGE_TITLE} description={PAGE_DESCRIPTION}>
+        <SessionListSkeleton />
+      </Page>
+    );
+
   if (items.length === 0)
     return (
-      <EmptyState
-        title="Sin sesiones"
-        description="No hay ejecuciones de OpenCode todavía. Inicia una para verla aquí."
-      />
+      <Page title={PAGE_TITLE} description={PAGE_DESCRIPTION}>
+        <EmptyState
+          title="Sin sesiones"
+          description="No hay ejecuciones de OpenCode todavía. Inicia una para verla aquí."
+        />
+      </Page>
     );
 
   return (
-    <Page title="Sesiones de OpenCode">
+    <Page title={PAGE_TITLE} description={PAGE_DESCRIPTION}>
       <SessionFilterBar
         options={options}
         selectedProjects={validSelected}

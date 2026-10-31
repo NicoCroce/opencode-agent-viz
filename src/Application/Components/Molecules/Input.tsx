@@ -1,8 +1,7 @@
 import { forwardRef, useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { Input as InputLib, InputProps as InputPropsLib } from '../ui/input';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Button } from './Button';
-import { faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
 import { useIsEditable } from '@app/Application/Hooks/useIsEditable';
 
 interface InputProps extends InputPropsLib {
@@ -20,7 +19,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <InputLib
         ref={ref}
-        className={`bg-white ${dateClass} ${className ?? ''}`}
+        className={`${dateClass} ${className ?? ''}`}
         disabled={forceEnabled ? false : (disabled ?? !isEditable)}
         {...props}
       />
@@ -35,18 +34,19 @@ const InputPassword = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
     <div className="relative">
       <Input
         {...props}
-        className="pr-14"
+        className="pr-10"
         type={show ? 'text' : 'password'}
         ref={ref}
       />
       <Button
         variant="ghost"
-        className="absolute right-px top-px p-3.25 h-[calc(var(--height-control)-1px)]!"
+        aria-label={show ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+        className="absolute right-1 top-1 size-7 rounded-md p-0"
         onClick={() => setShow((prev) => !prev)}
         type="button"
-      >
-        <FontAwesomeIcon icon={show ? faEyeSlash : faEye} />
-      </Button>
+        showIcon
+        icon={show ? EyeOff : Eye}
+      />
     </div>
   );
 });

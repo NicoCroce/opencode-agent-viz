@@ -59,7 +59,9 @@ export const SectionFrame = ({
 }: SectionFrameProps) => {
   const resolvedHeading =
     heading ??
-    (title !== undefined ? <SectionHeading>{title}</SectionHeading> : null);
+    (title !== undefined ? (
+      <SectionHeading marker>{title}</SectionHeading>
+    ) : null);
 
   let content: ReactNode = children;
   if (isError) {
@@ -67,8 +69,9 @@ export const SectionFrame = ({
   } else if (isLoading) {
     content = loading ?? <ListSkeleton />;
   } else if (isEmpty) {
-    content =
-      empty ?? <p className="text-xs text-muted-foreground">{emptyLabel}</p>;
+    content = empty ?? (
+      <p className="text-xs text-muted-foreground">{emptyLabel}</p>
+    );
   }
 
   return (

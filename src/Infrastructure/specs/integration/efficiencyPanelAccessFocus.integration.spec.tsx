@@ -317,7 +317,9 @@ describe('WorkspacePage · acceso, foco y cierre del panel de eficiencia (T039)'
 
     await waitFor(dialogClosed);
     // La nueva raíz se monta con su propio subárbol (un agente).
-    expect(await screen.findByText('1 agentes')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('group', { name: '1 agente' }),
+    ).toBeInTheDocument();
 
     view.unmount();
   });

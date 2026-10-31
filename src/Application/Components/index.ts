@@ -16,6 +16,8 @@ export { Link } from './Molecules/Link';
 export { List } from './Molecules/List';
 export * from './Molecules/AlertDialog';
 export { Metric } from './Molecules/Metric';
+export { SectionHeading } from './Molecules/SectionHeading';
+export { SectionFrame } from './Molecules/SectionFrame';
 export { StatusDot } from './Molecules/StatusDot';
 export { DurationBar } from './Molecules/DurationBar';
 export { RichText } from './Molecules/RichText';

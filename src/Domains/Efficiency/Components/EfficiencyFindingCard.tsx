@@ -1,10 +1,9 @@
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
 import {
-  faCircleExclamation,
-  faCircleInfo,
-  faTriangleExclamation,
-} from '@fortawesome/free-solid-svg-icons';
+  CircleAlert,
+  Info,
+  TriangleAlert,
+  type LucideIcon,
+} from 'lucide-react';
 import { Container } from '@app/Application/Components';
 import {
   Disclosure,
@@ -22,10 +21,10 @@ export interface EfficiencyFindingCardProps {
 }
 
 /** Icono por severidad: el nivel se comunica con texto + icono, nunca solo color. */
-const SEVERITY_ICON: Record<TSeverity, IconDefinition> = {
-  alta: faCircleExclamation,
-  media: faTriangleExclamation,
-  baja: faCircleInfo,
+const SEVERITY_ICON: Record<TSeverity, LucideIcon> = {
+  alta: CircleAlert,
+  media: TriangleAlert,
+  baja: Info,
 };
 
 /** Tono por severidad con tokens del tema; sin rojo (FR-027/R11). */
@@ -61,6 +60,7 @@ export const EfficiencyFindingCard = ({
   const isLongQuote =
     codePointLength(finding.quote) > PROMPT_TRUNCATE_CODE_POINTS;
   const severityLabel = SEVERITY_LABEL[finding.severity];
+  const SeverityIcon = SEVERITY_ICON[finding.severity];
 
   return (
     <article
@@ -77,11 +77,7 @@ export const EfficiencyFindingCard = ({
             SEVERITY_TONE[finding.severity],
           )}
         >
-          <FontAwesomeIcon
-            icon={SEVERITY_ICON[finding.severity]}
-            aria-hidden
-            className="size-3 shrink-0"
-          />
+          <SeverityIcon aria-hidden className="size-3 shrink-0" />
           {`${FINDING_CARD_LABEL.severity} ${severityLabel}`}
         </span>
       </header>

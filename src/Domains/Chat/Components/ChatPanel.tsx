@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBell } from '@fortawesome/free-solid-svg-icons';
+import { Bell } from 'lucide-react';
 import {
   Container,
   EmptyScreenError,
@@ -146,7 +145,7 @@ export const ChatAttentionBadge = ({
       data-testid="chat-attention-badge"
       className={`ml-1 inline-flex shrink-0 items-center gap-1 rounded-flat bg-status-waiting px-1.5 py-0.5 font-mono text-[11px] font-medium text-surface-0 ${className ?? ''}`}
     >
-      <FontAwesomeIcon icon={faBell} className="size-3" aria-hidden />
+      <Bell className="size-3" strokeWidth={2} aria-hidden />
       <span aria-hidden className="tabular-nums">
         {count}
       </span>
@@ -303,7 +302,8 @@ export const ChatPanel = ({
 
   // La variante de razonamiento se acota al modelo elegido (FR-008, P6).
   const reasoning = useMemo(
-    () => models.find((model) => model.id === selection.model?.id)?.reasoning ?? [],
+    () =>
+      models.find((model) => model.id === selection.model?.id)?.reasoning ?? [],
     [models, selection.model?.id],
   );
 
@@ -342,7 +342,7 @@ export const ChatPanel = ({
     <Container
       space="small"
       data-testid="chat-panel"
-      className={`h-full min-h-0 px-4 ${className ?? ''}`}
+      className={`h-full min-h-0 gap-3 px-4 pb-3 pt-3 ${className ?? ''}`}
     >
       {/* Banner de atención (T055, FR-009/FR-010): resume el pendiente más
           antiguo del subárbol y ofrece la acción a su request origen. Sin
@@ -400,11 +400,11 @@ export const ChatPanel = ({
           role="region"
           aria-label="Pendientes del subárbol"
           space="small"
-          className="shrink-0 border-t border-border pt-2"
+          className="shrink-0 gap-2 border-t border-border/60 pt-3"
         >
           <span
             role="status"
-            className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+            className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground"
           >
             {pending.length === 1
               ? '1 pendiente por responder'
@@ -417,7 +417,7 @@ export const ChatPanel = ({
               <Container
                 key={key}
                 space="small"
-                className="rounded-flat border border-border p-2"
+                className="rounded-lg border border-border/70 bg-surface-1/50 p-2.5"
               >
                 <span className="text-[11px] text-muted-foreground">
                   Origen: {item.originLabel}

@@ -137,7 +137,7 @@ describe('WorkspaceView — móvil (FR-013/FR-014)', () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId('history-node')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'inspector' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Detalle' }));
     expect(onChangeTab).toHaveBeenCalledWith('inspector');
 
     // Sin controles de escritorio.
@@ -208,7 +208,7 @@ describe('WorkspaceView — slots nulos sin sesión (FR-013)', () => {
     expect(
       screen.getByRole('tablist', { name: 'Vistas del workspace' }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('tabpanel', { name: 'chat' })).toBeInTheDocument();
+    expect(screen.getByRole('tabpanel', { name: 'Chat' })).toBeInTheDocument();
   });
 
   it('acepta los cinco slots nulos sin romper', () => {

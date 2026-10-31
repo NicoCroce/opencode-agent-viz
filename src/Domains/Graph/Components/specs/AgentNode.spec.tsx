@@ -168,15 +168,17 @@ describe('AgentNode', () => {
     expect(container.querySelector('.react-flow__resize-control.handle')).toBeInTheDocument();
   });
 
-  it('uses border-accent on the selected node while a non-selected ancestor does not', () => {
+  it('uses border-signal on the selected node while a non-selected ancestor does not', () => {
     const selected = renderAgentNode({ selected: true });
-    const selectedNode = selected.container.querySelector('.border-accent');
+    const selectedNode = selected.container.querySelector('.border-signal');
     expect(selectedNode).toBeInTheDocument();
-    expect(selectedNode).toHaveClass('border-accent');
+    expect(selectedNode).toHaveClass('border-signal');
 
     const ancestor = renderAgentNode({ selected: false });
-    expect(ancestor.container.querySelector('.border-accent')).toBeNull();
-    expect(ancestor.container.querySelector('.border-border')).toBeInTheDocument();
+    expect(ancestor.container.querySelector('.border-signal')).toBeNull();
+    expect(
+      ancestor.container.querySelector('[class*="border-border"]'),
+    ).toBeInTheDocument();
   });
 });
 
@@ -303,7 +305,7 @@ describe('AgentNode — paralelismo', () => {
       'title',
       '4 agentes ejecutados en paralelo',
     );
-    expect(badge).toHaveClass('text-foreground');
+    expect(badge).toHaveClass('text-foreground/80');
   });
 
   it('does not render a badge when the node ran alone', () => {

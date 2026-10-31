@@ -88,13 +88,13 @@ export const AgentNodeFooter = ({
   return (
     <Container
       space="none"
-      className="mt-auto min-w-0 gap-1 border-t border-border pt-1.5"
+      className="mt-auto min-w-0 gap-1 border-t border-border/60 pt-1.5"
     >
       <Container
         row
         align="center"
         space="none"
-        className="min-w-0 flex-wrap gap-x-1.5 font-mono text-[11px] tabular-nums text-foreground/70"
+        className="min-w-0 flex-wrap gap-x-1.5 font-mono text-[11px] tabular-nums text-foreground/80"
       >
         <span>
           {tokens === null ? formatTokens(null) : `${formatTokens(tokens)} tok`}

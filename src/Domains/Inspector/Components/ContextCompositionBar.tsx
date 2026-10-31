@@ -21,11 +21,11 @@ export const CONTEXT_CATEGORY_LABEL: Record<TContextCategory, string> = {
  * `contracts/context-panel-contract.md` §7).
  */
 const CATEGORY_COLOR: Record<TContextCategory, string> = {
-  toolResult: 'bg-primary',
-  toolInput: 'bg-status-waiting',
-  reasoning: 'bg-status-running',
-  assistantText: 'bg-status-done',
-  userText: 'bg-status-idle',
+  toolResult: 'bg-chart-1',
+  toolInput: 'bg-chart-2',
+  reasoning: 'bg-chart-3',
+  assistantText: 'bg-chart-4',
+  userText: 'bg-chart-5',
 };
 
 interface ContextCompositionBarProps {
@@ -59,7 +59,7 @@ export const ContextCompositionBar = ({
         space="none"
         role="img"
         aria-label={`Composición del contexto: ${summary}`}
-        className="h-2 w-full overflow-hidden rounded-flat border border-border"
+        className="h-1.5 w-full overflow-hidden rounded-full border border-border/60 bg-surface-0"
       >
         {buckets.map((bucket) => (
           <span
@@ -80,7 +80,12 @@ export const ContextCompositionBar = ({
             space="small"
             className="min-w-0 gap-2 text-[11px]"
           >
-            <Container row align="center" space="small" className="min-w-0 gap-1.5">
+            <Container
+              row
+              align="center"
+              space="small"
+              className="min-w-0 gap-1.5"
+            >
               <span
                 aria-hidden
                 className={cn(
@@ -98,7 +103,9 @@ export const ContextCompositionBar = ({
               space="small"
               className="shrink-0 gap-2 font-mono tabular-nums"
             >
-              <span className="text-foreground">{formatPercent(bucket.pct, 0)}</span>
+              <span className="text-foreground">
+                {formatPercent(bucket.pct, 0)}
+              </span>
               <span className="text-muted-foreground">
                 {hasTokens && bucket.tokens !== null
                   ? `${formatTokens(bucket.tokens)} tok`

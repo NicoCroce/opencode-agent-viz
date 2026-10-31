@@ -10,9 +10,22 @@ import type { TResourceUsage } from '@app/Domains/Inspector';
  * panel propio, sin tabbars anidadas (el tablist `Detalle | Chat` solo vive en
  * escritorio).
  */
-export const WORKSPACE_TABS = ['sessions', 'graph', 'inspector', 'chat'] as const;
+export const WORKSPACE_TABS = [
+  'sessions',
+  'graph',
+  'inspector',
+  'chat',
+] as const;
 
 export type TWorkspaceTab = (typeof WORKSPACE_TABS)[number];
+
+/** Etiquetas visibles del tablist móvil, en español y en orden. */
+export const WORKSPACE_TAB_LABEL: Record<TWorkspaceTab, string> = {
+  sessions: 'Sesiones',
+  graph: 'Grafo',
+  inspector: 'Detalle',
+  chat: 'Chat',
+};
 
 /** Linaje vacío: el nodo no tiene padre ni hijos en el grafo. */
 export const EMPTY_LINEAGE: TLineageNav = { parentId: null, childrenIds: [] };

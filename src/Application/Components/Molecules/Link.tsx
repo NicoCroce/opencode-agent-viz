@@ -10,7 +10,7 @@ interface LinkProps extends React.DetailedHTMLProps<
 export const Link = ({ target = '_blank', ...props }: LinkProps) => (
   <a
     target={target}
-    className="inline-block text-blue-900 hover:underline px-1"
+    className="inline-block text-signal hover:underline px-1"
     {...props}
   />
 );

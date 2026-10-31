@@ -217,14 +217,14 @@ describe('WorkspaceView — cableado de los cinco slots (T023, U2↔U3)', () => 
     ).toBeInTheDocument();
 
     // Slot `sessions`: el rail se monta en su tab con la sesión abierta.
-    fireEvent.click(screen.getByRole('tab', { name: 'sessions' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Sesiones' }));
     expect(screen.getByTestId(TESTID.sessionList)).toHaveAttribute(
       'data-selected',
       INTEGRATION_SESSION_ID,
     );
 
     // Slot `chat`: el panel llega al tab de primer nivel con la sesión abierta.
-    fireEvent.click(screen.getByRole('tab', { name: /^chat/ }));
+    fireEvent.click(screen.getByRole('tab', { name: /^Chat/ }));
     expect(await screen.findByTestId(TESTID.chatPanel)).toHaveAttribute(
       'data-session-id',
       INTEGRATION_SESSION_ID,

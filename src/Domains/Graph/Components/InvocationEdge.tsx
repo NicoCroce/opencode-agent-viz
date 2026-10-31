@@ -19,7 +19,7 @@ export type TInvocationEdge = Edge<TInvocationEdgeData, 'invocation'>;
 /** Reposo: gris visible (no `--border`, que se pierde en dark). */
 const REST_STROKE = 'hsl(var(--muted-foreground))';
 /** Foco (linaje) y hover: primer plano. */
-const FOCUS_STROKE = 'hsl(var(--foreground))';
+const FOCUS_STROKE = 'hsl(var(--signal))';
 
 /** Reposo: sin foco ni hover (contrato de render §2). */
 const REST_STYLE: CSSProperties = {
@@ -110,7 +110,8 @@ export const InvocationEdge = ({
     `L ${targetX} ${targetY}`,
   ].join(' ');
 
-  const hasFocus = focus.selectedNodeId !== null || focus.hoveredNodeId !== null;
+  const hasFocus =
+    focus.selectedNodeId !== null || focus.hoveredNodeId !== null;
   const resolvedStyle = hasFocus
     ? resolveFocusStyle(focus, id, source, target)
     : (style ?? REST_STYLE);

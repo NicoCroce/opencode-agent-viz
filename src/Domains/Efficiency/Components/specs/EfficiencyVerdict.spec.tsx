@@ -30,8 +30,8 @@ describe('EfficiencyVerdict', () => {
   it.each([
     ['eficiente', 'circle-check'],
     ['aceptable', 'thumbs-up'],
-    ['mejorable', 'triangle-exclamation'],
-    ['friccion', 'circle-exclamation'],
+    ['mejorable', 'triangle-alert'],
+    ['friccion', 'circle-alert'],
   ] as const)(
     'pinta la banda %s con texto e icono decorativo',
     (band, iconName) => {
@@ -40,7 +40,7 @@ describe('EfficiencyVerdict', () => {
       const bandText = screen.getByText(BAND_LABEL[band]);
       const icon = bandText.parentElement?.querySelector('svg');
 
-      expect(icon).toHaveAttribute('data-icon', iconName);
+      expect(icon).toHaveClass(`lucide-${iconName}`);
       expect(icon).toHaveAttribute('aria-hidden', 'true');
     },
   );

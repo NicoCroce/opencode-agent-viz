@@ -68,7 +68,7 @@ describe('WorkspaceMobileTabs — tablist de primer nivel (T059, FR-013, P4)', (
       name: 'Vistas del workspace',
     });
     expect(within(tablist).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(
-      ['sessions', 'graph', 'inspector', 'chat'],
+      ['Sesiones', 'Grafo', 'Detalle', 'Chat'],
     );
     expect([...WORKSPACE_TABS]).toEqual([
       'sessions',
@@ -111,18 +111,18 @@ describe('WorkspaceMobileTabs — tablist de primer nivel (T059, FR-013, P4)', (
     expect(screen.queryByTestId('chat-panel')).not.toBeInTheDocument();
 
     // El panel inactivo sigue existiendo (para `aria-controls`) pero oculto.
-    const sessions = screen.getByRole('tab', { name: 'sessions' });
+    const sessions = screen.getByRole('tab', { name: 'Sesiones' });
     expect(panelFor(sessions)).toHaveAttribute('hidden');
   });
 
   it('cambia de panel al activar otro tab', () => {
     render(<Harness initialTab="graph" />);
 
-    fireEvent.click(screen.getByRole('tab', { name: 'inspector' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Detalle' }));
 
     expect(screen.getByTestId('inspector-panel')).toBeInTheDocument();
     expect(screen.queryByTestId('graph-panel')).not.toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'inspector' })).toHaveAttribute(
+    expect(screen.getByRole('tab', { name: 'Detalle' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
@@ -131,29 +131,29 @@ describe('WorkspaceMobileTabs — tablist de primer nivel (T059, FR-013, P4)', (
   it('navega con flechas y Home/End moviendo foco y selección (APG)', () => {
     render(<Harness initialTab="graph" />);
 
-    const graph = screen.getByRole('tab', { name: 'graph' });
+    const graph = screen.getByRole('tab', { name: 'Grafo' });
     graph.focus();
 
     fireEvent.keyDown(graph, { key: 'ArrowRight' });
-    const inspector = screen.getByRole('tab', { name: 'inspector' });
+    const inspector = screen.getByRole('tab', { name: 'Detalle' });
     expect(inspector).toHaveAttribute('aria-selected', 'true');
     expect(inspector).toHaveAttribute('tabindex', '0');
     expect(document.activeElement).toBe(inspector);
 
     fireEvent.keyDown(inspector, { key: 'ArrowLeft' });
-    expect(screen.getByRole('tab', { name: 'graph' })).toHaveAttribute(
+    expect(screen.getByRole('tab', { name: 'Grafo' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
 
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'graph' }), { key: 'End' });
-    expect(screen.getByRole('tab', { name: 'chat' })).toHaveAttribute(
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Grafo' }), { key: 'End' });
+    expect(screen.getByRole('tab', { name: 'Chat' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
 
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'chat' }), { key: 'Home' });
-    expect(screen.getByRole('tab', { name: 'sessions' })).toHaveAttribute(
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Chat' }), { key: 'Home' });
+    expect(screen.getByRole('tab', { name: 'Sesiones' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
@@ -162,18 +162,18 @@ describe('WorkspaceMobileTabs — tablist de primer nivel (T059, FR-013, P4)', (
   it('hace wrap-around con ArrowRight/ArrowLeft', () => {
     render(<Harness initialTab="sessions" />);
 
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'sessions' }), {
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Sesiones' }), {
       key: 'ArrowLeft',
     });
-    expect(screen.getByRole('tab', { name: 'chat' })).toHaveAttribute(
+    expect(screen.getByRole('tab', { name: 'Chat' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
 
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'chat' }), {
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Chat' }), {
       key: 'ArrowRight',
     });
-    expect(screen.getByRole('tab', { name: 'sessions' })).toHaveAttribute(
+    expect(screen.getByRole('tab', { name: 'Sesiones' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
@@ -195,7 +195,7 @@ describe('WorkspaceMobileTabs — el chat es un panel propio (T059, FR-013, P4)'
   it('el tabpanel del chat es alcanzable por su tab', () => {
     render(<Harness initialTab="chat" />);
 
-    const chat = screen.getByRole('tab', { name: 'chat' });
+    const chat = screen.getByRole('tab', { name: 'Chat' });
     const panel = panelFor(chat);
 
     expect(panel).toHaveAttribute('role', 'tabpanel');
@@ -213,7 +213,7 @@ describe('WorkspaceMobileTabs — el chat es un panel propio (T059, FR-013, P4)'
       />,
     );
 
-    expect(screen.getByRole('tab', { name: 'chat' })).toHaveAttribute(
+    expect(screen.getByRole('tab', { name: 'Chat' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
@@ -225,7 +225,7 @@ describe('WorkspaceMobileTabs — badge de atención del tab Chat (T075, FR-009)
   it('monta el badge en el tab Chat con el conteo recibido por prop', () => {
     render(<Harness attentionCount={2} />);
 
-    const chat = screen.getByRole('tab', { name: /chat/ });
+    const chat = screen.getByRole('tab', { name: /Chat/ });
     expect(within(chat).getByTestId('chat-attention-badge')).toBeInTheDocument();
     // `aria-label` textual (marca no-color), `attention-contract.md §2`.
     expect(
@@ -233,7 +233,7 @@ describe('WorkspaceMobileTabs — badge de atención del tab Chat (T075, FR-009)
     ).toBeInTheDocument();
     // Los demás tabs no llevan badge.
     expect(
-      within(screen.getByRole('tab', { name: 'graph' })).queryByTestId(
+      within(screen.getByRole('tab', { name: 'Grafo' })).queryByTestId(
         'chat-attention-badge',
       ),
     ).not.toBeInTheDocument();

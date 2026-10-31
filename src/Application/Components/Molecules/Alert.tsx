@@ -1,5 +1,4 @@
 import { cva, type VariantProps } from 'class-variance-authority';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   Alert as UIAlert,
   AlertDescription,
@@ -9,17 +8,15 @@ import { Container } from '@app/Application/Components/Layout';
 import { ALERT_VARIANT_ICON } from './alertVariants';
 
 const alertVariants = cva(
-  'relative w-full rounded-lg border px-4 py-3 text-sm',
+  'relative w-full rounded-lg border px-4 py-3 text-sm [&_h5]:font-display [&_h5]:text-[13px] [&_h5]:font-semibold',
   {
     variants: {
       variant: {
-        info: 'bg-sky-700/5 border-sky-700/20 text-sky-900 dark:bg-sky-950/20 dark:border-sky-800/30 dark:text-sky-100',
-        error:
-          'bg-destructive/5 border-destructive/20 text-destructive dark:text-destructive',
+        info: 'border-signal/20 bg-signal/[0.05] text-foreground',
+        error: 'border-destructive/25 bg-destructive/[0.06] text-foreground',
         warning:
-          'bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/20 dark:border-amber-800/30 dark:text-amber-100',
-        success:
-          'bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/20 dark:border-emerald-800/30 dark:text-emerald-100',
+          'border-status-waiting/25 bg-status-waiting/[0.06] text-foreground',
+        success: 'border-status-done/25 bg-status-done/[0.06] text-foreground',
       },
     },
     defaultVariants: {
@@ -31,10 +28,10 @@ const alertVariants = cva(
 const iconVariants = cva('h-4 w-4', {
   variants: {
     variant: {
-      info: 'text-sky-700 dark:text-sky-400',
+      info: 'text-signal',
       error: 'text-destructive',
-      warning: 'text-amber-600 dark:text-amber-400',
-      success: 'text-emerald-600 dark:text-emerald-400',
+      warning: 'text-status-waiting',
+      success: 'text-status-done',
     },
   },
   defaultVariants: {
@@ -72,7 +69,7 @@ export const Alert = ({
   ariaLive,
   'data-testid': dataTestId,
 }: AlertProps) => {
-  const icon = ALERT_VARIANT_ICON[variant || 'info'];
+  const Icon = ALERT_VARIANT_ICON[variant || 'info'];
 
   return (
     <UIAlert
@@ -87,10 +84,10 @@ export const Alert = ({
           // Decorativo: duplica el significado del `variant`/`title`, así que no
           // debe anunciarse dentro de una región `aria-live` (el aviso de
           // truncamiento) ni de un `role="alert"`.
-          <FontAwesomeIcon
-            icon={icon}
-            className={iconVariants({ variant })}
+          <Icon
+            className={cn(iconVariants({ variant }), 'size-4')}
             aria-hidden="true"
+            strokeWidth={1.8}
           />
         )}
         <div>

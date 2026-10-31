@@ -43,9 +43,16 @@ export const AgentNodeHeader = ({
   parallel,
   speedup,
   latency,
+  isRunning,
   status,
 }: AgentNodeHeaderProps) => (
-  <Container row align="start" justify="between" space="small" className="min-w-0">
+  <Container
+    row
+    align="start"
+    justify="between"
+    space="small"
+    className="min-w-0"
+  >
     <span className="line-clamp-2 min-w-0 flex-1 text-xs font-semibold leading-snug text-foreground">
       {title ?? agentName}
     </span>
@@ -55,11 +62,12 @@ export const AgentNodeHeader = ({
         className={cn(
           'inline-block size-1.5 shrink-0 rounded-full',
           NODE_STATUS_COLOR[status],
+          isRunning && 'signal-pulse',
         )}
       />
       {parallel ? (
         <span
-          className="rounded-flat border border-foreground/40 px-1 font-mono text-[10px] leading-4 text-foreground"
+          className="rounded-flat border border-border bg-surface-3 px-1 font-mono text-[10px] leading-4 text-foreground/80"
           title={`${parallel.size} agentes ejecutados en paralelo`}
         >
           {`∥${parallel.size}`}

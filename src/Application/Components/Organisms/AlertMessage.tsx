@@ -1,5 +1,5 @@
 import { type VariantProps } from 'class-variance-authority';
-import { type IconDefinition } from '@fortawesome/free-solid-svg-icons';
+import { type LucideIcon } from 'lucide-react';
 import { Button } from '@app/Application/Components/Molecules/Button';
 import { cn } from '@/Application/lib/utils';
 import { Container } from '../..';
@@ -13,7 +13,7 @@ import {
 interface AlertMessageProps extends VariantProps<typeof emptyStateVariants> {
   title?: string;
   description?: string | null;
-  icon?: IconDefinition;
+  icon?: LucideIcon;
   action?: {
     label: string;
     onClick: () => void;
@@ -41,29 +41,32 @@ export const AlertMessage = ({
 
   return (
     <Container
-      space="large"
-      row
-      justify="start"
-      className={cn(emptyStateVariants({ variant: resolvedVariant }), className)}
+      space="small"
+      align="start"
+      className={cn(
+        emptyStateVariants({ variant: resolvedVariant }),
+        'max-w-2xl',
+        className,
+      )}
     >
       <AlertIconBadge variant={resolvedVariant} icon={icon} />
 
-      <Container align="start" space="none">
-        <h3 className="text-lg font-semibold text-foreground">
+      <Container align="start" space="small" className="min-w-0 flex-1">
+        <h3 className="font-display text-base font-semibold leading-snug tracking-[-0.02em] text-foreground">
           {displayTitle}
         </h3>
         {displayDescription && (
-          <p className="text-sm text-muted-foreground leading-relaxed">
+          <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
             {displayDescription}
           </p>
         )}
 
         {action && (
           <Button
-            variant={action.variant || 'default'}
+            variant={action.variant || 'link'}
             onClick={action.onClick}
             showIcon={false}
-            className="p-0 leading-relaxed h-auto mt-2"
+            className="mt-1 h-auto p-0 text-[13px]"
           >
             {action.label}
           </Button>

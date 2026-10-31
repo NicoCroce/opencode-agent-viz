@@ -1,39 +1,31 @@
 import { cva } from 'class-variance-authority';
 import {
-  faCircleCheck,
-  faCircleInfo,
-  faInbox,
-  faMagnifyingGlass,
-  faTriangleExclamation,
-  type IconDefinition,
-} from '@fortawesome/free-solid-svg-icons';
+  CheckCircle2,
+  CircleAlert,
+  Inbox,
+  Search,
+  TriangleAlert,
+  type LucideIcon,
+} from 'lucide-react';
 
 /**
  * Variantes de alerta/vacío compartidas por `Alert` y `AlertMessage` (SH-16).
  *
- * Antes había dos mapas de iconos sin tipar (`AlertMessage.defaultIcons` y
- * `Alert.defaultIcons`), tres mapas de texto sin tipar y dos `cva` en
- * `AlertMessage`; aquí quedan como fuente única y tipados contra `TAlertVariant`.
- * El conjunto es la unión de los seis estados que hoy conoce cada componente:
- * `error`/`warning`/`info`/`success` (ambos) y `empty`/`search` (solo
- * `AlertMessage`).
+ * Los colores salen de tokens semánticos (`destructive`, `status-waiting`,
+ * `signal`, `status-done`), nunca de la paleta cruda: así el tema cyan se
+ * mantiene coherente en todos los estados.
  */
 export type TAlertVariant =
-  | 'error'
-  | 'warning'
-  | 'info'
-  | 'success'
-  | 'empty'
-  | 'search';
+  'error' | 'warning' | 'info' | 'success' | 'empty' | 'search';
 
 /** Icono por variante; `error` y `warning` comparten el mismo triángulo. */
-export const ALERT_VARIANT_ICON: Record<TAlertVariant, IconDefinition> = {
-  error: faTriangleExclamation,
-  warning: faTriangleExclamation,
-  info: faCircleInfo,
-  success: faCircleCheck,
-  empty: faInbox,
-  search: faMagnifyingGlass,
+export const ALERT_VARIANT_ICON: Record<TAlertVariant, LucideIcon> = {
+  error: TriangleAlert,
+  warning: TriangleAlert,
+  info: CircleAlert,
+  success: CheckCircle2,
+  empty: Inbox,
+  search: Search,
 };
 
 /** Título por defecto por variante. */
@@ -58,18 +50,16 @@ export const ALERT_VARIANT_DESCRIPTION: Record<TAlertVariant, string> = {
 
 /** Estilos del contenedor de `AlertMessage` (una de las dos `cva` de origen). */
 export const emptyStateVariants = cva(
-  'flex flex-col items-center justify-center text-center p-4 rounded-xl animate-in fade-in duration-300',
+  'flex flex-col gap-4 p-6 rounded-xl animate-in fade-in duration-300 sm:flex-row',
   {
     variants: {
       variant: {
-        error: 'bg-destructive/5 border border-destructive/20',
-        warning:
-          'bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/30',
-        info: 'bg-sky-700/5 border border-sky-700/20',
-        success:
-          'bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/30',
-        empty: 'bg-muted/50 border border-border',
-        search: 'bg-muted/30 border border-dashed border-muted-foreground/30',
+        error: 'border border-destructive/25 bg-destructive/[0.05]',
+        warning: 'border border-status-waiting/25 bg-status-waiting/[0.05]',
+        info: 'border border-signal/20 bg-signal/[0.04]',
+        success: 'border border-status-done/25 bg-status-done/[0.05]',
+        empty: 'border border-border/70 bg-surface-1/50',
+        search: 'border border-dashed border-border bg-surface-1/40',
       },
     },
     defaultVariants: {
@@ -80,18 +70,17 @@ export const emptyStateVariants = cva(
 
 /** Estilos del contenedor del icono de `AlertMessage` (la otra `cva` de origen). */
 export const iconContainerVariants = cva(
-  'flex items-center justify-center w-16 h-16 rounded-full',
+  'flex size-11 shrink-0 items-center justify-center rounded-lg border',
   {
     variants: {
       variant: {
-        error: 'bg-destructive/10 text-destructive',
+        error: 'border-destructive/25 bg-destructive/10 text-destructive',
         warning:
-          'bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400',
-        info: 'bg-sky-700/10 text-sky-700',
-        success:
-          'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400',
-        empty: 'bg-muted text-muted-foreground',
-        search: 'bg-muted text-muted-foreground/70',
+          'border-status-waiting/25 bg-status-waiting/10 text-status-waiting',
+        info: 'border-signal/25 bg-signal/10 text-signal',
+        success: 'border-status-done/25 bg-status-done/10 text-status-done',
+        empty: 'border-border/70 bg-surface-2/80 text-muted-foreground',
+        search: 'border-border/70 bg-surface-2/80 text-muted-foreground/80',
       },
     },
     defaultVariants: {

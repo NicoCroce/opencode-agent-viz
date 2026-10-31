@@ -74,7 +74,7 @@ export const ChatOptionCombobox = ({
             aria-expanded={open}
             aria-haspopup="listbox"
             disabled={disabled}
-            className="inline-flex h-8 w-auto min-w-0 cursor-pointer items-center justify-between gap-1 rounded-full border border-input bg-transparent px-3 text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring forced-colors:focus-visible:outline-[Highlight] disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-8 w-auto min-w-0 cursor-pointer items-center justify-between gap-1 rounded-full border border-border/70 bg-surface-1/60 px-3 text-xs transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/45 forced-colors:focus-visible:outline-2 forced-colors:focus-visible:outline-[Highlight] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span
               className={cn(

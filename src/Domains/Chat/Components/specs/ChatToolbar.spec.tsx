@@ -82,7 +82,7 @@ describe('ChatToolbar — ojo de herramientas (U3)', () => {
     const toggle = getToggle();
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
     expect(toggle).toHaveAccessibleName(CHAT_TOOLS_VISIBLE_LABEL);
-    expect(toggle.querySelector('svg')).toHaveAttribute('data-icon', 'eye');
+    expect(toggle.querySelector('svg')).toHaveClass('lucide-eye');
   });
 
   it('refleja el estado oculto (aria-pressed false, ojo tachado)', () => {
@@ -91,7 +91,7 @@ describe('ChatToolbar — ojo de herramientas (U3)', () => {
     const toggle = getToggle();
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
     expect(toggle).toHaveAccessibleName(CHAT_TOOLS_HIDDEN_LABEL);
-    expect(toggle.querySelector('svg')).toHaveAttribute('data-icon', 'eye-slash');
+    expect(toggle.querySelector('svg')).toHaveClass('lucide-eye-off');
   });
 
   it('notifica el nuevo estado al pulsar', async () => {
