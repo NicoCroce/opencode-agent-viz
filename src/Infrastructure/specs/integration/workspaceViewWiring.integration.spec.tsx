@@ -106,7 +106,9 @@ const openPermission = permissionRequest({
  * subárbol valga `1`.
  */
 const seedOpenWorkspace = (client: QueryClient): void => {
-  seedQueryData(client, queryKeys.projects.list(), [buildProject(INTEGRATION_DIRECTORY)]);
+  seedQueryData(client, queryKeys.projects.list(), [
+    buildProject(INTEGRATION_DIRECTORY),
+  ]);
   seedSessions(client, [buildSessionInfo()]);
   seedSubtree(client, [buildSessionInfo()]);
   seedMessages(client, { [INTEGRATION_SESSION_ID]: [] });
@@ -142,131 +144,142 @@ const renderWorkspaceWithoutSession = async (client: QueryClient) => {
  */
 const INTEGRATION_TIMEOUT_MS = 20_000;
 
-describe('WorkspaceView — cableado de los cinco slots (T023, U2↔U3)', () => {
-  beforeEach(() => {
-    resetServiceMock();
-  });
-
-  it('escritorio: los cinco slots llegan con sus props/data-testid y el attentionCount del subárbol', async () => {
-    const client = createIntegrationQueryClient();
-    seedOpenWorkspace(client);
-    seedDevice(client, false);
-
-    await renderWorkspace(client);
-
-    const graph = await screen.findByTestId(TESTID.agentGraph);
-
-    // Slot `sessions`: el rail recibe los grupos del listado y la sesión abierta.
-    const rail = screen.getByTestId(TESTID.sessionList);
-    expect(rail).toHaveAttribute('data-group-count', '1');
-    expect(rail).toHaveAttribute('data-selected', INTEGRATION_SESSION_ID);
-
-    // Slot `graph`: el modelo construido por los hooks llega con su nodo
-    // enriquecido (`enrichment: 'ready'`) y con los handlers cableados.
-    expect(graph).toHaveAttribute(
-      'data-nodes',
-      JSON.stringify([{ id: INTEGRATION_SESSION_ID, enrichment: 'ready' }]),
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Seleccionar nodo' }));
-    expect(graph).toHaveAttribute('data-selected', INTEGRATION_SESSION_ID);
-
-    // Slot `inspector`: inspecciona la raíz abierta por defecto (`useChainSelection`).
-    expect(screen.getByTestId(TESTID.inspectorPanel)).toHaveAttribute(
-      'data-node',
-      INTEGRATION_SESSION_ID,
-    );
-
-    // `attentionCount`: el pendiente del subárbol (U4) llega al badge del tab.
-    expect(
-      screen.getByRole('img', { name: ONE_PENDING_LABEL }),
-    ).toBeInTheDocument();
-
-    // Slot `history`: abrir el histórico desde el grafo monta el overlay con el nodo.
-    fireEvent.click(screen.getByRole('button', { name: 'Abrir histórico' }));
-    expect(
-      await screen.findByTestId(TESTID.historyModal),
-    ).toHaveAttribute('data-node', INTEGRATION_SESSION_ID);
-
-    // Slot `chat`: en escritorio vive en la pestaña `Chat` del detalle, armado por
-    // los hooks (sesión abierta, directorio resuelto y semilla del nodo).
-    fireEvent.mouseDown(screen.getByRole('tab', { name: /^Chat/ }), {
-      button: 0,
+describe(
+  'WorkspaceView — cableado de los cinco slots (T023, U2↔U3)',
+  () => {
+    beforeEach(() => {
+      resetServiceMock();
     });
-    const chat = await screen.findByTestId(TESTID.chatPanel);
-    expect(chat).toHaveAttribute('data-session-id', INTEGRATION_SESSION_ID);
-    expect(chat).toHaveAttribute('data-directory', INTEGRATION_DIRECTORY);
-    expect(chat).toHaveAttribute(
-      'data-selection',
-      JSON.stringify({ agent: 'develop', model: null }),
-    );
-  });
 
-  it('móvil: el chat es un slot de primer nivel y el attentionCount viaja por el contexto de la vista', async () => {
-    const client = createIntegrationQueryClient();
-    seedOpenWorkspace(client);
-    seedDevice(client, true);
+    it('escritorio: los cinco slots llegan con sus props/data-testid y el attentionCount del subárbol', async () => {
+      const client = createIntegrationQueryClient();
+      seedOpenWorkspace(client);
+      seedDevice(client, false);
 
-    await renderWorkspace(client);
+      await renderWorkspace(client);
 
-    expect(await screen.findByTestId(TESTID.agentGraph)).toBeInTheDocument();
+      const graph = await screen.findByTestId(TESTID.agentGraph);
 
-    // El único tab de primer nivel lo monta la vista; el badge sale del
-    // `attentionCount` que `WorkspaceView` publica en el contexto.
-    expect(
-      screen.getByRole('img', { name: ONE_PENDING_LABEL }),
-    ).toBeInTheDocument();
+      // Slot `sessions`: el rail recibe los grupos del listado y la sesión abierta.
+      const rail = screen.getByTestId(TESTID.sessionList);
+      expect(rail).toHaveAttribute('data-group-count', '1');
+      expect(rail).toHaveAttribute('data-selected', INTEGRATION_SESSION_ID);
 
-    // Slot `sessions`: el rail se monta en su tab con la sesión abierta.
-    fireEvent.click(screen.getByRole('tab', { name: 'Sesiones' }));
-    expect(screen.getByTestId(TESTID.sessionList)).toHaveAttribute(
-      'data-selected',
-      INTEGRATION_SESSION_ID,
-    );
+      // Slot `graph`: el modelo construido por los hooks llega con su nodo
+      // enriquecido (`enrichment: 'ready'`) y con los handlers cableados.
+      expect(graph).toHaveAttribute(
+        'data-nodes',
+        JSON.stringify([{ id: INTEGRATION_SESSION_ID, enrichment: 'ready' }]),
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Seleccionar nodo' }));
+      expect(graph).toHaveAttribute('data-selected', INTEGRATION_SESSION_ID);
 
-    // Slot `chat`: el panel llega al tab de primer nivel con la sesión abierta.
-    fireEvent.click(screen.getByRole('tab', { name: /^Chat/ }));
-    expect(await screen.findByTestId(TESTID.chatPanel)).toHaveAttribute(
-      'data-session-id',
-      INTEGRATION_SESSION_ID,
-    );
-  });
+      // Slot `inspector`: inspecciona la raíz abierta por defecto (`useChainSelection`).
+      expect(screen.getByTestId(TESTID.inspectorPanel)).toHaveAttribute(
+        'data-node',
+        INTEGRATION_SESSION_ID,
+      );
 
-  it('sin sesión (`:id` ausente): el slot `chat` es `null`, el resto se monta y no hay estados de error forzados', async () => {
-    const client = createIntegrationQueryClient();
-    // El dato que falta es la **sesión abierta**; el listado sigue disponible.
-    seedQueryData(client, queryKeys.projects.list(), [
-      buildProject(INTEGRATION_DIRECTORY),
-    ]);
-    seedSessions(client, [buildSessionInfo()]);
-    seedDevice(client, false);
+      // `attentionCount`: el pendiente del subárbol (U4) llega al badge del tab.
+      expect(
+        screen.getByRole('img', { name: ONE_PENDING_LABEL }),
+      ).toBeInTheDocument();
 
-    await renderWorkspaceWithoutSession(client);
+      // Slot `history`: abrir el histórico desde el grafo monta el overlay con el nodo.
+      fireEvent.click(screen.getByRole('button', { name: 'Abrir histórico' }));
+      expect(await screen.findByTestId(TESTID.historyModal)).toHaveAttribute(
+        'data-node',
+        INTEGRATION_SESSION_ID,
+      );
 
-    // Slots `sessions` e `inspector` montados, con el dato que sí existe.
-    expect(screen.getByTestId(TESTID.sessionList)).toHaveAttribute(
-      'data-selected',
-      '',
-    );
-    expect(screen.getByTestId(TESTID.inspectorPanel)).toBeInTheDocument();
-
-    // Slot `graph`: panel montado en vacío, sin forzar error ni carga.
-    expect(screen.getByText('Sin agentes')).toBeInTheDocument();
-    expect(screen.queryByText('Error')).not.toBeInTheDocument();
-    expect(screen.queryByText('Sesión no encontrada')).not.toBeInTheDocument();
-    expect(screen.queryByTestId(TESTID.graphSkeleton)).not.toBeInTheDocument();
-
-    // Slot `chat`: `null`, así que no hay panel ni badge de atención.
-    expect(screen.queryByTestId(TESTID.chatPanel)).not.toBeInTheDocument();
-    expect(screen.queryByTestId('chat-attention-badge')).not.toBeInTheDocument();
-
-    // La vista reserva el slot del chat: llega vacío, no ausente.
-    fireEvent.mouseDown(screen.getByRole('tab', { name: /^Chat/ }), {
-      button: 0,
+      // Slot `chat`: en escritorio vive en la pestaña `Chat` del detalle, armado por
+      // los hooks (sesión abierta, directorio resuelto y semilla del nodo).
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /^Chat/ }), {
+        button: 0,
+      });
+      const chat = await screen.findByTestId(TESTID.chatPanel);
+      expect(chat).toHaveAttribute('data-session-id', INTEGRATION_SESSION_ID);
+      expect(chat).toHaveAttribute('data-directory', INTEGRATION_DIRECTORY);
+      expect(chat).toHaveAttribute(
+        'data-selection',
+        JSON.stringify({ agent: 'develop', model: null }),
+      );
     });
-    const chatSlot = await screen.findByTestId(DETAIL_CHAT_SLOT_TESTID);
-    expect(chatSlot).toBeEmptyDOMElement();
 
-    // Sin sesión no se fuerza ninguna consulta de respaldo del directorio.
-    expect(serviceMock.getSession).not.toHaveBeenCalled();
-  });
-}, INTEGRATION_TIMEOUT_MS);
+    it('móvil: el chat es un slot de primer nivel y el attentionCount viaja por el contexto de la vista', async () => {
+      const client = createIntegrationQueryClient();
+      seedOpenWorkspace(client);
+      seedDevice(client, true);
+
+      await renderWorkspace(client);
+
+      expect(await screen.findByTestId(TESTID.agentGraph)).toBeInTheDocument();
+
+      // El único tab de primer nivel lo monta la vista; el badge sale del
+      // `attentionCount` que `WorkspaceView` publica en el contexto.
+      expect(
+        screen.getByRole('img', { name: ONE_PENDING_LABEL }),
+      ).toBeInTheDocument();
+
+      // Slot `sessions`: el rail se monta en su tab con la sesión abierta.
+      fireEvent.click(screen.getByRole('tab', { name: 'Sesiones' }));
+      expect(screen.getByTestId(TESTID.sessionList)).toHaveAttribute(
+        'data-selected',
+        INTEGRATION_SESSION_ID,
+      );
+
+      // Slot `chat`: el panel llega al tab de primer nivel con la sesión abierta.
+      fireEvent.click(screen.getByRole('tab', { name: /^Chat/ }));
+      expect(await screen.findByTestId(TESTID.chatPanel)).toHaveAttribute(
+        'data-session-id',
+        INTEGRATION_SESSION_ID,
+      );
+    });
+
+    it('sin sesión (`:id` ausente): el slot `chat` es `null`, el resto se monta y no hay estados de error forzados', async () => {
+      const client = createIntegrationQueryClient();
+      // El dato que falta es la **sesión abierta**; el listado sigue disponible.
+      seedQueryData(client, queryKeys.projects.list(), [
+        buildProject(INTEGRATION_DIRECTORY),
+      ]);
+      seedSessions(client, [buildSessionInfo()]);
+      seedDevice(client, false);
+
+      await renderWorkspaceWithoutSession(client);
+
+      // Slots `sessions` e `inspector` montados, con el dato que sí existe.
+      expect(screen.getByTestId(TESTID.sessionList)).toHaveAttribute(
+        'data-selected',
+        '',
+      );
+      expect(screen.getByTestId(TESTID.inspectorPanel)).toBeInTheDocument();
+
+      // Slot `graph`: panel montado en vacío, sin forzar error ni carga.
+      expect(screen.getByText('Sin agentes')).toBeInTheDocument();
+      expect(screen.queryByText('Error')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('Sesión no encontrada'),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId(TESTID.graphSkeleton),
+      ).not.toBeInTheDocument();
+
+      // Slot `chat`: `null`, así que no hay panel ni badge de atención.
+      expect(screen.queryByTestId(TESTID.chatPanel)).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId('chat-attention-badge'),
+      ).not.toBeInTheDocument();
+
+      // La vista reserva el slot del chat: llega vacío, no ausente.
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /^Chat/ }), {
+        button: 0,
+      });
+      const chatSlot = await screen.findByTestId(DETAIL_CHAT_SLOT_TESTID);
+      expect(chatSlot).toBeEmptyDOMElement();
+
+      // Sin sesión no se fuerza ninguna consulta de respaldo del directorio.
+      expect(serviceMock.getSession).not.toHaveBeenCalled();
+    });
+  },
+  INTEGRATION_TIMEOUT_MS,
+);

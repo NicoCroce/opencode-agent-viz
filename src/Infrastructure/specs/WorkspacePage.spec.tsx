@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import type { SessionInfo } from '@opencode/client';
@@ -52,22 +58,16 @@ import { WorkspacePage } from '../WorkspacePage';
  */
 vi.mock('@app/Domains/Graph', async () => {
   const React = await import('react');
-  const { useGraphModel } = await import(
-    '@app/Domains/Graph/Hooks/useGraphModel'
-  );
+  const { useGraphModel } =
+    await import('@app/Domains/Graph/Hooks/useGraphModel');
   const { useNow } = await import('@app/Domains/Graph/Hooks/useNow');
-  const { useChainSelection } = await import(
-    '@app/Domains/Graph/Hooks/useChainSelection'
-  );
-  const { useFollowMode } = await import(
-    '@app/Domains/Graph/Hooks/useFollowMode'
-  );
-  const { summarizeSession } = await import(
-    '@app/Domains/Graph/lib/deriveMetrics'
-  );
-  const { isActiveStatus } = await import(
-    '@app/Domains/Graph/lib/nodeStatus'
-  );
+  const { useChainSelection } =
+    await import('@app/Domains/Graph/Hooks/useChainSelection');
+  const { useFollowMode } =
+    await import('@app/Domains/Graph/Hooks/useFollowMode');
+  const { summarizeSession } =
+    await import('@app/Domains/Graph/lib/deriveMetrics');
+  const { isActiveStatus } = await import('@app/Domains/Graph/lib/nodeStatus');
 
   return {
     // Marcador identificable que refleja la selección explícita y permite
@@ -87,7 +87,9 @@ vi.mock('@app/Domains/Graph', async () => {
           'data-selected': props.selectedNodeId ?? '',
           // Realce de atención (T072): el Set derivado en `WorkspacePage` viaja
           // hasta el grafo; se expone para verificar el cableado (FR-009).
-          'data-attention': [...(props.attentionNodeIds ?? [])].sort().join(','),
+          'data-attention': [...(props.attentionNodeIds ?? [])]
+            .sort()
+            .join(','),
         },
         React.createElement(
           'button',
@@ -130,9 +132,8 @@ vi.mock('@app/Domains/Sessions', async (importOriginal) => {
   // `undefined` y la página aún no lo consume (T019), de modo que los casos del
   // respaldo quedan RED por diseño.
   const actual = await importOriginal<typeof import('@app/Domains/Sessions')>();
-  const sessionDirectory = (
-    actual as { useSessionDirectory?: unknown }
-  ).useSessionDirectory;
+  const sessionDirectory = (actual as { useSessionDirectory?: unknown })
+    .useSessionDirectory;
 
   return {
     // T073: el rail (real) pasa `attentionByRoot` al listado; se expone para
@@ -265,7 +266,10 @@ vi.mock('@app/Domains/Chat', async (importOriginal) => {
  */
 const attentionNotifications = vi.hoisted(() =>
   vi.fn<
-    (items: TAttentionItem[], onNavigate?: (item: TAttentionItem) => void) => void
+    (
+      items: TAttentionItem[],
+      onNavigate?: (item: TAttentionItem) => void,
+    ) => void
   >(),
 );
 
@@ -385,7 +389,10 @@ const renderWorkspace = (client: QueryClient) =>
       <MemoryRouter initialEntries={[`/sessions/${SESSION_ID}`]}>
         <Routes>
           <Route path="/sessions/:id" element={<WorkspacePage />} />
-          <Route path="/sessions" element={<div data-testid="sessions-list" />} />
+          <Route
+            path="/sessions"
+            element={<div data-testid="sessions-list" />}
+          />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -422,7 +429,10 @@ beforeEach(() => {
   service.listProjects.mockReset();
   service.listProjects.mockResolvedValue([]);
   service.listRootSessions.mockReset();
-  service.listRootSessions.mockResolvedValue({ sessions: [], truncated: false });
+  service.listRootSessions.mockResolvedValue({
+    sessions: [],
+    truncated: false,
+  });
   service.listChildSessions.mockReset();
   service.listChildSessions.mockResolvedValue([]);
   service.getSession.mockReset();
@@ -1177,9 +1187,7 @@ describe('WorkspacePage — sesión inexistente sale de la carga (review 1, FR-0
     expect(screen.queryByText('Sin agentes')).not.toBeInTheDocument();
 
     // Ofrece salida: la acción navega al listado de sesiones (`/sessions`).
-    fireEvent.click(
-      screen.getByRole('button', { name: /listado|sesiones/i }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: /listado|sesiones/i }));
     expect(screen.getByTestId('sessions-list')).toBeInTheDocument();
   });
 });

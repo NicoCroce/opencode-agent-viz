@@ -39,7 +39,13 @@ const data: TGraphNodeData = {
     startedAt: 0,
     endedAt: 83_000,
     cost: 0.02,
-    tokens: { input: 1200, output: 300, reasoning: 0, cacheRead: 0, cacheWrite: 0 },
+    tokens: {
+      input: 1200,
+      output: 300,
+      reasoning: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+    },
     invocations: 1,
     retryCount: 0,
     hasLoop: false,
@@ -62,7 +68,9 @@ const props = {
   positionAbsoluteY: 0,
 } as unknown as ComponentProps<typeof AgentNode>;
 
-const renderAgentNode = (overrides: Partial<ComponentProps<typeof AgentNode>> = {}) =>
+const renderAgentNode = (
+  overrides: Partial<ComponentProps<typeof AgentNode>> = {},
+) =>
   render(
     <ReactFlowProvider>
       <AgentNode {...props} {...overrides} />
@@ -131,10 +139,10 @@ const withMetrics = (overrides: Partial<TNodeMetrics> = {}): TNodeMetrics => ({
   ...overrides,
 });
 
-const renderWithNode = (
-  status: TNodeStatus,
-  metrics: Partial<TNodeMetrics>,
-) => renderAgentNode({ data: withData({ status, metrics: withMetrics(metrics) }) });
+const renderWithNode = (status: TNodeStatus, metrics: Partial<TNodeMetrics>) =>
+  renderAgentNode({
+    data: withData({ status, metrics: withMetrics(metrics) }),
+  });
 
 const ACTIVE_STATUSES: TNodeStatus[] = [
   'running',
@@ -164,8 +172,12 @@ describe('AgentNode', () => {
     const { container } = renderAgentNode();
     const controls = container.querySelectorAll('.react-flow__resize-control');
     expect(controls.length).toBeGreaterThan(0);
-    expect(container.querySelector('.react-flow__resize-control.line')).toBeInTheDocument();
-    expect(container.querySelector('.react-flow__resize-control.handle')).toBeInTheDocument();
+    expect(
+      container.querySelector('.react-flow__resize-control.line'),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('.react-flow__resize-control.handle'),
+    ).toBeInTheDocument();
   });
 
   it('uses border-signal on the selected node while a non-selected ancestor does not', () => {
@@ -260,9 +272,7 @@ describe('AgentNode — rango horario (US5)', () => {
   it('prefers "en curso" over a present endedAt while running', () => {
     renderWithNode('running', { startedAt: START, endedAt: END });
 
-    expect(
-      screen.getByText(`${clock(START)} → en curso`),
-    ).toBeInTheDocument();
+    expect(screen.getByText(`${clock(START)} → en curso`)).toBeInTheDocument();
     expect(
       screen.queryByText(`${clock(START)} → ${clock(END)}`),
     ).not.toBeInTheDocument();
@@ -301,10 +311,7 @@ describe('AgentNode — paralelismo', () => {
 
     const badge = screen.getByText('∥4');
     expect(badge).toBeInTheDocument();
-    expect(badge).toHaveAttribute(
-      'title',
-      '4 agentes ejecutados en paralelo',
-    );
+    expect(badge).toHaveAttribute('title', '4 agentes ejecutados en paralelo');
     expect(badge).toHaveClass('text-foreground/80');
   });
 
@@ -412,17 +419,15 @@ describe('AgentNode — anomalía de latencia (T044, FR-023)', () => {
       }),
     });
 
-    expect(
-      screen.getByTestId('node-latency-mark'),
-    ).toHaveAccessibleName('Respuesta lenta: ×3.0 lo esperado para sus tokens');
+    expect(screen.getByTestId('node-latency-mark')).toHaveAccessibleName(
+      'Respuesta lenta: ×3.0 lo esperado para sus tokens',
+    );
   });
 
   it('no muestra la marca cuando no hay anomalías', () => {
     renderAgentNode({ data: withData({ context: null }) });
 
-    expect(
-      screen.queryByTestId('node-latency-mark'),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('node-latency-mark')).not.toBeInTheDocument();
   });
 });
 

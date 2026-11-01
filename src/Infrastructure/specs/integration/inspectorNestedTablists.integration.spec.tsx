@@ -174,7 +174,9 @@ const openNodeDetail = async (): Promise<void> => {
   await renderWorkspace(client);
   const graph = await screen.findByTestId(TESTID.agentGraph);
 
-  fireEvent.click(within(graph).getByRole('button', { name: 'Seleccionar nodo' }));
+  fireEvent.click(
+    within(graph).getByRole('button', { name: 'Seleccionar nodo' }),
+  );
   expect(graph.getAttribute('data-selected')).not.toBe('');
 };
 
@@ -291,9 +293,10 @@ describe('U5↔U4/U3 — anidamiento de tablists en el detalle del nodo (T019, F
         key: 'ArrowLeft',
       });
       await waitFor(() =>
-        expect(
-          internalTabs[internalTabs.length - 2],
-        ).toHaveAttribute('aria-selected', 'true'),
+        expect(internalTabs[internalTabs.length - 2]).toHaveAttribute(
+          'aria-selected',
+          'true',
+        ),
       );
       fireEvent.keyDown(internalTabs[internalTabs.length - 2], { key: 'Home' });
       await waitFor(() =>
@@ -349,9 +352,7 @@ describe('U5↔U4/U3 — anidamiento de tablists en el detalle del nodo (T019, F
           hidden: true,
         }),
       ).toBeNull();
-      expect(
-        screen.queryByTestId(INSPECTOR_SECTION_TABS_TEST_ID),
-      ).toBeNull();
+      expect(screen.queryByTestId(INSPECTOR_SECTION_TABS_TEST_ID)).toBeNull();
 
       // Ninguna consulta global por rol queda ambigua: un solo tablist, un solo
       // tabpanel visible (el `Detalle`) y las dos pestañas externas.
@@ -365,9 +366,7 @@ describe('U5↔U4/U3 — anidamiento de tablists en el detalle del nodo (T019, F
         'aria-labelledby',
         externalTabs[0].id,
       );
-      expect(
-        screen.queryByRole('tab', { name: SECTION_LABELS[0] }),
-      ).toBeNull();
+      expect(screen.queryByRole('tab', { name: SECTION_LABELS[0] })).toBeNull();
     },
     { timeout: 15_000 },
   );
@@ -459,9 +458,7 @@ describe('U5↔U4/U3 — el tablist de secciones en móvil (§1/§2, FR-013)', (
           hidden: true,
         }),
       ).toBeNull();
-      expect(
-        screen.queryByTestId(INSPECTOR_SECTION_TABS_TEST_ID),
-      ).toBeNull();
+      expect(screen.queryByTestId(INSPECTOR_SECTION_TABS_TEST_ID)).toBeNull();
 
       // No vacuidad: el tablist de primer nivel del workspace sigue montado.
       expect(screen.getAllByRole('tablist')).toHaveLength(1);

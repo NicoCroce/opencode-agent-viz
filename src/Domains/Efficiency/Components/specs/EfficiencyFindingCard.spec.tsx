@@ -8,9 +8,7 @@ import { EfficiencyFindingCard } from '../EfficiencyFindingCard';
 
 const SHORT_QUOTE =
   '[turno 2 · msg_user_2 · tool bash · 10:31] "instala las dependencias"';
-const LONG_QUOTE = `${'a'.repeat(
-  PROMPT_TRUNCATE_CODE_POINTS + 10,
-)}COLA-OCULTA`;
+const LONG_QUOTE = `${'a'.repeat(PROMPT_TRUNCATE_CODE_POINTS + 10)}COLA-OCULTA`;
 
 const makeFinding = (overrides: Partial<TFinding> = {}): TFinding => ({
   ruleId: 'RES-1',
@@ -51,9 +49,7 @@ describe('EfficiencyFindingCard', () => {
     expect(within(card).getByText('Cita')).toBeInTheDocument();
     expect(within(card).getByText(SHORT_QUOTE)).toBeInTheDocument();
     expect(within(card).getByText('Recomendación')).toBeInTheDocument();
-    expect(
-      within(card).getByText(finding.recommendation),
-    ).toBeInTheDocument();
+    expect(within(card).getByText(finding.recommendation)).toBeInTheDocument();
   });
 
   it.each([
@@ -100,7 +96,9 @@ describe('EfficiencyFindingCard', () => {
 
   it('monta la cita completa solo al expandir y la desmonta al colapsar', async () => {
     const user = userEvent.setup();
-    render(<EfficiencyFindingCard finding={makeFinding({ quote: LONG_QUOTE })} />);
+    render(
+      <EfficiencyFindingCard finding={makeFinding({ quote: LONG_QUOTE })} />,
+    );
 
     await user.click(screen.getByRole('button', { name: 'Ver cita completa' }));
 

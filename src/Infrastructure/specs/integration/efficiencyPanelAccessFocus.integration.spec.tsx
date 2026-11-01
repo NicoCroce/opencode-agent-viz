@@ -14,12 +14,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
-import {
-  MemoryRouter,
-  Route,
-  Routes,
-  useNavigate,
-} from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import type { Project, SessionMessageAssistant } from '@opencode/client';
 import type { TSessionMessage } from '@app/Infrastructure/Services/opencodeClient';
 import { formatDuration } from '@app/Application/Helpers';
@@ -252,195 +247,199 @@ const triggerMounted = (): boolean =>
 
 const INTEGRATION_TIMEOUT_MS = 30_000;
 
-describe('WorkspacePage · acceso, foco y cierre del panel de eficiencia (T039)', () => {
-  beforeEach(() => {
-    resetServiceMock();
-  });
-
-  it('abre el diálogo con foco atrapado, cierra con Escape y devuelve el foco; now es openedAt', async () => {
-    vi.spyOn(Date, 'now').mockReturnValue(OPENED_AT);
-    const client = createIntegrationQueryClient();
-    seedEfficiencyWorkspace(client);
-
-    const view = await renderWorkspaceWithNav(client);
-    await screen.findByTestId(TESTID.agentGraph);
-
-    const user = setupRadixUser();
-    const trigger = efficiencyTrigger();
-    await user.click(trigger);
-
-    const dialog = await openDialog();
-    const close = screen.getByRole('button', {
-      name: 'Cerrar análisis de eficiencia',
-    });
-    await waitFor(() => expect(close).toHaveFocus());
-    expect(dialog.contains(document.activeElement)).toBe(true);
-
-    // El foco no escapa del diálogo al recorrer sus controles.
-    for (let step = 0; step < 6; step += 1) {
-      await user.tab();
-      expect(dialog.contains(document.activeElement)).toBe(true);
-    }
-
-    // `now` = `openedAt`: el turno abierto usa ese reloj para su tiempo.
-    const openHeader = screen.getByRole('rowheader', { name: /^4\b/ });
-    const openRow = openHeader.closest('tr');
-    if (openRow === null) throw new Error('Fila del turno abierto ausente');
-    expect(within(openRow).getByText('abierto')).toBeInTheDocument();
-    expect(
-      within(openRow).getByText(formatDuration(OPEN_DURATION_MS)),
-    ).toBeInTheDocument();
-
-    await user.keyboard('{Escape}');
-
-    await waitFor(dialogClosed);
-    await waitFor(() => expect(trigger).toHaveFocus());
-
-    view.unmount();
-  });
-
-  it('cambiar la sesión raíz cierra el panel', async () => {
-    const client = createIntegrationQueryClient();
-    seedEfficiencyWorkspace(client);
-
-    const view = await renderWorkspaceWithNav(client);
-    await screen.findByTestId(TESTID.agentGraph);
-
-    const user = setupRadixUser();
-    const navToChild = screen.getByRole('button', {
-      name: 'Ir a la sesión hija',
-    });
-    await user.click(efficiencyTrigger());
-    await openDialog();
-
-    await user.click(navToChild);
-
-    await waitFor(dialogClosed);
-    // La nueva raíz se monta con su propio subárbol (un agente).
-    expect(
-      await screen.findByRole('group', { name: '1 agente' }),
-    ).toBeInTheDocument();
-
-    view.unmount();
-  });
-
-  it('si el disparador se desmonta antes de cerrar no fuerza un foco inválido ni lanza', async () => {
-    const client = createIntegrationQueryClient();
-    seedEfficiencyWorkspace(client);
-
-    const view = await renderWorkspaceWithNav(client);
-    await screen.findByTestId(TESTID.agentGraph);
-
-    const user = setupRadixUser();
-    const trigger = efficiencyTrigger();
-    await user.click(trigger);
-    await openDialog();
-
-    // El subárbol deja de tener nodos: la cabecera del grafo desmonta el botón.
-    act(() => {
-      client.setQueryData(queryKeys.graph.for(INTEGRATION_DIRECTORY, ROOT), {
-        sessions: [],
-        truncated: false,
-        loadedCount: 0,
-        notFound: false,
-      });
-    });
-
-    expect(await screen.findByText('Sin agentes')).toBeInTheDocument();
-    await waitFor(() => expect(triggerMounted()).toBe(false));
-    expect(trigger.isConnected).toBe(false);
-
-    await user.keyboard('{Escape}');
-
-    await waitFor(dialogClosed);
-    expect(document.activeElement).not.toBe(trigger);
-    expect(document.activeElement?.isConnected ?? true).toBe(true);
-
-    view.unmount();
-  });
-
-  it('en carga, error, no encontrada, sin agentes y raíz 404 no monta el botón', async () => {
-    interface TScenario {
-      nombre: string;
-      setup: (client: QueryClient) => void;
-      waitFor: () => Promise<unknown>;
-    }
-
-    const seedRoot = (client: QueryClient): void => {
-      seedQueryData(client, queryKeys.projects.list(), [
-        buildProject(INTEGRATION_DIRECTORY),
-      ]);
-      seedSessions(client, [buildSessionInfo()]);
-    };
-
-    const scenarios: TScenario[] = [
-      {
-        nombre: 'carga',
-        setup: () => {
-          serviceMock.getSession.mockReturnValue(
-            new Promise<never>(() => undefined),
-          );
-        },
-        waitFor: () => screen.findByTestId(TESTID.graphSkeleton),
-      },
-      {
-        nombre: 'error',
-        setup: (client) => {
-          seedSessions(client, [
-            buildSessionInfo({ id: 'otra_sesion', title: 'otra' }),
-          ]);
-          serviceMock.getSession.mockRejectedValue(new Error('fallo de red'));
-        },
-        waitFor: () =>
-          screen.findByText('Ocurrió un error al cargar los datos'),
-      },
-      {
-        nombre: 'no encontrada',
-        setup: (client) => {
-          seedRoot(client);
-          seedSubtree(client, [], { notFound: true });
-        },
-        waitFor: () => screen.findByText('Sesión no encontrada'),
-      },
-      {
-        nombre: 'sin agentes',
-        setup: (client) => {
-          seedRoot(client);
-          seedSubtree(client, []);
-        },
-        waitFor: () => screen.findByText('Sin agentes'),
-      },
-      {
-        nombre: 'raíz 404',
-        setup: (client) => {
-          seedSessions(client, [
-            buildSessionInfo({ id: 'otra_sesion', title: 'otra' }),
-          ]);
-          serviceMock.getSession.mockRejectedValue({
-            _tag: 'SessionNotFoundError',
-            sessionID: ROOT,
-            message: 'la sesión no existe',
-          });
-        },
-        waitFor: () => screen.findByText('Sesión no encontrada'),
-      },
-    ];
-
-    for (const scenario of scenarios) {
+describe(
+  'WorkspacePage · acceso, foco y cierre del panel de eficiencia (T039)',
+  () => {
+    beforeEach(() => {
       resetServiceMock();
+    });
+
+    it('abre el diálogo con foco atrapado, cierra con Escape y devuelve el foco; now es openedAt', async () => {
+      vi.spyOn(Date, 'now').mockReturnValue(OPENED_AT);
       const client = createIntegrationQueryClient();
-      seedDevice(client, false);
-      scenario.setup(client);
+      seedEfficiencyWorkspace(client);
 
-      const view = await renderWorkspace(client);
-      await scenario.waitFor();
+      const view = await renderWorkspaceWithNav(client);
+      await screen.findByTestId(TESTID.agentGraph);
 
+      const user = setupRadixUser();
+      const trigger = efficiencyTrigger();
+      await user.click(trigger);
+
+      const dialog = await openDialog();
+      const close = screen.getByRole('button', {
+        name: 'Cerrar análisis de eficiencia',
+      });
+      await waitFor(() => expect(close).toHaveFocus());
+      expect(dialog.contains(document.activeElement)).toBe(true);
+
+      // El foco no escapa del diálogo al recorrer sus controles.
+      for (let step = 0; step < 6; step += 1) {
+        await user.tab();
+        expect(dialog.contains(document.activeElement)).toBe(true);
+      }
+
+      // `now` = `openedAt`: el turno abierto usa ese reloj para su tiempo.
+      const openHeader = screen.getByRole('rowheader', { name: /^4\b/ });
+      const openRow = openHeader.closest('tr');
+      if (openRow === null) throw new Error('Fila del turno abierto ausente');
+      expect(within(openRow).getByText('abierto')).toBeInTheDocument();
       expect(
-        screen.queryByRole('button', { name: 'Eficiencia' }),
-        `en “${scenario.nombre}” no debe montarse el botón`,
-      ).not.toBeInTheDocument();
+        within(openRow).getByText(formatDuration(OPEN_DURATION_MS)),
+      ).toBeInTheDocument();
+
+      await user.keyboard('{Escape}');
+
+      await waitFor(dialogClosed);
+      await waitFor(() => expect(trigger).toHaveFocus());
 
       view.unmount();
-    }
-  });
-}, INTEGRATION_TIMEOUT_MS);
+    });
+
+    it('cambiar la sesión raíz cierra el panel', async () => {
+      const client = createIntegrationQueryClient();
+      seedEfficiencyWorkspace(client);
+
+      const view = await renderWorkspaceWithNav(client);
+      await screen.findByTestId(TESTID.agentGraph);
+
+      const user = setupRadixUser();
+      const navToChild = screen.getByRole('button', {
+        name: 'Ir a la sesión hija',
+      });
+      await user.click(efficiencyTrigger());
+      await openDialog();
+
+      await user.click(navToChild);
+
+      await waitFor(dialogClosed);
+      // La nueva raíz se monta con su propio subárbol (un agente).
+      expect(
+        await screen.findByRole('group', { name: '1 agente' }),
+      ).toBeInTheDocument();
+
+      view.unmount();
+    });
+
+    it('si el disparador se desmonta antes de cerrar no fuerza un foco inválido ni lanza', async () => {
+      const client = createIntegrationQueryClient();
+      seedEfficiencyWorkspace(client);
+
+      const view = await renderWorkspaceWithNav(client);
+      await screen.findByTestId(TESTID.agentGraph);
+
+      const user = setupRadixUser();
+      const trigger = efficiencyTrigger();
+      await user.click(trigger);
+      await openDialog();
+
+      // El subárbol deja de tener nodos: la cabecera del grafo desmonta el botón.
+      act(() => {
+        client.setQueryData(queryKeys.graph.for(INTEGRATION_DIRECTORY, ROOT), {
+          sessions: [],
+          truncated: false,
+          loadedCount: 0,
+          notFound: false,
+        });
+      });
+
+      expect(await screen.findByText('Sin agentes')).toBeInTheDocument();
+      await waitFor(() => expect(triggerMounted()).toBe(false));
+      expect(trigger.isConnected).toBe(false);
+
+      await user.keyboard('{Escape}');
+
+      await waitFor(dialogClosed);
+      expect(document.activeElement).not.toBe(trigger);
+      expect(document.activeElement?.isConnected ?? true).toBe(true);
+
+      view.unmount();
+    });
+
+    it('en carga, error, no encontrada, sin agentes y raíz 404 no monta el botón', async () => {
+      interface TScenario {
+        nombre: string;
+        setup: (client: QueryClient) => void;
+        waitFor: () => Promise<unknown>;
+      }
+
+      const seedRoot = (client: QueryClient): void => {
+        seedQueryData(client, queryKeys.projects.list(), [
+          buildProject(INTEGRATION_DIRECTORY),
+        ]);
+        seedSessions(client, [buildSessionInfo()]);
+      };
+
+      const scenarios: TScenario[] = [
+        {
+          nombre: 'carga',
+          setup: () => {
+            serviceMock.getSession.mockReturnValue(
+              new Promise<never>(() => undefined),
+            );
+          },
+          waitFor: () => screen.findByTestId(TESTID.graphSkeleton),
+        },
+        {
+          nombre: 'error',
+          setup: (client) => {
+            seedSessions(client, [
+              buildSessionInfo({ id: 'otra_sesion', title: 'otra' }),
+            ]);
+            serviceMock.getSession.mockRejectedValue(new Error('fallo de red'));
+          },
+          waitFor: () =>
+            screen.findByText('Ocurrió un error al cargar los datos'),
+        },
+        {
+          nombre: 'no encontrada',
+          setup: (client) => {
+            seedRoot(client);
+            seedSubtree(client, [], { notFound: true });
+          },
+          waitFor: () => screen.findByText('Sesión no encontrada'),
+        },
+        {
+          nombre: 'sin agentes',
+          setup: (client) => {
+            seedRoot(client);
+            seedSubtree(client, []);
+          },
+          waitFor: () => screen.findByText('Sin agentes'),
+        },
+        {
+          nombre: 'raíz 404',
+          setup: (client) => {
+            seedSessions(client, [
+              buildSessionInfo({ id: 'otra_sesion', title: 'otra' }),
+            ]);
+            serviceMock.getSession.mockRejectedValue({
+              _tag: 'SessionNotFoundError',
+              sessionID: ROOT,
+              message: 'la sesión no existe',
+            });
+          },
+          waitFor: () => screen.findByText('Sesión no encontrada'),
+        },
+      ];
+
+      for (const scenario of scenarios) {
+        resetServiceMock();
+        const client = createIntegrationQueryClient();
+        seedDevice(client, false);
+        scenario.setup(client);
+
+        const view = await renderWorkspace(client);
+        await scenario.waitFor();
+
+        expect(
+          screen.queryByRole('button', { name: 'Eficiencia' }),
+          `en “${scenario.nombre}” no debe montarse el botón`,
+        ).not.toBeInTheDocument();
+
+        view.unmount();
+      }
+    });
+  },
+  INTEGRATION_TIMEOUT_MS,
+);

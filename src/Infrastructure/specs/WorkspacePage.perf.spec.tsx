@@ -26,7 +26,8 @@ import { WorkspacePage } from '../WorkspacePage';
  * pasa por el barrel y este espía observa **solo** la decisión de la página.
  */
 const graphHooks = vi.hoisted(() => ({
-  useNow: vi.fn<(options?: { enabled?: boolean; intervalMs?: number }) => number>(),
+  useNow:
+    vi.fn<(options?: { enabled?: boolean; intervalMs?: number }) => number>(),
   /**
    * Captura las props con las que `GraphPane` monta `AgentGraph` para observar
    * la identidad de los nodos del modelo (SC-006, T053) sin renderizar React Flow.
@@ -70,22 +71,16 @@ vi.mock('@app/Application/Helpers/perf', async (importOriginal) => {
  * se sustituyen solo los componentes que montan React Flow.
  */
 vi.mock('@app/Domains/Graph', async () => {
-  const { useGraphModel } = await import(
-    '@app/Domains/Graph/Hooks/useGraphModel'
-  );
+  const { useGraphModel } =
+    await import('@app/Domains/Graph/Hooks/useGraphModel');
   const { useNow } = await import('@app/Domains/Graph/Hooks/useNow');
-  const { useChainSelection } = await import(
-    '@app/Domains/Graph/Hooks/useChainSelection'
-  );
-  const { useFollowMode } = await import(
-    '@app/Domains/Graph/Hooks/useFollowMode'
-  );
-  const { summarizeSession } = await import(
-    '@app/Domains/Graph/lib/deriveMetrics'
-  );
-  const { isActiveStatus } = await import(
-    '@app/Domains/Graph/lib/nodeStatus'
-  );
+  const { useChainSelection } =
+    await import('@app/Domains/Graph/Hooks/useChainSelection');
+  const { useFollowMode } =
+    await import('@app/Domains/Graph/Hooks/useFollowMode');
+  const { summarizeSession } =
+    await import('@app/Domains/Graph/lib/deriveMetrics');
+  const { isActiveStatus } = await import('@app/Domains/Graph/lib/nodeStatus');
 
   graphHooks.useNow.mockImplementation(useNow);
 
@@ -361,7 +356,9 @@ describe('WorkspacePage — tick del resumen condicionado a nodos activos (T041,
 
     // La estructura ya está disponible (1 nodo), pero ningún nodo está activo.
     await waitFor(() =>
-      expect(screen.getByRole('group', { name: '1 agente' })).toBeInTheDocument(),
+      expect(
+        screen.getByRole('group', { name: '1 agente' }),
+      ).toBeInTheDocument(),
     );
     expect(graphHooks.useNow).toHaveBeenCalledWith({ enabled: false });
     expect(summaryTicks().every((enabled) => enabled === false)).toBe(true);
@@ -377,7 +374,9 @@ describe('WorkspacePage — tick del resumen condicionado a nodos activos (T041,
     renderWorkspace(client);
 
     await waitFor(() =>
-      expect(screen.getByRole('group', { name: '1 agente' })).toBeInTheDocument(),
+      expect(
+        screen.getByRole('group', { name: '1 agente' }),
+      ).toBeInTheDocument(),
     );
     await waitFor(() =>
       expect(graphHooks.useNow).toHaveBeenCalledWith({ enabled: true }),
@@ -503,7 +502,9 @@ describe('WorkspacePage — identidad de nodo estable con ~150 nodos (T053, SC-0
     // El modelo real expone los ~150 nodos en el primer render (todo en caché).
     const nodesBefore = latestGraphNodes();
     expect(nodesBefore).toHaveLength(PERF_NODE_COUNT);
-    expect(screen.getByRole('group', { name: `${PERF_NODE_COUNT} agentes` })).toBeInTheDocument();
+    expect(
+      screen.getByRole('group', { name: `${PERF_NODE_COUNT} agentes` }),
+    ).toBeInTheDocument();
 
     const rootBefore = nodeById(nodesBefore, PERF_ROOT_ID);
     const rootDurationBefore = rootBefore.data.metrics.durationMs;

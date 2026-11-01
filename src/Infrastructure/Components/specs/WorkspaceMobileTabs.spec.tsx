@@ -67,9 +67,11 @@ describe('WorkspaceMobileTabs — tablist de primer nivel (T059, FR-013, P4)', (
     const tablist = screen.getByRole('tablist', {
       name: 'Vistas del workspace',
     });
-    expect(within(tablist).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(
-      ['Sesiones', 'Grafo', 'Detalle', 'Chat'],
-    );
+    expect(
+      within(tablist)
+        .getAllByRole('tab')
+        .map((tab) => tab.textContent),
+    ).toEqual(['Sesiones', 'Grafo', 'Detalle', 'Chat']);
     expect([...WORKSPACE_TABS]).toEqual([
       'sessions',
       'graph',
@@ -146,13 +148,17 @@ describe('WorkspaceMobileTabs — tablist de primer nivel (T059, FR-013, P4)', (
       'true',
     );
 
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'Grafo' }), { key: 'End' });
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Grafo' }), {
+      key: 'End',
+    });
     expect(screen.getByRole('tab', { name: 'Chat' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
 
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'Chat' }), { key: 'Home' });
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Chat' }), {
+      key: 'Home',
+    });
     expect(screen.getByRole('tab', { name: 'Sesiones' })).toHaveAttribute(
       'aria-selected',
       'true',
@@ -182,7 +188,9 @@ describe('WorkspaceMobileTabs — tablist de primer nivel (T059, FR-013, P4)', (
 
 describe('WorkspaceMobileTabs — el chat es un panel propio (T059, FR-013, P4)', () => {
   it('monta el panel de chat sin tabbars anidadas', () => {
-    render(<Harness initialTab="chat" chat={<div data-testid="chat-panel" />} />);
+    render(
+      <Harness initialTab="chat" chat={<div data-testid="chat-panel" />} />,
+    );
 
     expect(screen.getByTestId('chat-panel')).toBeInTheDocument();
     // El único tablist es el del workspace: el chat no anida `Detalle | Chat`.
@@ -226,7 +234,9 @@ describe('WorkspaceMobileTabs — badge de atención del tab Chat (T075, FR-009)
     render(<Harness attentionCount={2} />);
 
     const chat = screen.getByRole('tab', { name: /Chat/ });
-    expect(within(chat).getByTestId('chat-attention-badge')).toBeInTheDocument();
+    expect(
+      within(chat).getByTestId('chat-attention-badge'),
+    ).toBeInTheDocument();
     // `aria-label` textual (marca no-color), `attention-contract.md §2`.
     expect(
       screen.getByRole('img', { name: '2 pendientes por atender' }),
@@ -242,7 +252,9 @@ describe('WorkspaceMobileTabs — badge de atención del tab Chat (T075, FR-009)
   it('sin conteo no monta badge (FR-011)', () => {
     render(<Harness />);
 
-    expect(screen.queryByTestId('chat-attention-badge')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('chat-attention-badge'),
+    ).not.toBeInTheDocument();
   });
 
   it('usa el conteo del contexto cuando no llega la prop (cableado de la página)', () => {
