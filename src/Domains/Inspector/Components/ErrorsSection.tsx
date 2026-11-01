@@ -1,5 +1,9 @@
 import { Container } from '@app/Application/Components';
-import { SectionFrame } from '@app/Application/Components/Molecules';
+import {
+  DETAIL_LIST_CLASSNAME,
+  DETAIL_LIST_ROW_CLASSNAME,
+  SectionFrame,
+} from '@app/Application/Components/Molecules';
 
 interface ErrorsSectionProps {
   errors: { message: string; at: number }[];
@@ -26,9 +30,12 @@ export const ErrorsSection = ({
     isEmpty={errors.length === 0}
     emptyLabel="Sin errores."
   >
-    <Container space="small">
+    <Container space="none" className={DETAIL_LIST_CLASSNAME}>
       {errors.map((error, index) => (
-        <p key={`${error.at}-${index}`} className="text-xs text-status-error">
+        <p
+          key={`${error.at}-${index}`}
+          className={`${DETAIL_LIST_ROW_CLASSNAME} break-words text-xs text-status-error`}
+        >
           {error.message}
         </p>
       ))}

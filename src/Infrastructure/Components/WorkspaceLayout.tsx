@@ -24,6 +24,12 @@ interface WorkspaceLayoutProps {
    */
   chat?: ReactNode;
   history: ReactNode;
+  /**
+   * Overlay de eficiencia (contrato overlay §2): se monta junto a `history` en
+   * las **dos** presentaciones. Es un slot, no una columna ni un tab, así que no
+   * altera las tres columnas de escritorio ni el móvil (FR-006/FR-047).
+   */
+  efficiency?: ReactNode;
   /** Ancho actual del panel de detalle en px (US5/FR-010..FR-012). */
   inspectorWidth: number;
   /** `true` mientras se arrastra el separador (feedback `--status-running`). */
@@ -43,7 +49,9 @@ interface WorkspaceLayoutProps {
  * tablist + panel activo) y la vista desktop (rail de sesiones, panel del grafo
  * y panel del inspector en tres columnas). Recibe los paneles ya armados como
  * `ReactNode` para que la elección de presentación no duplique lógica
- * (AGENTS §9). El overlay del histórico se monta en ambas presentaciones.
+ * (AGENTS §9). El overlay del histórico se monta en ambas presentaciones, y el
+ * slot `efficiency` se monta justo a su lado: ambos son capas, no columnas ni
+ * tabs, así que no alteran las tres columnas ni el tablist móvil.
  *
  * En desktop se inserta el separador de resize entre el grafo y el inspector y
  * el ancho se aplica a la columna del inspector; en móvil **no** se monta el
@@ -68,6 +76,7 @@ export const WorkspaceLayout = ({
   inspector,
   chat = null,
   history,
+  efficiency = null,
   inspectorWidth,
   isResizing,
   onResizeStart,
@@ -86,6 +95,7 @@ export const WorkspaceLayout = ({
           chat={chat}
         />
         {history}
+        {efficiency}
       </>
     );
   }
@@ -95,7 +105,7 @@ export const WorkspaceLayout = ({
       <Container row space="none" className="relative h-full min-h-0 min-w-0">
         <Container
           space="none"
-          className="w-[280px] shrink-0 min-w-0 overflow-auto border-r border-border"
+          className="w-[280px] shrink-0 min-w-0 overflow-auto border-r border-border bg-surface-1"
         >
           {sessions}
         </Container>
@@ -117,7 +127,7 @@ export const WorkspaceLayout = ({
           className={`min-w-0 border-border ${
             isFullscreen
               ? 'absolute inset-0 z-20 overflow-auto border-l-0 bg-surface-0'
-              : 'overflow-auto border-l'
+              : 'overflow-auto border-l bg-surface-1'
           }`}
           style={isFullscreen ? undefined : { width: inspectorWidth }}
         >
@@ -125,6 +135,7 @@ export const WorkspaceLayout = ({
         </Container>
       </Container>
       {history}
+      {efficiency}
     </>
   );
 };

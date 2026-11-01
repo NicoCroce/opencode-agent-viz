@@ -15,7 +15,9 @@ import {
   type TExecutionPlan,
   type TRowLayout,
 } from '../lib/executionLevels';
-import { NODE_HEIGHT } from '../lib/layoutGraph';
+import { GRAPH_VIEW_MODE, type TGraphViewMode } from '../lib/graphViewMode';
+import { NODE_HEIGHT, NODE_WIDTH } from '../lib/layoutGraph';
+import { layoutTree } from '../lib/layoutTree';
 import { isActiveStatus } from '../lib/nodeStatus';
 import { worseNodeStatus } from '../lib/nodeStatusRank';
 import { REST_EDGE_COLOR, REST_EDGE_STYLE } from '../lib/restEdgeStyle';
@@ -28,6 +30,11 @@ export interface UseGraphLayoutModelResult {
   rowLayout: TRowLayout;
   nodes: TGraphNode[];
   edges: Edge[];
+  /**
+   * Centro X (flujo) de la raíz del árbol en la vista "Grafo"; el encuadre la
+   * centra cuando el árbol no entra completo. `null` en carriles.
+   */
+  anchorX: number | null;
 }
 
 /**
@@ -38,7 +45,10 @@ export const useGraphLayoutModel = (
   graph: TGraphModel,
   plan: TExecutionPlan,
   overrides: Record<string, TNodeSizeOverride>,
+  mode: TGraphViewMode = GRAPH_VIEW_MODE.LANES,
 ): UseGraphLayoutModelResult => {
+  const isTree = mode === GRAPH_VIEW_MODE.GRAPH;
+
   const statusByLevel = useMemo(() => {
     const map: Record<number, TNodeStatus> = {};
     for (const node of graph.nodes) {
@@ -75,7 +85,38 @@ export const useGraphLayoutModel = (
     [plan, heightByNode],
   );
 
+  // Vista "Grafo": árbol de invocación. Se re-layouta solo si cambian ids,
+  // tamaños o aristas, no con cada cambio de datos (Principio VII).
+  const treeKey = isTree
+    ? `${viewNodes.map((node) => `${node.id}:${node.width}x${node.height}`).join(',')}|${graph.edges.map((edge) => edge.id).join(',')}`
+    : '';
+  const treePositions = useMemo(
+    () =>
+      isTree
+        ? layoutTree(
+            viewNodes.map((node) => ({
+              id: node.id,
+              width: node.width ?? NODE_WIDTH,
+              height: node.height ?? NODE_HEIGHT,
+            })),
+            graph.edges,
+          )
+        : null,
+    // `treeKey` resume viewNodes/edges: re-layoutar por identidad haría correr
+    // dagre en cada evento de estado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [treeKey],
+  );
+
   const nodes = useMemo<TGraphNode[]>(() => {
+    if (treePositions) {
+      // El árbol manda la posición; sin gutter ni carriles.
+      return viewNodes.map((node) => ({
+        ...node,
+        position: treePositions[node.id] ?? node.position,
+      }));
+    }
+
     // El carril manda el `y`; el `x` sigue siendo el de la columna del nivel.
     const positioned = viewNodes.map((node) => {
       const level = plan.levelByNode[node.id];
@@ -93,7 +134,17 @@ export const useGraphLayoutModel = (
       ...positioned,
       ...buildGutterNodes(plan, rowLayout, statusByLevel, activeLevel),
     ] as unknown as TGraphNode[];
-  }, [viewNodes, plan, rowLayout, statusByLevel, activeLevel]);
+  }, [viewNodes, plan, rowLayout, statusByLevel, activeLevel, treePositions]);
+
+  // Raíz del árbol: el primer nodo que no es destino de ninguna arista.
+  const anchorX = useMemo(() => {
+    if (!treePositions) return null;
+    const targets = new Set(graph.edges.map((edge) => edge.target));
+    const root = viewNodes.find((node) => !targets.has(node.id));
+    const position = root ? treePositions[root.id] : undefined;
+    if (!root || !position) return null;
+    return position.x + (root.width ?? NODE_WIDTH) / 2;
+  }, [treePositions, viewNodes, graph.edges]);
 
   const edges = useMemo<Edge[]>(
     () =>
@@ -105,17 +156,19 @@ export const useGraphLayoutModel = (
           source: edge.source,
           target: edge.target,
           type: 'invocation',
-          data: { railX: executionRailX(column) },
+          data: isTree
+            ? { routing: 'tree' }
+            : { routing: 'rail', railX: executionRailX(column) },
           style: REST_EDGE_STYLE,
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            width: 12,
-            height: 12,
+            width: 9,
+            height: 9,
             color: REST_EDGE_COLOR,
           },
         };
       }),
-    [graph.edges, plan.columnByNode],
+    [graph.edges, plan.columnByNode, isTree],
   );
 
   return {
@@ -126,5 +179,6 @@ export const useGraphLayoutModel = (
     rowLayout,
     nodes,
     edges,
+    anchorX,
   };
 };

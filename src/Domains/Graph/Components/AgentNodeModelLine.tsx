@@ -22,7 +22,7 @@ export const AgentNodeModelLine = ({ model }: AgentNodeModelLineProps) => {
       space="small"
       className="mt-1 min-w-0"
     >
-      <span className="min-w-0 break-all font-mono text-[11px] leading-snug text-foreground">
+      <span className="min-w-0 break-all font-mono text-[11px] leading-snug text-muted-foreground">
         {formatModelRef(model)}
       </span>
       {model.variant ? (

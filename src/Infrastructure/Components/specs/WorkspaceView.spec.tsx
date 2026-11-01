@@ -164,6 +164,39 @@ describe('WorkspaceView — móvil (FR-013/FR-014)', () => {
   });
 });
 
+describe('WorkspaceView — slot de eficiencia (T034, FR-006/FR-047)', () => {
+  it('propaga el slot en escritorio sin desplazar el histórico ni las columnas', () => {
+    renderView({ efficiency: <div data-testid="efficiency-node" /> });
+
+    expect(screen.getByTestId('efficiency-node')).toBeInTheDocument();
+    expect(screen.getByTestId('history-node')).toBeInTheDocument();
+    // Sigue siendo la vista de tres columnas con separador (FR-047).
+    expect(screen.getByTestId('inspector-column')).toBeInTheDocument();
+    expect(screen.getByRole('separator')).toBeInTheDocument();
+  });
+
+  it('propaga el mismo slot en móvil, junto al histórico y el tablist', () => {
+    renderView({
+      isMobile: true,
+      tab: 'graph',
+      efficiency: <div data-testid="efficiency-node" />,
+    });
+
+    expect(screen.getByTestId('efficiency-node')).toBeInTheDocument();
+    expect(screen.getByTestId('history-node')).toBeInTheDocument();
+    expect(
+      screen.getByRole('tablist', { name: 'Vistas del workspace' }),
+    ).toBeInTheDocument();
+  });
+
+  it('sin slot no monta nada extra y conserva el histórico (regresión)', () => {
+    renderView();
+
+    expect(screen.queryByTestId('efficiency-node')).not.toBeInTheDocument();
+    expect(screen.getByTestId('history-node')).toBeInTheDocument();
+  });
+});
+
 describe('WorkspaceView — slots nulos sin sesión (FR-013)', () => {
   it('no rompe con `chat` nulo en escritorio ni en móvil', () => {
     const desktop = renderView({ chat: null });

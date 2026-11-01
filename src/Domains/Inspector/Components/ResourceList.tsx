@@ -28,6 +28,7 @@ export const ResourceList = ({ resources }: ResourceListProps) => {
   return (
     <SectionFrame
       title="Recursos"
+      variant="card"
       isEmpty={isEmpty}
       emptyLabel="Sin recursos configurados para este agente."
     >

@@ -91,9 +91,12 @@ const nodeFocus = (overrides: Partial<TNodeFocus> = {}): TNodeFocus => ({
   ...overrides,
 });
 
-/** Elemento raíz del card (el único con `bg-surface-2`): recibe la opacidad de foco. */
+/**
+ * Elemento raíz del card (el primero con `bg-surface-1` en orden de documento;
+ * la marca de atención, hija suya, lo comparte): recibe la opacidad de foco.
+ */
 const getCard = (container: HTMLElement): HTMLElement => {
-  const card = container.querySelector('.bg-surface-2');
+  const card = container.querySelector('.bg-surface-1');
   if (!(card instanceof HTMLElement)) {
     throw new Error('No se encontró el card del AgentNode');
   }

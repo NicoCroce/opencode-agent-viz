@@ -46,22 +46,22 @@ export const GutterNode = ({ data }: NodeProps<TGutterNode>) => {
   return (
     <div
       className={cn(
-        'relative flex h-full w-full flex-col justify-center gap-1 border-r px-4',
-        data.active ? 'border-accent/70' : 'border-border/70',
+        'relative flex h-full w-full flex-col justify-center gap-1 border-r border-dashed px-4',
+        data.active ? 'border-accent/50' : 'border-border',
       )}
     >
       <span
         className={cn(
-          'font-mono text-base font-semibold leading-none tabular-nums',
-          data.active ? 'text-accent' : 'text-foreground/85',
+          'font-display text-lg font-medium leading-none tabular-nums',
+          data.active ? 'text-accent' : 'text-muted-foreground',
         )}
       >
         {String(data.level).padStart(2, '0')}
       </span>
-      <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+      <span className="font-mono text-[10px] tabular-nums text-status-idle">
         {timeRange}
       </span>
-      <span className="flex items-center gap-1.5 font-mono text-[11px] tabular-nums text-muted-foreground">
+      <span className="flex items-center gap-1.5 font-mono text-[10px] tabular-nums text-status-idle">
         <span>{formatDuration(data.endedAt - data.startedAt)}</span>
         <span aria-hidden>·</span>
         <span>{data.count > 1 ? `∥ ${data.count} en paralelo` : '1 agente'}</span>
@@ -69,8 +69,10 @@ export const GutterNode = ({ data }: NodeProps<TGutterNode>) => {
       <span
         aria-hidden
         className={cn(
-          'absolute -right-[3.5px] top-1/2 h-[7px] w-[7px] -translate-y-1/2 rounded-full',
+          // Anillo del color del lienzo: el punto "corta" la línea punteada.
+          'absolute -right-[3.5px] top-1/2 h-[7px] w-[7px] -translate-y-1/2 rounded-full ring-4 ring-surface-0',
           NODE_STATUS_COLOR[data.status],
+          isRunning && 'glow-accent',
         )}
       />
     </div>

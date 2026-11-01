@@ -38,12 +38,12 @@ describe('EffortMeter — muescas (S9)', () => {
     expect(litNotches()).toHaveLength(5);
   });
 
-  it('paints lit notches with --primary and unlit ones with a neutral token', () => {
+  it('paints lit notches with --effort and unlit ones with a neutral token', () => {
     render(<EffortMeter effort={effort({ level: 2 })} />);
     const notches = screen.getAllByTestId('effort-notch');
 
-    expect(notches[0]).toHaveClass('bg-primary');
-    expect(notches[1]).toHaveClass('bg-primary');
+    expect(notches[0]).toHaveClass('bg-effort');
+    expect(notches[1]).toHaveClass('bg-effort');
     expect(notches[2]).toHaveClass('bg-border');
     expect(notches[4]).toHaveClass('bg-border');
   });

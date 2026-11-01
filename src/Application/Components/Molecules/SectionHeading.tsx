@@ -22,7 +22,7 @@ export const SectionHeading = ({
 }: SectionHeadingProps) => (
   <span
     className={cn(
-      'text-[11px] font-medium uppercase tracking-wide text-muted-foreground',
+      'font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground',
       className,
     )}
     {...props}

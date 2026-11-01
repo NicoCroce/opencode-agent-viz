@@ -33,11 +33,9 @@ export const ExecutionLanes = ({
         key={level.level}
         className={cn(
           'lane-in pointer-events-none absolute',
-          activeLevel === level.level
-            ? 'bg-accent/[0.05]'
-            : level.level % 2 === 1
-              ? 'bg-white/[0.015]'
-              : '',
+          // Sin bandas alternas: el lienzo es la retícula de puntos y solo el
+          // carril activo se tiñe de cyan.
+          activeLevel === level.level && 'bg-accent/[0.04]',
         )}
         style={{
           left: 0,
@@ -48,7 +46,7 @@ export const ExecutionLanes = ({
         }}
       >
         {level.level > 0 ? (
-          <div className="absolute inset-x-0 top-0 h-px bg-border/40" />
+          <div className="absolute inset-x-0 top-0 border-t border-dashed border-border/60" />
         ) : null}
         {activeLevel === level.level ? (
           <div className="absolute inset-y-0 left-0 w-[2px] bg-accent/70" />

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import type { SessionInfo } from '@opencode/client';
 import { STORE_KEY } from '@app/Application/Hooks';
 import {
@@ -77,6 +77,7 @@ vi.mock('@app/Domains/Graph', async () => {
     AgentGraph: (props: {
       selectedNodeId?: string | null;
       onSelectNode?: (id: string) => void;
+      onOpenHistory?: (id: string) => void;
       attentionNodeIds?: ReadonlySet<string>;
     }) =>
       React.createElement(
@@ -95,6 +96,16 @@ vi.mock('@app/Domains/Graph', async () => {
             onClick: () => props.onSelectNode?.('ses_root'),
           },
           'Seleccionar nodo',
+        ),
+        // T036: disparador del histórico desde el grafo, para ejercer la
+        // exclusión mutua con el overlay de eficiencia (FR-006).
+        React.createElement(
+          'button',
+          {
+            type: 'button',
+            onClick: () => props.onOpenHistory?.('ses_root'),
+          },
+          'Abrir histórico',
         ),
       ),
     GraphSkeleton: () =>
@@ -186,13 +197,24 @@ vi.mock('@app/Domains/Inspector', async () => {
   };
 });
 
+/**
+ * Estado de vista del histórico bajo control del test (T036): los espías
+ * permiten afirmar la exclusión mutua con el overlay de eficiencia (FR-006) sin
+ * montar el modal real.
+ */
+const historySpies = vi.hoisted(() => ({
+  open: vi.fn<(sessionId: string) => void>(),
+  close: vi.fn<() => void>(),
+  navigateTo: vi.fn<(sessionId: string) => void>(),
+}));
+
 vi.mock('@app/Domains/History', () => ({
   HistoryModal: () => null,
   useHistory: () => ({
     targetId: null,
-    open: vi.fn(),
-    close: vi.fn(),
-    navigateTo: vi.fn(),
+    open: historySpies.open,
+    close: historySpies.close,
+    navigateTo: historySpies.navigateTo,
   }),
 }));
 
@@ -388,6 +410,9 @@ beforeEach(() => {
   });
   vi.mocked(useSessionAttention).mockReturnValue([]);
   attentionNotifications.mockClear();
+  historySpies.open.mockClear();
+  historySpies.close.mockClear();
+  historySpies.navigateTo.mockClear();
 
   service.listSessions.mockReset();
   // Dependencias del respaldo del `directory` (T016/T018): sin proyectos ni
@@ -1156,5 +1181,148 @@ describe('WorkspacePage — sesión inexistente sale de la carga (review 1, FR-0
       screen.getByRole('button', { name: /listado|sesiones/i }),
     );
     expect(screen.getByTestId('sessions-list')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Cableado del overlay de eficiencia (T035/T036, FR-001/FR-005/FR-006): la página
+ * es la única que sabe del disparador, del estado de apertura y de los datos. Se
+ * verifica la apertura/cierre, la exclusión mutua con el histórico y el reset al
+ * cambiar la sesión raíz; el contenido del informe tiene su propio spec.
+ */
+describe('WorkspacePage — overlay de eficiencia (T035/T036, FR-001/FR-006)', () => {
+  beforeEach(() => {
+    service.listSessions.mockResolvedValue([sessionInfo]);
+  });
+
+  /** Botón del grafo que abre el histórico (mock de `AgentGraph`). */
+  const historyTrigger = (): HTMLElement =>
+    // Con el diálogo abierto, Radix oculta el resto del árbol (`aria-hidden`).
+    screen.getByRole('button', { name: 'Abrir histórico', hidden: true });
+
+  /** Abre el overlay desde la cabecera del grafo y devuelve el diálogo. */
+  const openEfficiency = async (): Promise<HTMLElement> => {
+    fireEvent.click(screen.getByRole('button', { name: 'Eficiencia' }));
+    return screen.findByRole('dialog', { name: 'Eficiencia de la sesión' });
+  };
+
+  /** Sonda de navegación: cambia la sesión raíz sin remontar la página. */
+  const NavigationProbe = () => {
+    const navigate = useNavigate();
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          void navigate('/sessions/ses_other');
+        }}
+      >
+        Cambiar de raíz
+      </button>
+    );
+  };
+
+  const renderWithNavigation = (client: QueryClient) =>
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={[`/sessions/${SESSION_ID}`]}>
+          <Routes>
+            <Route
+              path="/sessions/:id"
+              element={
+                <>
+                  <WorkspacePage />
+                  <NavigationProbe />
+                </>
+              }
+            />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+  it('abre el overlay desde la cabecera del grafo y lo cierra con “Cerrar”', async () => {
+    const client = createClient();
+    seedSubtreeCache(client, [sessionInfo]);
+    setDevice(client, false);
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    const dialog = await openEfficiency();
+    expect(dialog).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Cerrar análisis de eficiencia' }),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('abrir eficiencia cierra el histórico (exclusión mutua)', async () => {
+    const client = createClient();
+    seedSubtreeCache(client, [sessionInfo]);
+    setDevice(client, false);
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+
+    historySpies.close.mockClear();
+    await openEfficiency();
+
+    expect(historySpies.close).toHaveBeenCalled();
+  });
+
+  it('abrir el histórico (desde el grafo) cierra eficiencia', async () => {
+    const client = createClient();
+    seedSubtreeCache(client, [sessionInfo]);
+    setDevice(client, false);
+
+    renderWorkspace(client);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+
+    await openEfficiency();
+
+    fireEvent.click(historyTrigger());
+
+    expect(historySpies.open).toHaveBeenCalledWith(SESSION_ID);
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('el cambio de sesión raíz cierra el overlay', async () => {
+    const client = createClient();
+    seedSubtreeCache(client, [sessionInfo]);
+    setDevice(client, false);
+
+    renderWithNavigation(client);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-graph')).toBeInTheDocument(),
+    );
+
+    await openEfficiency();
+
+    // El diálogo modal oculta el resto del árbol (`aria-hidden`): se busca
+    // explícitamente entre los elementos ocultos.
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Cambiar de raíz', hidden: true }),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
   });
 });

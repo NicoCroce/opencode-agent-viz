@@ -322,7 +322,7 @@ export const ChatHistoryDialog = ({
                       data-testid="chat-history-item"
                       data-entry-id={entry.id}
                       onClick={() => handleSelect(entry.id)}
-                      className="flex w-full flex-col items-start gap-0.5 rounded-flat px-3 py-2 text-left transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                      className="flex w-full flex-col items-start gap-0.5 rounded-flat px-3 py-2 text-left transition-colors hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                     >
                       <span className="text-[11px] font-medium text-muted-foreground">
                         {authorLabel}

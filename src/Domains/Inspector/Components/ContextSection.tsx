@@ -1,6 +1,11 @@
 import type { ReactNode } from 'react';
 import { Container } from '@app/Application/Components';
-import { DetailRow, SectionFrame } from '@app/Application/Components/Molecules';
+import {
+  DetailRow,
+  SECTION_CARD_CLASSNAME,
+  SECTION_ROWS_CARD_CLASSNAME,
+  SectionFrame,
+} from '@app/Application/Components/Molecules';
 import { Alert } from '@app/Application/Components/Molecules/Alert';
 import {
   formatPercent,
@@ -67,7 +72,8 @@ const reasoningShare = (tokens: TTokenUsage | null | undefined): number | null =
  * ventana/caché (con la tasa de acierto y el coste por 1k), la evolución del
  * contexto, la salida con su relación de razonamiento y las compactaciones, con
  * los cuatro estados de pantalla delegados a `SectionFrame`. Otras historias
- * añaden apartados vía `children`.
+ * añaden apartados vía `children`. Cada bloque va en una tarjeta
+ * (`SECTION_CARD_CLASSNAME`); la de la ventana abre con su uso y la composición.
  */
 export const ContextSection = ({
   context,
@@ -106,23 +112,26 @@ export const ContextSection = ({
     >
       <Container space="small">
         {context?.provisional ? (
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-status-idle">
             provisional
           </span>
         ) : null}
 
-        {breakdown && breakdown.buckets.length > 0 ? (
-          <ContextCompositionBar
-            buckets={breakdown.buckets}
-            hasTokens={breakdown.hasTokens}
-          />
-        ) : null}
-
-        <Container space="none" className="gap-0.5">
+        {/* Tarjeta de la ventana: uso frente al límite + composición. */}
+        <Container space="small" className={SECTION_CARD_CLASSNAME}>
           <ContextWindowUsage
             windowTokens={window?.windowTokens ?? null}
             usage={usage}
           />
+          {breakdown && breakdown.buckets.length > 0 ? (
+            <ContextCompositionBar
+              buckets={breakdown.buckets}
+              hasTokens={breakdown.hasTokens}
+            />
+          ) : null}
+        </Container>
+
+        <Container space="none" className={SECTION_ROWS_CARD_CLASSNAME}>
           <DetailRow
             label="Caché (lectura)"
             value={formatTokens(window?.cacheRead ?? null)}
@@ -156,7 +165,7 @@ export const ContextSection = ({
           limitTokens={usage?.limitTokens ?? null}
         />
 
-        <Container space="none" className="gap-0.5">
+        <Container space="none" className={SECTION_ROWS_CARD_CLASSNAME}>
           <DetailRow label="Salida (respuesta)" value={formatTokens(output)} />
           <DetailRow label="Razonamiento" value={formatTokens(reasoning)} />
           <DetailRow
@@ -165,7 +174,7 @@ export const ContextSection = ({
           />
         </Container>
 
-        <Container space="none" className="gap-0.5">
+        <Container space="none" className={SECTION_ROWS_CARD_CLASSNAME}>
           {compactionLoop ? (
             <Alert
               variant="warning"

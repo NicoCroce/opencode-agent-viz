@@ -21,10 +21,12 @@ export const CONTEXT_CATEGORY_LABEL: Record<TContextCategory, string> = {
  * `contracts/context-panel-contract.md` §7).
  */
 const CATEGORY_COLOR: Record<TContextCategory, string> = {
-  toolResult: 'bg-primary',
-  toolInput: 'bg-status-waiting',
-  reasoning: 'bg-status-running',
-  assistantText: 'bg-status-done',
+  // Escala cyan por luminosidad (chart-1..4) + gris: las categorías se
+  // distinguen por claridad, no solo por tono, y no reutilizan LEDs de estado.
+  toolResult: 'bg-chart-1',
+  toolInput: 'bg-chart-3',
+  reasoning: 'bg-chart-2',
+  assistantText: 'bg-chart-4',
   userText: 'bg-status-idle',
 };
 
@@ -37,8 +39,9 @@ interface ContextCompositionBarProps {
 
 /**
  * Barra apilada de la composición del contexto con leyenda (FR-001..FR-004;
- * `contracts/context-panel-contract.md` §2/§7). Presentación pura: recibe los
- * buckets ya derivados. Cada categoría muestra su porcentaje y su valor
+ * `contracts/context-panel-contract.md` §2/§7): barra segmentada de 8px con 2px
+ * entre tramos y leyenda con muestras cuadradas de 8px. Presentación pura:
+ * recibe los buckets ya derivados. Cada categoría muestra su porcentaje y su valor
  * absoluto (tokens o caracteres), de modo que la lectura no depende del color.
  */
 export const ContextCompositionBar = ({
@@ -59,7 +62,7 @@ export const ContextCompositionBar = ({
         space="none"
         role="img"
         aria-label={`Composición del contexto: ${summary}`}
-        className="h-2 w-full overflow-hidden rounded-flat border border-border"
+        className="h-2 w-full gap-0.5! overflow-hidden rounded bg-secondary"
       >
         {buckets.map((bucket) => (
           <span
@@ -70,7 +73,7 @@ export const ContextCompositionBar = ({
         ))}
       </Container>
 
-      <Container space="none" className="gap-0.5">
+      <Container space="none" className="gap-1!">
         {buckets.map((bucket) => (
           <Container
             key={bucket.category}
@@ -78,17 +81,17 @@ export const ContextCompositionBar = ({
             align="center"
             justify="between"
             space="small"
-            className="min-w-0 gap-2 text-[11px]"
+            className="min-w-0 gap-2 text-xs"
           >
             <Container row align="center" space="small" className="min-w-0 gap-1.5">
               <span
                 aria-hidden
                 className={cn(
-                  'h-2 w-2 shrink-0 rounded-full',
+                  'size-2 shrink-0 rounded-[2px]',
                   CATEGORY_COLOR[bucket.category],
                 )}
               />
-              <span className="min-w-0 truncate text-foreground/80">
+              <span className="min-w-0 truncate text-muted-foreground">
                 {CONTEXT_CATEGORY_LABEL[bucket.category]}
               </span>
             </Container>

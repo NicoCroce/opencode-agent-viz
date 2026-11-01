@@ -7,7 +7,7 @@ interface ModelSectionProps {
 }
 
 export const ModelSection = ({ model }: ModelSectionProps) => (
-  <SectionFrame title="Modelo">
+  <SectionFrame title="Modelo" variant="card">
     <DetailRow
       label="Nombre"
       value={model ? `${model.providerID}/${model.id}` : UNAVAILABLE}

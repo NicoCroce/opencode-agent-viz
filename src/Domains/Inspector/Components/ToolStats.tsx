@@ -1,5 +1,6 @@
 import { Container } from '@app/Application/Components';
 import {
+  DETAIL_LIST_CLASSNAME,
   DetailListRow,
   SectionFrame,
 } from '@app/Application/Components/Molecules';
@@ -31,7 +32,7 @@ export const ToolStats = ({
       isEmpty={stats.length === 0}
       emptyLabel={isEmptyLabel}
     >
-      <Container space="small">
+      <Container space="none" className={DETAIL_LIST_CLASSNAME}>
         {stats.map((stat) => (
           <DetailListRow key={stat.name}>
             <span className="truncate font-mono text-xs text-foreground">

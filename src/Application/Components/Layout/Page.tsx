@@ -11,27 +11,31 @@ import { useEffect } from 'react';
 interface PageProps {
   children: React.ReactNode;
   title: string;
+  /**
+   * Antetítulo en versalitas mono de acento sobre el título (p. ej. un resumen
+   * `3 en curso · 12 sesiones`). Opcional.
+   */
+  eyebrow?: React.ReactNode;
   size?: 'small' | 'full';
   headerRight?: React.ReactNode;
   backButton?: boolean;
 }
 
+/** Ancho máximo de la columna centrada por tamaño de página. */
+const PAGE_WIDTH = {
+  small: 'max-w-[600px]',
+  full: 'max-w-[1120px]',
+} as const;
+
 export const Page = ({
   children,
   title,
+  eyebrow,
   size = 'full',
   headerRight,
   backButton = false,
 }: PageProps) => {
   const { isMobile } = useDevice();
-
-  const small =
-    size === 'small' ? 'max-w-[600px]' : 'md:max-w-[900px] lg:max-w-[1400px]';
-
-  const classContainer = clsx(
-    'w-full flex flex-col gap-4 md:gap-6 mx-auto',
-    small,
-  );
   const { setQueryData } = useGlobalStore(STORE_KEY.backButtonEnabled);
 
   useEffect(() => {
@@ -39,20 +43,33 @@ export const Page = ({
   }, [backButton, setQueryData]);
 
   return (
-    <div className="page p-4 grid grid-rows-[min-content_auto] grid-cols-1 gap-6 max-w-[100vw] h-full md:p-6 pt-0 overflow-auto">
+    <div className="page h-full max-w-[100vw] overflow-auto">
+      {/* Columna centrada del diseño: 1120px, 48/24/64 de padding en escritorio. */}
       <Container
-        row={isMobile ? false : true}
-        justify="between"
-        align={isMobile ? 'start' : 'center'}
-        className={clsx('lg:pb-6 mx-auto w-full', small)}
-      >
-        <Title variant="h1">{title}</Title>
-        {headerRight && (
-          <Container className="self-end">{headerRight}</Container>
+        space="large"
+        className={clsx(
+          'mx-auto w-full px-4 pb-16 pt-8 md:px-6 md:pt-12',
+          PAGE_WIDTH[size],
         )}
-      </Container>
+      >
+        <Container
+          row={!isMobile}
+          justify="between"
+          align={isMobile ? 'start' : 'end'}
+        >
+          <Container space="small">
+            {eyebrow ? (
+              <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">
+                {eyebrow}
+              </span>
+            ) : null}
+            <Title variant="h1">{title}</Title>
+          </Container>
+          {headerRight && <Container>{headerRight}</Container>}
+        </Container>
 
-      <section className={classContainer}>{children}</section>
+        <section className="flex w-full flex-col gap-6">{children}</section>
+      </Container>
     </div>
   );
 };

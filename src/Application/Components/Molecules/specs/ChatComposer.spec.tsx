@@ -101,14 +101,14 @@ describe('ChatComposer', () => {
     const send = screen.getByRole('button', { name: 'Enviar mensaje' });
     expect(send).not.toHaveClass('bg-primary');
     expect(send).not.toHaveClass('text-primary-foreground');
-    expect(send).toHaveClass('hover:bg-accent');
+    expect(send).toHaveClass('hover:bg-accent/10');
 
     // Con turno: el botón de detener mantiene el mismo tratamiento neutro.
     rerender(<Harness initialValue="hola" busy />);
     const stop = screen.getByRole('button', { name: 'Detener el turno' });
     expect(stop).not.toHaveClass('bg-primary');
     expect(stop).not.toHaveClass('text-primary-foreground');
-    expect(stop).toHaveClass('hover:bg-accent');
+    expect(stop).toHaveClass('hover:bg-accent/10');
   });
 
   it('renders the chat controls slot in the footer row (U1)', () => {

@@ -11,16 +11,18 @@ import { AgentNodeHeader } from './AgentNodeHeader';
 import { AgentNodeModelLine } from './AgentNodeModelLine';
 import { NodeResizeHandles } from './NodeResizeHandles';
 import { NodeStatusRail } from './NodeStatusRail';
+import { NODE_CARD_TONE, SELECTED_TINT } from './nodeCardTone';
 import { useNodeAttention } from './NodeFocusContext';
 import { useNodeFocusOpacity } from './useNodeFocusOpacity';
 
 type AgentFlowNode = Node<TGraphNodeData, 'agent'>;
 
 /**
- * Card del agente: encabezado (título + cluster de estado), línea de modelo,
- * pie con consumo/contexto y banda de esfuerzo al pie (la firma del nodo). El
- * alto lo calcula `cardHeight` (`lib/cardHeight.ts`) y lo comparten los carriles
- * de ejecución.
+ * Card del agente: barra de estado superior, encabezado (título + cluster de
+ * estado), línea de modelo, pie con consumo/contexto y banda de esfuerzo al pie
+ * (la firma del nodo). El alto lo calcula `cardHeight` (`lib/cardHeight.ts`) y lo
+ * comparten los carriles de ejecución; la barra es absoluta y no lo altera. El
+ * borde y el tinte por estado salen de `NODE_CARD_TONE`.
  */
 const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) => {
   // Resaltado de foco por contexto (contrato de render §1.2/§2).
@@ -32,19 +34,22 @@ const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) =>
   // (FR-015/FR-017); un estado terminal ya no está activo.
   const isRunning = isActiveStatus(data.status);
   const parallel = data.parallel && data.parallel.size > 1 ? data.parallel : null;
+  const tone = NODE_CARD_TONE[data.status];
 
   return (
     <div
       style={focusOpacity === undefined ? undefined : { opacity: focusOpacity }}
       className={cn(
-        'group relative h-full w-full min-w-0 rounded-flat border bg-surface-2',
+        'group relative h-full w-full min-w-0 rounded-[10px] border bg-surface-1',
         // El pendiente gana el borde (no-color: trazo discontinuo + etiqueta
-        // textual), luego la selección, luego el borde en reposo.
+        // textual), luego la selección, luego el borde propio del estado. El
+        // tinte es una capa de imagen sobre `--surface-1`.
         hasAttention
           ? 'border-dashed border-status-waiting'
           : selected
-            ? 'border-accent'
-            : 'border-border',
+            ? 'border-accent ring-glow'
+            : tone.border,
+        selected ? SELECTED_TINT : tone.tint,
         // Color de tiradores: `--border` en reposo y `--accent` en hover/selected.
         selected
           ? '[--xy-resize-background-color:hsl(var(--accent))]'
@@ -80,7 +85,6 @@ const AgentNodeComponent = ({ id, data, selected }: NodeProps<AgentFlowNode>) =>
           parallel={parallel}
           speedup={data.speedup ?? null}
           latency={data.context?.latency ?? null}
-          isRunning={isRunning}
           status={data.status}
         />
         <AgentNodeModelLine model={data.model} />

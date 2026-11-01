@@ -1,5 +1,9 @@
+import type { ReactNode } from 'react';
 import { Container } from '@app/Application/Components';
-import { DetailRow } from '@app/Application/Components/Molecules';
+import {
+  DetailRow,
+  SectionHeading,
+} from '@app/Application/Components/Molecules';
 import { formatPercent, formatTokens } from '@app/Application/Helpers';
 import { cn } from '@app/Application/lib/utils';
 import type { TContextUsage } from '../Inspector.entity';
@@ -14,6 +18,9 @@ const LEVEL_COLOR: Record<TContextUsageLevel, string> = {
   critical: 'bg-status-error',
 };
 
+/** Etiqueta de la cabecera de la tarjeta (versalitas mono de 10px). */
+const WINDOW_LABEL = 'Ventana de contexto';
+
 interface ContextWindowUsageProps {
   /** Tokens del último paso; se muestran solos si no hay límite conocido. */
   windowTokens: number | null;
@@ -21,19 +28,36 @@ interface ContextWindowUsageProps {
   usage: TContextUsage | null;
 }
 
+/** Cabecera de la tarjeta: etiqueta a la izquierda, cifra mono a la derecha. */
+const WindowHeader = ({ value }: { value: ReactNode }) => (
+  <Container
+    row
+    align="baseline"
+    justify="between"
+    space="small"
+    className="min-w-0"
+  >
+    <SectionHeading className="text-[10px] tracking-[0.12em]">
+      {WINDOW_LABEL}
+    </SectionHeading>
+    <span className="min-w-0 truncate font-mono text-[13px] tabular-nums text-foreground">
+      {value}
+    </span>
+  </Container>
+);
+
 /**
  * Ventana de contexto del nodo: tokens usados y, si el catálogo trae el límite
- * del modelo, el total, el porcentaje y una barra de uso. El porcentaje va
- * siempre en texto; el color de la barra no es la única señal.
+ * del modelo, el total, el porcentaje y una barra de uso de 8px. El porcentaje
+ * va siempre en texto; el color de la barra no es la única señal. Es la
+ * cabecera de la tarjeta de contexto que compone `ContextSection`.
  */
 export const ContextWindowUsage = ({
   windowTokens,
   usage,
 }: ContextWindowUsageProps) => {
   if (usage === null) {
-    return (
-      <DetailRow label="Ventana de contexto" value={formatTokens(windowTokens)} />
-    );
+    return <WindowHeader value={formatTokens(windowTokens)} />;
   }
 
   const percent = usage.ratio * 100;
@@ -41,9 +65,8 @@ export const ContextWindowUsage = ({
   const limit = formatTokens(usage.limitTokens);
 
   return (
-    <Container space="none" className="gap-1">
-      <DetailRow label="Ventana de contexto" value={`${used} de ${limit}`} />
-      <DetailRow label="Uso de la ventana" value={formatPercent(percent, 0)} />
+    <Container space="small">
+      <WindowHeader value={`${used} de ${limit}`} />
       <Container
         row
         space="none"
@@ -53,13 +76,17 @@ export const ContextWindowUsage = ({
         aria-valuemax={100}
         aria-valuenow={Math.round(Math.min(percent, 100))}
         aria-valuetext={`${formatPercent(percent, 0)}: ${used} de ${limit} tokens`}
-        className="h-1.5 w-full overflow-hidden rounded-flat border border-border bg-muted"
+        className="h-2 w-full overflow-hidden rounded bg-secondary"
       >
         <span
-          className={cn('h-full', LEVEL_COLOR[contextUsageLevel(usage.ratio)])}
+          className={cn(
+            'h-full rounded',
+            LEVEL_COLOR[contextUsageLevel(usage.ratio)],
+          )}
           style={{ width: `${Math.min(percent, 100)}%` }}
         />
       </Container>
+      <DetailRow label="Uso de la ventana" value={formatPercent(percent, 0)} />
     </Container>
   );
 };

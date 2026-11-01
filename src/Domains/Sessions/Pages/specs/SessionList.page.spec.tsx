@@ -2,9 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import type { QueryClient } from '@tanstack/react-query';
 import type { Project, SessionInfo } from '@opencode/client';
 import { opencodeService } from '@app/Infrastructure/Services/opencodeClient';
+import { STORE_KEY } from '@app/Application/Hooks';
 import { renderWithProviders } from '@app/test/renderWithProviders';
+import { queryKeys } from '@app/Domains/queryKeys';
 import { SessionListPage } from '../SessionList.page';
 import { FILTER_PARAM_KEYS } from '../../lib/sessionFilters';
 import { buildSession } from '../../specs/fixtures';
@@ -128,6 +131,10 @@ describe('SessionListPage — orden de estados (FR-019)', () => {
     expect(container.querySelectorAll('.animate-pulse')).toHaveLength(5);
     expect(screen.queryByText('Sin sesiones')).not.toBeInTheDocument();
     expect(getBar()).not.toBeInTheDocument();
+    // El esqueleto vive dentro de la misma página (título + columna centrada).
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Sesiones' }),
+    ).toBeInTheDocument();
   });
 
   it('renders "Sin sesiones" (without filter bar) when there are no sessions at all', async () => {
@@ -552,5 +559,53 @@ describe('SessionListPage — todas las raíces con volumen alto (FR-001, SC-001
     expect(
       screen.queryByRole('button', { name: /session child-/ }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('SessionListPage — presentación de escritorio y cabecera', () => {
+  const seedDesktop = (running: string[] = []) => (client: QueryClient) => {
+    client.setQueryData([STORE_KEY.isMobile], false);
+    client.setQueryData(
+      queryKeys.sessions.status(),
+      Object.fromEntries(running.map((id) => [id, { type: 'busy' }])),
+    );
+  };
+
+  it('renders the sessions as a table per project on desktop', async () => {
+    mockProjects(PROJ_A, PROJ_B);
+    mockSessions({
+      [PROJ_A]: [session('a1', PROJ_A)],
+      [PROJ_B]: [session('b1', PROJ_B)],
+    });
+
+    renderWithProviders(<SessionListPage />, {
+      initialEntries: ['/sessions'],
+      seed: seedDesktop(),
+    });
+
+    expect(await screen.findByRole('table', { name: 'alpha' })).toBeVisible();
+    expect(screen.getByRole('table', { name: 'beta' })).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: /session a1/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('summarizes running and total sessions in the eyebrow', async () => {
+    mockProjects(PROJ_A);
+    mockSessions({
+      [PROJ_A]: [session('a1', PROJ_A), session('a2', PROJ_A)],
+    });
+
+    renderWithProviders(<SessionListPage />, {
+      initialEntries: ['/sessions'],
+      seed: seedDesktop(['a1']),
+    });
+
+    expect(
+      await screen.findByText('1 en curso · 2 sesiones'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Sesiones' }),
+    ).toBeInTheDocument();
   });
 });

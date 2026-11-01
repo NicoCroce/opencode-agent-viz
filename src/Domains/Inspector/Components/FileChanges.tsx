@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { Container } from '@app/Application/Components';
-import { SectionFrame } from '@app/Application/Components/Molecules';
+import {
+  DETAIL_LIST_CLASSNAME,
+  DETAIL_LIST_ROW_CLASSNAME,
+  SectionFrame,
+} from '@app/Application/Components/Molecules';
 import { cn } from '@app/Application/lib/utils';
 import type { TFileChange } from '../Inspector.entity';
 import { FileDiff } from './FileDiff';
@@ -68,7 +72,7 @@ export const FileChanges = ({
       emptyLabel="Sin cambios de archivos"
     >
       <Container space="small">
-        <Container space="none">
+        <Container space="none" className={DETAIL_LIST_CLASSNAME}>
           {changes.map((change) => {
             const isSelected = change.file === selectedFile;
             return (
@@ -82,7 +86,8 @@ export const FileChanges = ({
                   )
                 }
                 className={cn(
-                  'flex w-full min-w-0 items-center gap-1.5 border-b border-border px-1 py-1 text-left transition-colors last:border-b-0',
+                  'flex w-full min-w-0 items-center gap-1.5 text-left transition-colors',
+                  DETAIL_LIST_ROW_CLASSNAME,
                   'hover:bg-surface-2',
                   isSelected && 'bg-surface-2',
                 )}

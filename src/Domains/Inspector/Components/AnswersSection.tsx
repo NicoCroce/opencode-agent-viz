@@ -5,7 +5,10 @@ import {
   EmptyScreenError,
   HistoryEntry,
 } from '@app/Application/Components';
-import { ListSkeleton } from '@app/Application/Components/Molecules';
+import {
+  ListSkeleton,
+  SectionHeading,
+} from '@app/Application/Components/Molecules';
 import type { THistoryEntry } from '@app/Domains/History/History.entity';
 
 interface AnswersSectionProps {
@@ -134,9 +137,7 @@ export const AnswersSection = ({
   return (
     <Container space="small">
       <Container row space="small" justify="between" align="center">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-          Respuestas
-        </span>
+        <SectionHeading>Respuestas</SectionHeading>
         <Button
           variant="outline"
           onClick={onToggleReasoning}

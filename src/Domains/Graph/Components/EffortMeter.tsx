@@ -16,7 +16,7 @@ const BASE_REASON = 'esfuerzo base';
 /**
  * Medidor de esfuerzo del nodo (S9; effort-contract §5; design-direction §3.6):
  * barra de `EFFORT_MAX` segmentos que **ocupa el ancho disponible** (`flex-1`),
- * de **solo lectura**. Los encendidos usan `--primary` (exclusivo del esfuerzo);
+ * de **solo lectura**. Los encendidos usan `--effort` (exclusivo del esfuerzo);
  * los apagados, un borde neutro. Mientras el nivel es provisional, el medidor se
  * atenúa. Expone `role="img"` con la leyenda "Esfuerzo N de 5: <reasons>" (nunca
  * es un control, FR-027). La etiqueta y el nivel los aporta `AgentNodeEffortBand`.
@@ -48,7 +48,7 @@ export const EffortMeter = ({ effort }: EffortMeterProps) => {
             aria-hidden
             className={cn(
               'h-0.5 flex-1 rounded-[1px]',
-              lit ? 'bg-primary' : 'bg-border',
+              lit ? 'bg-effort' : 'bg-border',
             )}
           />
         );

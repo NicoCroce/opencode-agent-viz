@@ -4,3 +4,7 @@ export * from './SessionFilterBar';
 export * from './SessionList';
 export * from './SessionListSkeleton';
 export * from './TimeRangeFilter';
+export * from './SessionGroupHeading';
+export * from './SessionStatusLabel';
+export * from './SessionTable';
+export * from './SessionTableRow';

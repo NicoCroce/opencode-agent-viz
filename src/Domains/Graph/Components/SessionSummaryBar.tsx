@@ -34,11 +34,13 @@ export interface SessionSummaryBarProps {
 }
 
 /**
- * Barra de resumen agregado de la sesión (FR-024..FR-027): contadores por
- * estado, coste, tokens y tiempo transcurrido. Tira monoespaciada y de altura
- * fija que se actualiza en el sitio, sin reordenar ni saltar el grafo
- * (FR-027). Se alimenta del `TSessionSummary` ya agregado por
- * `summarizeSession`; es presentación pura y no accede al SDK (Principio V).
+ * Resumen agregado de la sesión en la cabecera del grafo (FR-024..FR-027): la
+ * **tira de métricas** (`<dl>` bordeado: coste, tokens, tiempo y paralelismo)
+ * seguida de los **chips de estado** (LED + número + etiqueta). Envuelve en
+ * anchos estrechos sin reordenar ni saltar el grafo (FR-027): las celdas tienen
+ * ancho estable y los valores se actualizan en el sitio. Se alimenta del
+ * `TSessionSummary` ya agregado por `summarizeSession`; es presentación pura y
+ * no accede al SDK (Principio V).
  *
  * Los contadores de en curso, esperando y con error se muestran siempre
  * (FR-024); el resto de estados solo cuando tienen agentes. Las dos esperas se
@@ -55,32 +57,34 @@ export const SessionSummaryBar = ({ summary }: SessionSummaryBarProps) => {
   return (
     <Container
       row
-      space="small"
       align="center"
-      className="min-w-0 overflow-hidden whitespace-nowrap font-mono text-[11px] tabular-nums text-muted-foreground"
+      space="none"
+      className="min-w-0 flex-wrap gap-x-3 gap-y-2"
     >
-      {counters.map((counter) => (
-        <SummaryCounterBadge key={counter.status} counter={counter} />
-      ))}
+      <dl className="m-0 grid min-w-0 grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-border bg-border sm:grid-cols-4">
+        <SummaryMetric
+          label="Costo"
+          value={summary.metrics.cost}
+          format={formatCost}
+        />
+        <SummaryMetric label="Tokens" value={tokens} format={formatTokens} />
+        <SummaryMetric
+          label="Tiempo"
+          value={summary.elapsedMs}
+          format={formatDuration}
+        />
+        <SummaryMetric
+          label="Paralelismo"
+          value={summary.sessionSpeedup?.speedup ?? null}
+          format={formatSpeedup}
+        />
+      </dl>
 
-      <span aria-hidden>·</span>
-
-      <SummaryMetric
-        label="Costo"
-        value={summary.metrics.cost}
-        format={formatCost}
-      />
-      <SummaryMetric label="Tokens" value={tokens} format={formatTokens} />
-      <SummaryMetric
-        label="Tiempo"
-        value={summary.elapsedMs}
-        format={formatDuration}
-      />
-      <SummaryMetric
-        label="Paralelismo"
-        value={summary.sessionSpeedup?.speedup ?? null}
-        format={formatSpeedup}
-      />
+      <Container row align="center" space="none" className="min-w-0 flex-wrap gap-1.5">
+        {counters.map((counter) => (
+          <SummaryCounterBadge key={counter.status} counter={counter} />
+        ))}
+      </Container>
     </Container>
   );
 };

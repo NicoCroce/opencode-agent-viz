@@ -3,6 +3,7 @@ import {
   ChatPendingRequest,
   type TPermissionDecision,
 } from '@app/Application/Components/Molecules/ChatPendingRequest';
+import { DETAIL_LIST_ROW_CLASSNAME } from '@app/Application/Components/Molecules/DetailListRow';
 import type { TPermissionEntry } from '../Inspector.entity';
 
 interface PermissionRowProps {
@@ -42,16 +43,13 @@ export const PermissionRow = ({
         permission={permission}
         onReplyPermission={onReplyPermission}
         isPending={isPending}
-        className="border-b border-border py-1 last:border-b-0"
+        className={DETAIL_LIST_ROW_CLASSNAME}
       />
     );
   }
 
   return (
-    <Container
-      space="none"
-      className="border-b border-border py-1 last:border-b-0"
-    >
+    <Container space="none" className={DETAIL_LIST_ROW_CLASSNAME}>
       <span className="font-mono text-xs text-foreground">
         {permission.action}
       </span>

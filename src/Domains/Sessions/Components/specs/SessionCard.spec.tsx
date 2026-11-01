@@ -273,4 +273,54 @@ describe('SessionCard', () => {
     // Token de contraste ≥3:1 (ámbar de estado sobre la superficie oscura).
     expect(badge).toHaveClass('bg-status-waiting', 'text-surface-0');
   });
+
+  it('marks the selected card with the accent border and the soft ring', () => {
+    render(
+      <SessionCard
+        item={{ session, agentName: 'develop' }}
+        selected
+        onSelect={() => undefined}
+      />,
+    );
+    expect(screen.getByRole('button')).toHaveClass('border-accent', 'ring-glow');
+  });
+
+  it('keeps an unselected card transparent', () => {
+    render(
+      <SessionCard
+        item={{ session, agentName: 'develop' }}
+        selected={false}
+        onSelect={() => undefined}
+      />,
+    );
+    const card = screen.getByRole('button');
+    expect(card).toHaveClass('border-transparent', 'bg-transparent');
+    expect(card).not.toHaveClass('ring-glow');
+  });
+
+  it('lights the status dot only while the session is live', () => {
+    const { rerender } = render(
+      <SessionCard
+        item={{ session, agentName: 'develop' }}
+        status={{ type: 'busy' }}
+        selected={false}
+        onSelect={() => undefined}
+      />,
+    );
+    expect(screen.getByRole('img', { name: 'En curso' })).toHaveClass(
+      'glow-accent',
+    );
+
+    rerender(
+      <SessionCard
+        item={{ session, agentName: 'develop' }}
+        nodeStatus="succeeded"
+        selected={false}
+        onSelect={() => undefined}
+      />,
+    );
+    expect(screen.getByRole('img', { name: 'Terminada' })).not.toHaveClass(
+      'glow-accent',
+    );
+  });
 });

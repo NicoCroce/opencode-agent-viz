@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
+import { faChartLine } from '@fortawesome/free-solid-svg-icons';
 import {
   Button,
   Container,
@@ -7,6 +8,7 @@ import {
   EmptyState,
 } from '@app/Application/Components';
 import { GraphTruncationBanner } from '@app/Application/Components/Molecules';
+import { cn } from '@app/Application/lib/utils';
 import {
   AgentGraph,
   GraphSkeleton,
@@ -16,6 +18,22 @@ import {
 import { queryKeys } from '@app/Domains/queryKeys';
 import { SESSIONS_LIST_ROUTE } from '@app/Domains/Sessions';
 import type { TSessionSummary } from '@app/Domains/Inspector';
+// Ruta directa (no el barrel): los specs del workspace mockean el barrel de
+// Graph con una lista fija de exports.
+import { useGraphViewMode } from '@app/Domains/Graph/Hooks/useGraphViewMode';
+import { useGraphPaneHeadline } from '../Hooks/useGraphPaneHeadline';
+import {
+  HEADLINE_TONE,
+  type THeadlineTone,
+} from '../lib/workspaceHeadline';
+
+/** Color del eyebrow según el estado global de la sesión. */
+const HEADLINE_TONE_CLASS: Record<THeadlineTone, string> = {
+  [HEADLINE_TONE.RUNNING]: 'text-accent',
+  [HEADLINE_TONE.WAITING]: 'text-status-waiting',
+  [HEADLINE_TONE.ERROR]: 'text-status-error',
+  [HEADLINE_TONE.IDLE]: 'text-muted-foreground',
+};
 
 /**
  * Forma mínima del resultado cacheado de raíces (`sessions.roots`) que necesita
@@ -46,10 +64,22 @@ interface GraphPaneProps {
    * `AgentGraph` para el realce por contexto, sin tocar `data` ni re-layoutar.
    */
   attentionNodeIds?: ReadonlySet<string>;
+  /**
+   * Abre el panel de eficiencia con el **disparador real** (contrato overlay
+   * §1): el overlay guarda la referencia para devolverle el foco al cerrar
+   * (FR-005). Opcional para no romper consumos/tests que solo miran el grafo.
+   */
+  onOpenEfficiency?: (trigger: HTMLElement) => void;
+  /**
+   * Presentación móvil: el botón `Eficiencia` queda en solo icono y su
+   * `aria-label` aporta el nombre accesible (contrato overlay §1).
+   */
+  isMobile?: boolean;
 }
 
 /**
- * Panel del grafo: cabecera (contador de agentes + resumen + botón seguir) y
+ * Panel del grafo: cabecera (eyebrow de estado + título de la sesión, botones
+ * eficiencia/seguir y, debajo, la tira de métricas con los chips de estado) y
  * cuerpo con el orden de estados obligatorio **error → carga → no encontrada →
  * vacío → datos** (FR-004/FR-005/FR-008, Principio VI).
  *
@@ -79,6 +109,8 @@ export const GraphPane = ({
   onOpenHistory,
   rootId,
   attentionNodeIds,
+  onOpenEfficiency,
+  isMobile = false,
 }: GraphPaneProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -109,34 +141,98 @@ export const GraphPane = ({
   // El corte del subárbol (`graph.truncated`) ya está acotado por construcción a
   // la sesión abierta; se suma el del listado de su propio directorio.
   const isTruncated = graph.truncated || rootsTruncated;
+  const headline = useGraphPaneHeadline(graph.graph.nodes, rootId, summary);
+  const view = useGraphViewMode();
 
   return (
     <Container space="none" className="h-full min-h-0 min-w-0">
       <Container
-        row
-        space="small"
-        justify="between"
-        align="center"
-        className="min-w-0 shrink-0 border-b border-border px-3 py-2"
+        space="none"
+        className="min-w-0 shrink-0 gap-3 px-3 pt-3 sm:px-5 sm:pt-4"
       >
-        <Container row space="small" align="center" className="min-w-0">
-          <span className="shrink-0 font-mono text-xs text-muted-foreground">
-            {graph.graph.nodes.length} agentes
-          </span>
-          {summary ? <SessionSummaryBar summary={summary} /> : null}
-        </Container>
-        <Button
-          variant="outline"
-          onClick={follow.toggle}
-          aria-pressed={follow.enabled}
+        <Container
+          row
+          align="end"
+          justify="between"
+          space="none"
+          className="min-w-0 flex-wrap gap-x-4 gap-y-2"
         >
-          {follow.enabled ? 'Siguiendo' : 'Seguir'}
-        </Button>
+          <Container space="none" className="min-w-0 gap-1">
+            {/*
+              Eyebrow: estado global + nº de agentes (en versalitas por CSS; el
+              texto conserva su forma "N agentes", que leen los specs).
+            */}
+            <span
+              className={cn(
+                'font-mono text-[11px] uppercase tracking-[0.14em]',
+                HEADLINE_TONE_CLASS[headline.tone],
+              )}
+            >
+              {headline.statusLabel ? (
+                <>
+                  {headline.statusLabel}
+                  <span aria-hidden> · </span>
+                </>
+              ) : null}
+              <span>{headline.agentCount} agentes</span>
+            </span>
+            {headline.title ? (
+              <h2
+                className={cn(
+                  'm-0 truncate font-display font-medium tracking-[-0.01em] text-foreground',
+                  isMobile ? 'text-base' : 'text-2xl',
+                )}
+                title={headline.title}
+              >
+                {headline.title}
+              </h2>
+            ) : null}
+          </Container>
+          <Container row space="small" align="center" className="shrink-0">
+            {/*
+              Entrada al análisis de eficiencia (contrato overlay §1): solo con al
+              menos un nodo, porque sin sesión no hay nada que analizar. Va
+              **antes** de `Seguir` para no desplazar el control existente y en
+              móvil se reduce a icono con nombre accesible.
+            */}
+            {graph.graph.nodes.length > 0 ? (
+              <Button
+                variant="default"
+                icon={faChartLine}
+                showIcon
+                aria-haspopup="dialog"
+                aria-label={isMobile ? 'Abrir análisis de eficiencia' : undefined}
+                onClick={(event) => onOpenEfficiency?.(event.currentTarget)}
+              >
+                {isMobile ? null : 'Eficiencia'}
+              </Button>
+            ) : null}
+            <Button
+              variant="outline"
+              onClick={follow.toggle}
+              aria-pressed={follow.enabled}
+              className={cn(
+                follow.enabled && 'border-accent/50 bg-accent/10 text-accent',
+              )}
+            >
+              {follow.enabled ? 'Siguiendo' : 'Seguir'}
+            </Button>
+          </Container>
+        </Container>
+        {summary ? <SessionSummaryBar summary={summary} /> : null}
       </Container>
       {isTruncated ? (
-        <GraphTruncationBanner className="shrink-0 rounded-none border-x-0 border-t-0" />
+        <GraphTruncationBanner className="mx-3 mt-3 w-auto shrink-0 sm:mx-5" />
       ) : null}
-      <Container block className="min-h-0 min-w-0 flex-1">
+      {/*
+        Lienzo en un panel redondeado y bordeado (retícula de puntos ya
+        tematizada por `AgentGraph`, que también da a los controles de zoom la
+        receta de botón-icono).
+      */}
+      <Container
+        block
+        className="relative mx-3 mb-3 mt-3 min-h-0 min-w-0 flex-1 overflow-hidden rounded-xl border border-border bg-surface-0 sm:mx-5 sm:mb-5 sm:mt-3.5"
+      >
         {/*
           Orden de estados del contrato de subárbol §4, sin excepción:
           error → carga acotada → no encontrada → vacío → datos. "No encontrada"
@@ -178,6 +274,8 @@ export const GraphPane = ({
             followNodeId={follow.followNodeId}
             resetKey={rootId}
             attentionNodeIds={attentionNodeIds}
+            viewMode={view.mode}
+            onViewModeChange={view.setMode}
           />
         )}
       </Container>

@@ -1,9 +1,8 @@
 import { Container } from '@app/Application/Components';
-import { SectionHeading } from '@app/Application/Components/Molecules';
-import { folderName } from '@app/Application/Helpers';
 import type { TSessionStatus } from '../Session.entity';
 import type { TSessionGroup } from '../Hooks/useRootSessions';
 import { SessionCard } from './SessionCard';
+import { SessionGroupHeading } from './SessionGroupHeading';
 
 interface SessionListProps {
   groups: TSessionGroup[];
@@ -25,6 +24,10 @@ interface SessionListProps {
   attentionByRoot?: Record<string, number>;
 }
 
+/**
+ * Listado de sesiones en tarjetas: rail del espacio de trabajo y presentación
+ * móvil de la página. Agrupa por proyecto con `SessionGroupHeading`.
+ */
 export const SessionList = ({
   groups,
   statuses,
@@ -35,44 +38,27 @@ export const SessionList = ({
   attentionByRoot,
 }: SessionListProps) => (
   <Container space="medium" className={className}>
-    {groups.map((group) => {
-      const count = group.items.length;
-      const countLabel = `${count} ${count === 1 ? 'sesión' : 'sesiones'}`;
-
-      return (
-        <Container key={group.directory || 'sin-carpeta'} space="small">
-          <SectionHeading
-            className="flex items-center gap-1.5"
-            title={group.directory}
-          >
-            <span aria-hidden className="text-accent">
-              #
-            </span>
-            <span className="truncate">{folderName(group.directory)}</span>
-            {showCount ? (
-              <span
-                className="shrink-0 font-mono tabular-nums text-muted-foreground"
-                aria-label={countLabel}
-              >
-                {count}
-                <span className="sr-only"> {countLabel}</span>
-              </span>
-            ) : null}
-          </SectionHeading>
-          <Container space="small">
-            {group.items.map((item) => (
-              <SessionCard
-                key={item.session.id}
-                item={item}
-                status={statuses?.[item.session.id]}
-                attentionCount={attentionByRoot?.[item.session.id] ?? 0}
-                selected={item.session.id === selectedId}
-                onSelect={onSelect}
-              />
-            ))}
-          </Container>
+    {groups.map((group) => (
+      <Container key={group.directory || 'sin-carpeta'} space="small">
+        <SessionGroupHeading
+          directory={group.directory}
+          count={group.items.length}
+          showCount={showCount}
+          className="px-1 pt-1"
+        />
+        <Container space="small">
+          {group.items.map((item) => (
+            <SessionCard
+              key={item.session.id}
+              item={item}
+              status={statuses?.[item.session.id]}
+              attentionCount={attentionByRoot?.[item.session.id] ?? 0}
+              selected={item.session.id === selectedId}
+              onSelect={onSelect}
+            />
+          ))}
         </Container>
-      );
-    })}
+      </Container>
+    ))}
   </Container>
 );

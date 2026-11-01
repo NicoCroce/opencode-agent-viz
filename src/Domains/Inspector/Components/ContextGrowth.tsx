@@ -1,4 +1,8 @@
 import { Container } from '@app/Application/Components';
+import {
+  SECTION_CARD_CLASSNAME,
+  SectionHeading,
+} from '@app/Application/Components/Molecules';
 import { formatTokens } from '@app/Application/Helpers';
 import { prefersReducedMotion } from '@app/Application/Helpers/prefersReducedMotion';
 import { cn } from '@app/Application/lib/utils';
@@ -70,10 +74,12 @@ export const ContextGrowth = ({
 
   if (points.length === 1) {
     return (
-      <Container space="small" data-testid="context-growth">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-          Evolución del contexto
-        </span>
+      <Container
+        space="small"
+        data-testid="context-growth"
+        className={SECTION_CARD_CLASSNAME}
+      >
+        <SectionHeading>Evolución del contexto</SectionHeading>
         <span
           role="img"
           aria-label={summary}
@@ -89,10 +95,12 @@ export const ContextGrowth = ({
   const reduceMotion = prefersReducedMotion();
 
   return (
-    <Container space="small" data-testid="context-growth">
-      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        Evolución del contexto
-      </span>
+    <Container
+      space="small"
+      data-testid="context-growth"
+      className={SECTION_CARD_CLASSNAME}
+    >
+      <SectionHeading>Evolución del contexto</SectionHeading>
       <svg
         role="img"
         aria-label={summary}

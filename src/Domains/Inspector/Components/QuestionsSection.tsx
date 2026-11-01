@@ -3,6 +3,10 @@ import {
   EmptyScreenError,
   Skeleton,
 } from '@app/Application/Components';
+import {
+  DETAIL_LIST_CLASSNAME,
+  SectionHeading,
+} from '@app/Application/Components/Molecules';
 import type {
   TChatFormAnswer,
   TPermissionDecision,
@@ -73,9 +77,7 @@ export const QuestionsSection = ({
 
   return (
     <Container space="small">
-      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        Preguntas y permisos
-      </span>
+      <SectionHeading>Preguntas y permisos</SectionHeading>
 
       {isError ? <EmptyScreenError /> : null}
 
@@ -94,10 +96,10 @@ export const QuestionsSection = ({
         <Container space="small">
           {permissions.length > 0 ? (
             <Container space="small">
-              <span className="text-[11px] font-medium text-muted-foreground">
+              <span className="text-xs font-medium text-muted-foreground">
                 Permisos
               </span>
-              <Container space="none">
+              <Container space="none" className={DETAIL_LIST_CLASSNAME}>
                 {permissions.map((permission) => (
                   <PermissionRow
                     key={permission.id}
@@ -118,10 +120,10 @@ export const QuestionsSection = ({
 
           {questions.length > 0 ? (
             <Container space="small">
-              <span className="text-[11px] font-medium text-muted-foreground">
+              <span className="text-xs font-medium text-muted-foreground">
                 Preguntas
               </span>
-              <Container space="none">
+              <Container space="none" className={DETAIL_LIST_CLASSNAME}>
                 {questions.map((question) => (
                   <QuestionRow
                     key={question.id}
@@ -139,7 +141,7 @@ export const QuestionsSection = ({
             </Container>
           ) : null}
 
-          <span className="text-[11px] text-muted-foreground">
+          <span className="font-mono text-[11px] text-muted-foreground">
             Turnos en cola: {queuedTurns}
           </span>
         </Container>

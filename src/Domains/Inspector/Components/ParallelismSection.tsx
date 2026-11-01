@@ -1,6 +1,7 @@
 import { Container } from '@app/Application/Components';
 import {
   DetailRow,
+  SECTION_CARD_CLASSNAME,
   SectionHeading,
 } from '@app/Application/Components/Molecules';
 import {
@@ -26,17 +27,21 @@ export const ParallelismSection = ({ speedup }: ParallelismSectionProps) => {
   if (!speedup || speedup.speedup === null) return null;
 
   return (
-    <Container space="small" data-testid="parallelism-section">
+    <Container
+      space="small"
+      data-testid="parallelism-section"
+      className={SECTION_CARD_CLASSNAME}
+    >
       <Container row align="baseline" justify="between" space="small">
         <SectionHeading>Paralelismo</SectionHeading>
         {speedup.provisional ? (
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-status-idle">
             provisional
           </span>
         ) : null}
       </Container>
 
-      <Container space="none" className="gap-0.5">
+      <Container space="none" className="gap-1.5!">
         <DetailRow label="Agentes en paralelo" value={speedup.size} />
         <DetailRow
           label="Tiempo en serie"
