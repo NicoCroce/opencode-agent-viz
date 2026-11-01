@@ -93,7 +93,7 @@ export const SessionCard = ({
         aria-current={selected}
         className={cn(
           'group relative flex min-h-[96px] w-full min-w-0 flex-col gap-2.5 rounded-xl border p-3.5 text-left transition-[background-color,border-color,box-shadow] duration-150',
-          featured && 'md:col-span-2 xl:col-span-2',
+          featured && 'md:col-span-2',
           selected
             ? 'border-signal/40 bg-surface-2/80 shadow-[0_0_0_1px_hsl(var(--signal)/0.12)]'
             : featured

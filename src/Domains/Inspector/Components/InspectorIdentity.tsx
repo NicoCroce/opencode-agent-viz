@@ -22,7 +22,12 @@ export const InspectorIdentity = ({
       {node.data.title ?? node.data.agentName}
     </h2>
 
-    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+    <Container
+      row
+      align="center"
+      space="none"
+      className="min-w-0 flex-wrap gap-1.5"
+    >
       <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-border/70 bg-surface-1/70 px-2 py-0.5">
         <StatusDot status={node.data.status} />
         <span className="min-w-0 truncate font-mono text-[10px] text-foreground/80">
@@ -32,7 +37,7 @@ export const InspectorIdentity = ({
       <span className="rounded-full border border-border/60 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
         {NODE_STATUS_LABEL[node.data.status]}
       </span>
-    </div>
+    </Container>
 
     <span
       className="flex min-w-0 items-center gap-1 font-mono text-[10px] text-muted-foreground/80"

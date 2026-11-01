@@ -49,7 +49,7 @@ export const Page = ({
         align={isMobile ? 'start' : 'center'}
         className={clsx('mx-auto w-full border-b border-border/50 pb-4', small)}
       >
-        <div className="flex min-w-0 flex-col gap-1">
+        <Container space="none" className="min-w-0 gap-1">
           <Title variant="h1">{title}</Title>
           {description ? (
             <p className="flex items-start gap-2 text-[13px] leading-relaxed text-muted-foreground">
@@ -60,7 +60,7 @@ export const Page = ({
               {description}
             </p>
           ) : null}
-        </div>
+        </Container>
         {headerRight && (
           <Container className="self-end">{headerRight}</Container>
         )}

@@ -38,9 +38,27 @@ export const SessionList = ({
       const count = group.items.length;
       const countLabel = `${count} ${count === 1 ? 'sesión' : 'sesiones'}`;
 
+      const cards = group.items.map((item) => {
+        const status = statuses?.[item.session.id];
+        const isLive = status?.type === 'busy' || status?.type === 'retry';
+
+        return (
+          <SessionCard
+            key={item.session.id}
+            item={item}
+            status={status}
+            attentionCount={attentionByRoot?.[item.session.id] ?? 0}
+            layout={showCount ? 'card' : 'row'}
+            featured={showCount && isLive}
+            selected={item.session.id === selectedId}
+            onSelect={onSelect}
+          />
+        );
+      });
+
       return (
         <Container key={group.directory || 'sin-carpeta'} space="small">
-          <div className="flex items-center gap-2 pb-1.5">
+          <Container row align="center" space="small" className="pb-1.5">
             <span aria-hidden className="font-mono text-[11px] text-signal/80">
               #
             </span>
@@ -60,35 +78,16 @@ export const SessionList = ({
               </span>
             ) : null}
             <span aria-hidden className="h-px flex-1 bg-border/50" />
-          </div>
-          <Container space="none" className="gap-1.5">
-            <div
-              className={
-                showCount
-                  ? 'grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3'
-                  : 'flex flex-col gap-0.5'
-              }
-            >
-              {group.items.map((item) => {
-                const status = statuses?.[item.session.id];
-                const isLive =
-                  status?.type === 'busy' || status?.type === 'retry';
-
-                return (
-                  <SessionCard
-                    key={item.session.id}
-                    item={item}
-                    status={status}
-                    attentionCount={attentionByRoot?.[item.session.id] ?? 0}
-                    layout={showCount ? 'card' : 'row'}
-                    featured={showCount && isLive}
-                    selected={item.session.id === selectedId}
-                    onSelect={onSelect}
-                  />
-                );
-              })}
-            </div>
           </Container>
+          {showCount ? (
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {cards}
+            </div>
+          ) : (
+            <Container space="none" className="gap-0.5">
+              {cards}
+            </Container>
+          )}
         </Container>
       );
     })}

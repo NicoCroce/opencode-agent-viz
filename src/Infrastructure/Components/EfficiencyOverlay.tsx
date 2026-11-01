@@ -222,9 +222,7 @@ export const EfficiencyOverlay = ({
               space="none"
               className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-6"
             >
-              <div className="mx-auto w-full max-w-6xl flex-wrap">
-                {renderBody()}
-              </div>
+              <div className="mx-auto w-full max-w-6xl">{renderBody()}</div>
             </Container>
           </Container>
         </DialogPrimitive.Content>

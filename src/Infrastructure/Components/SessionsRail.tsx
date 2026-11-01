@@ -50,7 +50,13 @@ export const SessionsRail = ({
 
   return (
     <Container space="none" className="h-full">
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/50 px-4 py-3">
+      <Container
+        row
+        align="center"
+        justify="between"
+        space="small"
+        className="shrink-0 border-b border-border/50 px-4 py-3"
+      >
         <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
           Sesiones
         </span>
@@ -60,7 +66,7 @@ export const SessionsRail = ({
         >
           {total}
         </span>
-      </div>
+      </Container>
       <div className="min-h-0 flex-1 overflow-auto px-2 py-2">
         <Container space="none" className="gap-1">
           {isTruncated ? <GraphTruncationBanner /> : null}

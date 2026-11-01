@@ -49,17 +49,17 @@ export const AppShell = () => (
     className="relative h-full bg-transparent text-foreground"
   >
     <header className="relative z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border/70 bg-surface-0/70 px-4 backdrop-blur-xl">
-      <div className="flex min-w-0 items-center gap-3">
+      <Container row align="center" space="none" className="min-w-0 gap-3">
         <BrandMark />
-        <div className="flex min-w-0 items-baseline gap-2">
+        <Container row align="baseline" space="small" className="min-w-0">
           <span className="font-display text-[13px] font-semibold leading-none tracking-[-0.02em] text-foreground">
             agent viz
           </span>
           <span className="font-mono text-[9px] uppercase leading-none tracking-[0.22em] text-muted-foreground/80">
             opencode
           </span>
-        </div>
-      </div>
+        </Container>
+      </Container>
       <ConnectionBadge />
     </header>
 

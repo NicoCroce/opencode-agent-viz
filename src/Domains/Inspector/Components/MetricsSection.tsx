@@ -49,7 +49,13 @@ export const MetricsSection = ({ metrics }: MetricsSectionProps) => (
         label="Razonamiento"
         value={formatTokens(metrics.tokens?.reasoning ?? null)}
       />
-      <div className="col-span-3 flex min-w-0 items-center justify-between gap-3 rounded-lg border border-border/60 bg-surface-1/50 px-2.5 py-2">
+      <Container
+        row
+        align="center"
+        justify="between"
+        space="none"
+        className="col-span-3 min-w-0 gap-3 rounded-lg border border-border/60 bg-surface-1/50 px-2.5 py-2"
+      >
         <SectionHeading className="text-[9px] tracking-[0.14em]">
           Caché leída + escrita
         </SectionHeading>
@@ -61,7 +67,7 @@ export const MetricsSection = ({ metrics }: MetricsSectionProps) => (
               : null,
           )}
         </span>
-      </div>
+      </Container>
     </div>
     {metrics.hasLoop ? (
       <LoopBadge
